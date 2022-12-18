@@ -51,7 +51,7 @@ namespace SpaceEngineersOreRedistribution
             Point p = e.MouseDevice.GetPosition(BorderView);
             var dx = (p.X - _start.X);
             var dy = (p.Y - _start.Y);
-            Debug.WriteLine("Moved " + dx + ";" + dy);
+            //Debug.WriteLine("Moved " + dx + ";" + dy);
             Matrix m = ImageView.RenderTransform.Value;
             m.OffsetX = _origin.X + (p.X - _start.X);
             m.OffsetY = _origin.Y + (p.Y - _start.Y);
@@ -70,7 +70,7 @@ namespace SpaceEngineersOreRedistribution
             if (BorderView.IsMouseCaptured) return;
             BorderView.CaptureMouse();
             _moved = false;
-            Debug.WriteLine("Down, Mouse captured");
+            //Debug.WriteLine("Down, Mouse captured");
             _start = e.GetPosition(BorderView);
             _origin.X = ImageView.RenderTransform.Value.OffsetX;
             _origin.Y = ImageView.RenderTransform.Value.OffsetY;

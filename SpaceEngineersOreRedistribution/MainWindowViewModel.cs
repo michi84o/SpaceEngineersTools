@@ -103,33 +103,21 @@ namespace SpaceEngineersOreRedistribution
                 var definitions = root.Elements("Definition");
                 foreach (var definition in definitions)
                 {
-
                     string xsiTypeValue = definition.Attribute(xsi + "type")?.Value;
                     if (xsiTypeValue != "PlanetGeneratorDefinition") continue;
-                    var id = definition.Element("Id")?.Element("SubtypeId")?.Value;
-                    if (id == null) continue;
-                    var def = new PlanetDefinition();
-                    def.Name = id;
-                    PlanetDefinitions.Add(def);
-                    var oreMappings = definition.Element("OreMappings");
-                    if (oreMappings == null) continue;
-                    foreach (var oreMapping in oreMappings.Elements("Ore"))
+                    ReadPlanetDefinition(definition);
+                }
+                // Pertam & Triton use different format
+                var defs = root.Elements("PlanetGeneratorDefinitions");
+                foreach (var def in defs)
+                {
+                    var subDefs = def.Elements("PlanetGeneratorDefinition");
+                    foreach (var subDef in subDefs)
                     {
-                        try
-                        {
-                            var ore = new OreMapping();
-                            ore.Value = int.Parse(oreMapping.Attribute("Value")?.Value);
-                            ore.Type = oreMapping.Attribute("Type")?.Value;
-                            ore.Start = int.Parse(oreMapping.Attribute("Start")?.Value);
-                            ore.Depth = int.Parse(oreMapping.Attribute("Depth")?.Value);
-                            // optional:
-                            ore.TargetColor = oreMapping.Attribute("TargetColor")?.Value;
-                            ore.ColorInfluence = oreMapping.Attribute("ColorInfluence")?.Value;
-                            def.OreMappings.Add(ore);
-                        }
-                        catch { continue; }
+                        ReadPlanetDefinition(subDef);
                     }
                 }
+
             }
             catch (Exception e)
             {
@@ -137,6 +125,34 @@ namespace SpaceEngineersOreRedistribution
                 return;
             }
         }
+        bool ReadPlanetDefinition(XElement definition)
+        {
+            var id = definition.Element("Id")?.Element("SubtypeId")?.Value;
+            if (id == null) return false;
+            var def = new PlanetDefinition();
+            def.Name = id;
+            PlanetDefinitions.Add(def);
+            var oreMappings = definition.Element("OreMappings");
+            if (oreMappings == null) return false;
+            foreach (var oreMapping in oreMappings.Elements("Ore"))
+            {
+                try
+                {
+                    var ore = new OreMapping();
+                    ore.Value = int.Parse(oreMapping.Attribute("Value")?.Value);
+                    ore.Type = oreMapping.Attribute("Type")?.Value;
+                    ore.Start = int.Parse(oreMapping.Attribute("Start")?.Value);
+                    ore.Depth = int.Parse(oreMapping.Attribute("Depth")?.Value);
+                    // optional:
+                    ore.TargetColor = oreMapping.Attribute("TargetColor")?.Value;
+                    ore.ColorInfluence = oreMapping.Attribute("ColorInfluence")?.Value;
+                    def.OreMappings.Add(ore);
+                }
+                catch { return false; }
+            }
+            return true;
+        }
+
 
         BitmapImage _tileUp;
         public BitmapImage TileUp
