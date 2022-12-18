@@ -26,6 +26,7 @@
                 Header="File">
                 <MenuItem Header="Open Planet Definition" Command="{Binding OpenPlanetDefinitionCommand}" />
             </MenuItem>
+            <MenuItem Header="Noise Map Generator" Command="{Binding NoiseMapGeneratorCommand}"/>
         </Menu>
         <GroupBox
             Grid.Row="1" Grid.Column="0" MinWidth="150" Header="Planets" Margin="3">
@@ -67,28 +68,16 @@
         </GroupBox>
         <GroupBox
             Grid.Row="1" Grid.Column="3" Grid.RowSpan="2" Header="Map" Margin="3">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition/>
-                </Grid.RowDefinitions>
-                <Grid Grid.Row="0">
-                    <StackPanel Orientation="Horizontal" >
-                        <Button Width="50" Content="Back" Margin="3" Command="{Binding ImageCommand}" CommandParameter="back" />
-                        <Button Width="50" Content="Front" Margin="3" Command="{Binding ImageCommand}" CommandParameter="front"/>
-                        <Button Width="50" Content="Left" Margin="3" Command="{Binding ImageCommand}" CommandParameter="left"/>
-                        <Button Width="50" Content="Right" Margin="3" Command="{Binding ImageCommand}" CommandParameter="right"/>
-                        <Button Width="50" Content="Up" Margin="3" Command="{Binding ImageCommand}" CommandParameter="up" />
-                        <Button Width="50" Content="Down" Margin="3" Command="{Binding ImageCommand}" CommandParameter="down" />
-                        <TextBlock Text="Current Tile: " VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding CurrentImage}" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Grid>
-                <Border
-                    Grid.Row="1" x:Name="BorderView" ClipToBounds="True" Background="Gray">
-                    <Image x:Name="ImageView" Source="{Binding Image}"  />
-                </Border>
-            </Grid>
+            <Border Margin="3" x:Name="BorderView" ClipToBounds="True" Background="Gray">
+                <Canvas x:Name="ImageView" Width="8192" Height="6144" Background="DarkGray">
+                    <Image Width="2048" Height="2048" Canvas.Left="0" Canvas.Top="0" Source="{Binding TileUp}" />
+                    <Image Width="2048" Height="2048" Canvas.Left="0" Canvas.Top="2048" Source="{Binding TileFront}"/>
+                    <Image Width="2048" Height="2048" Canvas.Left="2048" Canvas.Top="2048" Source="{Binding TileRight}" />
+                    <Image Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="2048" Source="{Binding TileBack}"/>
+                    <Image Width="2048" Height="2048" Canvas.Left="6144" Canvas.Top="2048" Source="{Binding TileLeft}"/>
+                    <Image Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="4096" Source="{Binding TileDown}"/>
+                </Canvas>
+            </Border>
         </GroupBox>
     </Grid>
 </Window>

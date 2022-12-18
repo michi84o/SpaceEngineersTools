@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing.Imaging;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -73,6 +74,9 @@ namespace SpaceEngineersOreRedistribution
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             ViewModel.OpenPlanetDefinition(@"C:\Users\Michael\AppData\Roaming\SpaceEngineers\Mods\OreRedistribution\Data\PlanetDataFiles\PlanetGeneratorDefinitions.sbc");
+
+
+
         }
     }
 }

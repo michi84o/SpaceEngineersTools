@@ -30,7 +30,7 @@ namespace SpaceEngineersOreRedistribution
                 OreTypes.Clear();
                 if (value == null)
                 {
-                    UpdateImage();
+                    UpdateImages();
                     return;
                 }
                 HashSet<string> types = new();
@@ -53,7 +53,7 @@ namespace SpaceEngineersOreRedistribution
                 OreMappings.Clear();
                 if (value == null || SelectedPlanetDefinition == null)
                 {
-                    UpdateImage();
+                    UpdateImages();
                     return;
                 }
                 var mappings = SelectedPlanetDefinition.OreMappings.Where(x => x.Type == value);
@@ -61,7 +61,7 @@ namespace SpaceEngineersOreRedistribution
                 {
                     OreMappings.Add(mapping);
                 }
-                UpdateImage();
+                UpdateImages();
             }
         }
         public ObservableCollection<OreMapping> OreMappings { get; } = new();
@@ -79,22 +79,17 @@ namespace SpaceEngineersOreRedistribution
 
         string _lastOpenedFile;
 
-        string _currentImage = "front";
-        public string CurrentImage
-        {
-            get => _currentImage;
-            set
-            {
-                if (!SetProp(ref _currentImage, value)) return;
-                UpdateImage();
-            }
-        }
-
         public void OpenPlanetDefinition(string file)
         {
             _lastOpenedFile = file;
             PlanetDefinitions.Clear();
-            Image = null;
+            TileUp = null;
+            TileFront = null;
+            TileRight = null;
+            TileBack = null;
+            TileLeft = null;
+            TileDown = null;
+
             try
             {
                 XNamespace xsi = "http://www.w3.org/2001/XMLSchema-instance";
@@ -143,11 +138,43 @@ namespace SpaceEngineersOreRedistribution
             }
         }
 
-        BitmapImage _image;
-        public BitmapImage Image
+        BitmapImage _tileUp;
+        public BitmapImage TileUp
         {
-            get => _image;
-            set => SetProp(ref _image, value);
+            get => _tileUp;
+            set => SetProp(ref _tileUp, value);
+        }
+
+        BitmapImage _tileFront;
+        public BitmapImage TileFront
+        {
+            get => _tileFront;
+            set => SetProp(ref _tileFront, value);
+        }
+
+        BitmapImage _tileRight;
+        public BitmapImage TileRight
+        {
+            get => _tileRight;
+            set => SetProp(ref _tileRight, value);
+        }
+        BitmapImage _tileBack;
+        public BitmapImage TileBack
+        {
+            get => _tileBack;
+            set => SetProp(ref _tileBack, value);
+        }
+        BitmapImage _tileLeft;
+        public BitmapImage TileLeft
+        {
+            get => _tileLeft;
+            set => SetProp(ref _tileLeft, value);
+        }
+        BitmapImage _tileDown;
+        public BitmapImage TileDown
+        {
+            get => _tileDown;
+            set => SetProp(ref _tileDown, value);
         }
 
         void ClearImages()
@@ -159,23 +186,41 @@ namespace SpaceEngineersOreRedistribution
             _images.Clear();
         }
 
-        void UpdateImage()
+        void UpdateImages()
         {
-            Image = null;
-            if (SelectedPlanetDefinition == null) return;
-            if (!_images.TryGetValue(_currentImage, out var value)) return;
-            if (value == null) return;
+            TileUp = null;
+            TileFront = null;
+            TileRight = null;
+            TileBack = null;
+            TileLeft = null;
+            TileDown = null;
 
-            List<OreMapping> oreMappings = null;
-
-            if (SelectedOreType != null && OreMappings != null && OreMappings.Count > 0)
+            var keys = _images.Keys;
+            foreach (var key in keys)
             {
-                oreMappings = OreMappings.ToList();
+                if (SelectedPlanetDefinition == null) return;
+                if (!_images.TryGetValue(key, out var value)) return;
+                if (value == null) return;
+
+                List<OreMapping> oreMappings = null;
+
+                if (SelectedOreType != null && OreMappings != null && OreMappings.Count > 0)
+                {
+                    oreMappings = OreMappings.ToList();
+                }
+                using var b = value.FilterForOre(oreMappings);
+                var img = ImageData.FromBitmap(b);
+
+                switch (key)
+                {
+                    case "back": TileBack = img; break;
+                    case "down": TileDown = img; break;
+                    case "front": TileFront = img; break;
+                    case "left": TileLeft = img; break;
+                    case "right": TileRight = img; break;
+                    case "up": TileUp = img; break;
+                }
             }
-            using var b = value.FilterForOre(oreMappings);
-
-
-            Image = ImageData.FromBitmap(b);
         }
 
         void LoadImages()
@@ -187,7 +232,7 @@ namespace SpaceEngineersOreRedistribution
             _images["left"] = GetInfo("left_mat.png");
             _images["right"] = GetInfo("right_mat.png");
             _images["up"] = GetInfo("up_mat.png");
-            UpdateImage();
+            UpdateImages();
         }
 
         ImageData GetInfo(string pngName)
@@ -202,10 +247,10 @@ namespace SpaceEngineersOreRedistribution
 
         Dictionary<string, ImageData> _images = new();
 
-        public ICommand ImageCommand => new RelayCommand(o =>
+        public ICommand NoiseMapGeneratorCommand => new RelayCommand(o =>
         {
-            if (o is string s)
-                CurrentImage = s;
+            var ng = new NoiseGeneratorView();
+            ng.Show();
         });
 
     }
