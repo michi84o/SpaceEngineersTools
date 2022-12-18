@@ -1,5 +1,9 @@
 # SpaceEngineersTools
 
-SpaceEngineersOreRedistribution:
+## SpaceEngineersOreRedistribution:
 This is a viewer for the planet definition files, specifically ore.
-Later this tool will be able to randomize ore distribution on planets.
+My later goal is to randomize ore distribution on planets.
+
+Ignore the noise generator stuff. Thats just an experiment.
+
+![Screenshot of viewer](Screenshots/SE_Ore.png)
