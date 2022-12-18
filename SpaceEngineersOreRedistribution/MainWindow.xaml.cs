@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing.Imaging;
 using System.Linq;
 using System.Text;
@@ -30,16 +31,27 @@ namespace SpaceEngineersOreRedistribution
 
             Loaded += MainWindow_Loaded;
 
-            BorderView.MouseWheel += ImageView_MouseWheel;
-            ImageView.MouseLeftButtonDown += ImageView_MouseLeftButtonDown; ;
-            ImageView.MouseLeftButtonUp += ImageView_MouseLeftButtonUp; ;
-            ImageView.MouseMove += ImageView_MouseMove; ;
+            ImageView.MouseWheel += ImageView_MouseWheel;
+            BorderView.MouseLeftButtonDown += ImageView_MouseLeftButtonDown; ;
+            BorderView.MouseLeftButtonUp += ImageView_MouseLeftButtonUp; ;
+            BorderView.MouseMove += ImageView_MouseMove; ;
         }
 
+        bool _moved = false;
         private void ImageView_MouseMove(object sender, MouseEventArgs e)
         {
-            if (!ImageView.IsMouseCaptured) return;
+            if (!BorderView.IsMouseCaptured) { return; }
+            if (!_moved)
+            {
+                // For some reason we get a mouse moved event uppon first mouse_down.
+                // Ignore this or image will jump
+                _moved = true;
+                return;
+            }
             Point p = e.MouseDevice.GetPosition(BorderView);
+            var dx = (p.X - _start.X);
+            var dy = (p.Y - _start.Y);
+            Debug.WriteLine("Moved " + dx + ";" + dy);
             Matrix m = ImageView.RenderTransform.Value;
             m.OffsetX = _origin.X + (p.X - _start.X);
             m.OffsetY = _origin.Y + (p.Y - _start.Y);
@@ -48,13 +60,17 @@ namespace SpaceEngineersOreRedistribution
 
         private void ImageView_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            ImageView.ReleaseMouseCapture();
+            BorderView.ReleaseMouseCapture();
+            Debug.WriteLine("Mouse capture released");
+            _moved = false;
         }
 
         private void ImageView_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (ImageView.IsMouseCaptured) return;
-            ImageView.CaptureMouse();
+            if (BorderView.IsMouseCaptured) return;
+            BorderView.CaptureMouse();
+            _moved = false;
+            Debug.WriteLine("Down, Mouse captured");
             _start = e.GetPosition(BorderView);
             _origin.X = ImageView.RenderTransform.Value.OffsetX;
             _origin.Y = ImageView.RenderTransform.Value.OffsetY;
@@ -73,10 +89,9 @@ namespace SpaceEngineersOreRedistribution
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+#if DEBUG
             ViewModel.OpenPlanetDefinition(@"C:\Users\Michael\AppData\Roaming\SpaceEngineers\Mods\OreRedistribution\Data\PlanetDataFiles\PlanetGeneratorDefinitions.sbc");
-
-
-
+#endif
         }
     }
 }

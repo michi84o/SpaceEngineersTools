@@ -17,7 +17,7 @@ namespace SpaceEngineersOreRedistribution
             set => SetProp(ref _seed, value);
         }
 
-        int _octaves;
+        int _octaves = 8;
         public int Octaves
         {
             get => _octaves;
