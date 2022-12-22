@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.2.32630.192
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NoiseTest", "NoiseTest.csproj", "{6860C989-E236-467E-BF3F-6055A36FC5F6}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6860C989-E236-467E-BF3F-6055A36FC5F6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6860C989-E236-467E-BF3F-6055A36FC5F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6860C989-E236-467E-BF3F-6055A36FC5F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6860C989-E236-467E-BF3F-6055A36FC5F6}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {01EA5D5E-1C32-4D79-B19D-336114FB9A05}
+	EndGlobalSection
+EndGlobal
