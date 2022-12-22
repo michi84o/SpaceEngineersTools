@@ -90,14 +90,11 @@ namespace NoiseTest
                 }
             }
 
-            //var pval = (byte)value * 256;
-            //lockBmap.SetPixel(x, y, Color.FromArgb(pval, pval, pval));
-
-            //System.Diagnostics.Debug.WriteLine(max);
-            //System.Diagnostics.Debug.WriteLine(min);
-
             lockBmap.UnlockBits();
             MyImage.Source = FromBitmap(bmap);
+
+            bmap.Save("noise.png", ImageFormat.Png);
+
             bmap.Dispose();
         }
 
@@ -183,7 +180,8 @@ namespace NoiseTest
             }
             catch (Exception ex)
             {
-                throw ex;
+                System.Diagnostics.Debug.WriteLine(ex.Message);
+                throw;
             }
         }
 

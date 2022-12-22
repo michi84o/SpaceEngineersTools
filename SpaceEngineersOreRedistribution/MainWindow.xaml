@@ -27,6 +27,10 @@
                 <MenuItem Header="Open Planet Definition" Command="{Binding OpenPlanetDefinitionCommand}" />
             </MenuItem>
             <MenuItem Header="Noise Map Generator" Command="{Binding NoiseMapGeneratorCommand}"/>
+            <MenuItem Header="Map">
+                <CheckBox Content="Show Ore Locations" IsChecked="{Binding ShowOreLocations}" />
+                <CheckBox Content="Show Gradients" IsChecked="{Binding ShowGradients}" />
+            </MenuItem>
         </Menu>
         <GroupBox
             Grid.Row="1" Grid.Column="0" MinWidth="150" Header="Planets" Margin="3">

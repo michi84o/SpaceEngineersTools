@@ -28,19 +28,64 @@ namespace SpaceEngineersOreRedistribution
             return new System.Drawing.Bitmap(image);
         }
 
-        public Bitmap FilterForOre(List<OreMapping> oreMappings)
+        public Bitmap CalculateGradients()
+        {
+            var bmap = GetHeightMap();
+            if (bmap == null) return null;
+
+            var gMap = new Bitmap(2048,2048);
+            var lgMap = new LockBitmap(gMap);
+            lgMap.LockBits();
+
+            var lbmap = new LockBitmap(bmap);
+            lbmap.LockBits();
+
+            Parallel.For(1, lbmap.Width-1, x =>
+            {
+                Parallel.For(1, lbmap.Height-1, y =>
+                {
+                    // Calc gradient in all directions and use max value
+                    int currentPixel = lbmap.GetPixel(x, y).G;
+                    List<int> neighbors = new();
+                    neighbors.Add(lbmap.GetPixel(x-1, y).G);
+                    neighbors.Add(lbmap.GetPixel(x+1, y).G);
+                    neighbors.Add(lbmap.GetPixel(x, y-1).G);
+                    neighbors.Add(lbmap.GetPixel(x, y+1).G);
+                    neighbors.Add(lbmap.GetPixel(x-1, y-1).G);
+                    neighbors.Add(lbmap.GetPixel(x+1, y+1).G);
+                    neighbors.Add(lbmap.GetPixel(x+1, y-1).G);
+                    neighbors.Add(lbmap.GetPixel(x-1, y+1).G);
+                    double maxGradient = 0;
+                    foreach (var n in neighbors)
+                    {
+                        var gradient = Math.Abs(currentPixel - n);
+                        if (gradient > maxGradient) maxGradient = gradient;
+                    }
+                    int ig = (int)(maxGradient*100); // Don't know max value of all gradients for stretching.
+                    if (ig > 255) ig = 255;
+                    lgMap.SetPixel(x, y, Color.FromArgb(ig,ig,ig));
+                });
+            });
+
+            lbmap.UnlockBits();
+            lgMap.UnlockBits();
+
+            bmap.Dispose();
+            return gMap;
+        }
+
+        public Bitmap ShowOre(Bitmap background, List<OreMapping> oreMappings)
         {
             var bmap = GetBitmap();
 
             // Height map used to replace black background
-            var hmap = GetHeightMap();
+            
             LockBitmap lhmap = null;
-            if (hmap != null)
+            if (background != null)
             {
-                lhmap = new LockBitmap(hmap);
+                lhmap = new LockBitmap(background);
                 lhmap.LockBits();
             }
-
 
             var lockBmap = new LockBitmap(bmap);
             lockBmap.LockBits();

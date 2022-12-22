@@ -66,6 +66,28 @@ namespace SpaceEngineersOreRedistribution
         }
         public ObservableCollection<OreMapping> OreMappings { get; } = new();
 
+        bool _showOreLocations = true;
+        public bool ShowOreLocations
+        {
+            get => _showOreLocations;
+            set
+            {
+                if (!SetProp(ref _showOreLocations, value)) return;
+                UpdateImages();
+            }
+        }
+
+        bool _showGradients;
+        public bool ShowGradients
+        {
+            get => _showGradients;
+            set
+            {
+                if (!SetProp(ref _showGradients, value)) return;
+                UpdateImages();
+            }
+        }
+
         public ICommand OpenPlanetDefinitionCommand => new RelayCommand(o =>
         {
             var dlg = new OpenFileDialog();
@@ -225,8 +247,23 @@ namespace SpaceEngineersOreRedistribution
                 {
                     oreMappings = OreMappings.ToList();
                 }
-                using var b = value.FilterForOre(oreMappings);
+                System.Drawing.Bitmap b;
+                if (ShowGradients)
+                {
+                    b = value.CalculateGradients();
+                }
+                else                {
+                    b = value.GetHeightMap();
+                }
+                if (ShowOreLocations)
+                {
+                    var oreMap = value.ShowOre(b, oreMappings);
+                    b.Dispose();
+                    b = oreMap;
+                }
+
                 var img = ImageData.FromBitmap(b);
+                b.Dispose();
 
                 switch (key)
                 {
