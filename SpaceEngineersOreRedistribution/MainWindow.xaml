@@ -14,6 +14,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
@@ -26,10 +27,11 @@
                 Header="File">
                 <MenuItem Header="Open Planet Definition" Command="{Binding OpenPlanetDefinitionCommand}" />
             </MenuItem>
-            <MenuItem Header="Noise Map Generator" Command="{Binding NoiseMapGeneratorCommand}"/>
+            <!--<MenuItem Header="Noise Map Generator" Command="{Binding NoiseMapGeneratorCommand}"/>-->
             <MenuItem Header="Map">
                 <CheckBox Content="Show Ore Locations" IsChecked="{Binding ShowOreLocations}" />
                 <CheckBox Content="Show Gradients" IsChecked="{Binding ShowGradients}" />
+                <CheckBox Content="Show TerrainTypes" IsChecked="{Binding ShowTerrainTypes}" />
             </MenuItem>
         </Menu>
         <GroupBox
@@ -45,33 +47,107 @@
                 SelectedItem="{Binding SelectedOreType}"/>
         </GroupBox>
         <GroupBox
-            Grid.Row="1" Grid.Column="1" Grid.RowSpan="2" Header="Ore Type" MinWidth="350" Margin="3">
-            <ListView
-                ItemsSource="{Binding OreMappings}">
-                <ListView.ItemTemplate>
-                    <DataTemplate>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="50"/>
-                                <ColumnDefinition Width="50"/>
-                                <ColumnDefinition Width="50"/>
-                                <ColumnDefinition Width="50"/>
-                                <ColumnDefinition Width="50"/>
-                                <ColumnDefinition Width="50"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Value" Grid.Column="0" HorizontalAlignment="Center" />
-                            <TextBox Text="{Binding Value}" Grid.Column="1" HorizontalAlignment="Stretch" />
-                            <TextBlock Text="Start" Grid.Column="2" HorizontalAlignment="Center" />
-                            <TextBox Text="{Binding Start}" Grid.Column="3" HorizontalAlignment="Stretch" />
-                            <TextBlock Text="Depth" Grid.Column="4" HorizontalAlignment="Center" />
-                            <TextBox Text="{Binding Depth}" Grid.Column="5" HorizontalAlignment="Stretch" />
-                        </Grid>
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
+            Grid.Row="3" Grid.Column="0" Header="Environment" MinWidth="150" Margin="3">
+            <ListBox
+                ItemsSource="{Binding EnvironmentItems}"
+                SelectedItem="{Binding SelectedEnvironmentItem}"/>
         </GroupBox>
+        <Grid
+            Grid.Row="1" Grid.Column="1" Grid.RowSpan="3">
+            <Grid.RowDefinitions>
+                <RowDefinition/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <GroupBox
+                Grid.Row="0"
+                Header="Selected Ore Type" MinWidth="350" Margin="3">
+                <ListView
+                ItemsSource="{Binding OreMappings}">
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="50"/>
+                                    <ColumnDefinition Width="50"/>
+                                    <ColumnDefinition Width="50"/>
+                                    <ColumnDefinition Width="50"/>
+                                    <ColumnDefinition Width="50"/>
+                                    <ColumnDefinition Width="50"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Value" Grid.Column="0" HorizontalAlignment="Center" />
+                                <TextBox Text="{Binding Value}" Grid.Column="1" HorizontalAlignment="Stretch" />
+                                <TextBlock Text="Start" Grid.Column="2" HorizontalAlignment="Center" />
+                                <TextBox Text="{Binding Start}" Grid.Column="3" HorizontalAlignment="Stretch" />
+                                <TextBlock Text="Depth" Grid.Column="4" HorizontalAlignment="Center" />
+                                <TextBox Text="{Binding Depth}" Grid.Column="5" HorizontalAlignment="Stretch" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </GroupBox>
+            <GroupBox
+                Grid.Row="1" Header="Selected Environment Item" Margin="3">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition/>
+                        <RowDefinition/>
+                        <RowDefinition/>
+                        <RowDefinition/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock
+                        Grid.Row="0" Grid.Column="0" Text="Biome: " Margin="3" HorizontalAlignment="Right"/>
+                    <TextBlock
+                        Grid.Row="0" Grid.Column="1" Margin="3"
+                        Text="{Binding SelectedEnvironmentItem.Biome}" HorizontalAlignment="Left" />
+                    <TextBlock
+                        Grid.Row="0" Grid.Column="2" Text="Material: " Margin="3" HorizontalAlignment="Right"/>
+                    <TextBlock
+                        Grid.Row="0" Grid.Column="3" Margin="3"
+                        Text="{Binding SelectedEnvironmentItem.Material}" HorizontalAlignment="Left" />
+                    <TextBlock
+                        Grid.Row="1" Grid.Column="0" Text="Min Height:" Margin="3" HorizontalAlignment="Right"/>
+                    <TextBlock
+                        Grid.Row="1" Grid.Column="1" Margin="3"
+                        Text="{Binding SelectedEnvironmentItem.MinHeight}" HorizontalAlignment="Left" />
+                    <TextBlock
+                        Grid.Row="1" Grid.Column="2" Text="Max Height:" Margin="3" HorizontalAlignment="Right"/>
+                    <TextBlock
+                        Grid.Row="1" Grid.Column="3" Margin="3"
+                        Text="{Binding SelectedEnvironmentItem.MaxHeight}" HorizontalAlignment="Left" />
+                    <TextBlock
+                        Grid.Row="2" Grid.Column="0" Text="Min Latitude:" Margin="3" HorizontalAlignment="Right"/>
+                    <TextBlock
+                        Grid.Row="2" Grid.Column="1" Margin="3"
+                        Text="{Binding SelectedEnvironmentItem.MinLatitude}" HorizontalAlignment="Left" />
+                    <TextBlock
+                        Grid.Row="2" Grid.Column="2" Text="Max Latitude:" Margin="3" HorizontalAlignment="Right"/>
+                    <TextBlock
+                        Grid.Row="2" Grid.Column="3" Margin="3"
+                        Text="{Binding SelectedEnvironmentItem.MaxLatitude}" HorizontalAlignment="Left" />
+                    <TextBlock
+                        Grid.Row="3" Grid.Column="0" Text="Min Slope:" Margin="3" HorizontalAlignment="Right"/>
+                    <TextBlock
+                        Grid.Row="3" Grid.Column="1" Margin="3"
+                        Text="{Binding SelectedEnvironmentItem.MinSlope}" HorizontalAlignment="Left" />
+                    <TextBlock
+                        Grid.Row="3" Grid.Column="2" Text="Max Slope:" Margin="3" HorizontalAlignment="Right"/>
+                    <TextBlock
+                        Grid.Row="3" Grid.Column="3" Margin="3"
+                        Text="{Binding SelectedEnvironmentItem.MaxSlope}" HorizontalAlignment="Left" />
+
+
+                </Grid>
+            </GroupBox>
+        </Grid>
+
         <GroupBox
-            Grid.Row="1" Grid.Column="3" Grid.RowSpan="2" Header="Map" Margin="3">
+            Grid.Row="1" Grid.Column="3" Grid.RowSpan="3" Header="Map" Margin="3">
             <Border Margin="3" x:Name="BorderView" ClipToBounds="True" Background="Gray">
                 <Canvas x:Name="ImageView" Width="8192" Height="6144" Background="DarkGray">
                     <Image Width="2048" Height="2048" Canvas.Left="0" Canvas.Top="0" Source="{Binding TileUp}" />
@@ -85,3 +161,4 @@
         </GroupBox>
     </Grid>
 </Window>
+
