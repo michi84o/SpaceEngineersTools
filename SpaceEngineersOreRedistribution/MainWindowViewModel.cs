@@ -380,7 +380,7 @@ namespace SpaceEngineersOreRedistribution
         ImageData GetInfo(string pngName)
         {
             var dir = Path.GetDirectoryName(_lastOpenedFile);
-            var imageDir = Path.Combine(dir, SelectedPlanetDefinition.Name);
+            var imageDir = Path.Combine(dir, "PlanetDataFiles", SelectedPlanetDefinition.Name);
             if (!Directory.Exists(imageDir)) return null;
             var file = Path.Combine(imageDir, pngName);
             if (!File.Exists(file)) return null;
