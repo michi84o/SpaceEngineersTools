@@ -90,7 +90,7 @@ namespace SpaceEngineersOreRedistribution
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
 #if DEBUG
-            ViewModel.OpenPlanetDefinition(@"C:\Users\Michael\AppData\Roaming\SpaceEngineers\Mods\OreRedistribution\Data\PlanetDataFiles\PlanetGeneratorDefinitions.sbc");
+            ViewModel.OpenPlanetDefinition(@"C:\Users\Michael\AppData\Roaming\SpaceEngineers\Mods\OreRedistribution\Data\PlanetGeneratorDefinitions.sbc");
 #endif
         }
     }

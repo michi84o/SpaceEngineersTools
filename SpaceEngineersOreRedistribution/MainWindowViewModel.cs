@@ -53,6 +53,26 @@ namespace SpaceEngineersOreRedistribution
                 LoadImages();
             }
         }
+
+        List<System.Windows.Media.Color> _colors = new List<System.Windows.Media.Color>
+        {
+            System.Windows.Media.Colors.LawnGreen,
+            System.Windows.Media.Colors.DeepSkyBlue,
+            System.Windows.Media.Colors.Red,
+            System.Windows.Media.Colors.Orange,
+            System.Windows.Media.Colors.BlueViolet,
+            System.Windows.Media.Colors.Magenta,
+            System.Windows.Media.Colors.SpringGreen,
+            System.Windows.Media.Colors.Gold,
+            System.Windows.Media.Colors.MediumPurple,
+            System.Windows.Media.Colors.Blue,
+            System.Windows.Media.Colors.Firebrick,
+            System.Windows.Media.Colors.Goldenrod,
+            System.Windows.Media.Colors.MediumAquamarine,
+            System.Windows.Media.Colors.MediumVioletRed,
+            System.Windows.Media.Colors.OliveDrab,
+        };
+        System.Windows.Media.SolidColorBrush _defaultOreBrush = new(System.Windows.Media.Color.FromRgb(0, 0xff, 0));
         string _selectedOreType;
         public string SelectedOreType
         {
@@ -68,8 +88,16 @@ namespace SpaceEngineersOreRedistribution
                     return;
                 }
                 var mappings = SelectedPlanetDefinition.OreMappings.Where(x => x.Type == value);
+                int colorIndex = 0;
                 foreach (var mapping in mappings)
                 {
+                    if (colorIndex < _colors.Count)
+                    {
+                        var color = _colors[colorIndex++];
+                        mapping.MapRgbValue = new(color.R, color.G, color.B);
+                    }
+                    else
+                        mapping.MapRgbValue = new(0, 255, 0);
                     OreMappings.Add(mapping);
                 }
                 if (ShowOreLocations)
@@ -340,7 +368,8 @@ namespace SpaceEngineersOreRedistribution
                 {
                     b = value.CalculateGradients();
                 }
-                else                {
+                else
+                {
                     b = value.GetHeightMap();
                 }
                 if (ShowOreLocations)

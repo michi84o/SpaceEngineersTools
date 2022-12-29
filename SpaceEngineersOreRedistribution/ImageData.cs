@@ -33,6 +33,10 @@ namespace SpaceEngineersOreRedistribution
             var bmap = GetHeightMap();
             if (bmap == null) return null;
 
+            var oreMap = GetBitmap();
+            var lOreMap = new LockBitmap(oreMap);
+            lOreMap.LockBits();
+
             var gMap = new Bitmap(2048,2048);
             var lgMap = new LockBitmap(gMap);
             lgMap.LockBits();
@@ -46,6 +50,7 @@ namespace SpaceEngineersOreRedistribution
                 {
                     // Calc gradient in all directions and use max value
                     int currentPixel = lbmap.GetPixel(x, y).G;
+
                     List<int> neighbors = new();
                     neighbors.Add(lbmap.GetPixel(x-1, y).G);
                     neighbors.Add(lbmap.GetPixel(x+1, y).G);
@@ -61,16 +66,21 @@ namespace SpaceEngineersOreRedistribution
                         var gradient = Math.Abs(currentPixel - n);
                         if (gradient > maxGradient) maxGradient = gradient;
                     }
-                    int ig = (int)(maxGradient*100); // Don't know max value of all gradients for stretching.
+
+                    int ig = (int)(maxGradient*20); // Don't know max value of all gradients for stretching. Vanilla Earthlike: 24, but most are 12 or less
                     if (ig > 255) ig = 255;
-                    lgMap.SetPixel(x, y, Color.FromArgb(ig,ig,ig));
+                    int r = lOreMap.GetPixel(x,y).R;
+                    if (r != 82) r = ig;
+                    lgMap.SetPixel(x, y, Color.FromArgb(r,ig,ig));
                 });
             });
 
             lbmap.UnlockBits();
             lgMap.UnlockBits();
+            lOreMap.UnlockBits();
 
             bmap.Dispose();
+            oreMap.Dispose();
             return gMap;
         }
 
@@ -79,7 +89,7 @@ namespace SpaceEngineersOreRedistribution
             var bmap = GetBitmap();
 
             // Height map used to replace black background
-            
+
             LockBitmap lhmap = null;
             if (background != null)
             {
@@ -109,9 +119,13 @@ namespace SpaceEngineersOreRedistribution
                     }
                     else
                     {
-                        if (oreMappings.Any(x => x.Value == px.B))
+                        var mapping = oreMappings.FirstOrDefault(x => x.Value == px.B);
+                        if (mapping != null)
                         {
-                            px = Color.FromArgb(0, 255, 0);
+                            px = Color.FromArgb(
+                                mapping.MapRgbValue.R,
+                                mapping.MapRgbValue.G,
+                                mapping.MapRgbValue.B);
                         }
                         else if (px.B < 255)
                         {

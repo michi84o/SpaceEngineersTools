@@ -22,5 +22,36 @@ namespace SpaceEngineersOreRedistribution
         string _colorInfluence;
         public string ColorInfluence { get => _colorInfluence; set => SetProp(ref _colorInfluence, value); }
 
+        RgbValue _mapRgbValue;
+        public RgbValue MapRgbValue
+        {
+            get => _mapRgbValue;
+            set
+            {
+                if (!SetProp(ref _mapRgbValue, value)) return;
+                MapBrush = new(System.Windows.Media.Color.FromRgb(value.R, value.G, value.B));
+                OnPropertyChanged(nameof(MapBrush));
+            }
+        }
+
+        // Used for display in local UI
+        public System.Windows.Media.SolidColorBrush MapBrush
+        {
+            get;
+            protected set;
+        } = new(System.Windows.Media.Color.FromRgb(0, 255, 0));
+    }
+
+    public class RgbValue
+    {
+        public byte R;
+        public byte G;
+        public byte B;
+        public RgbValue(byte r, byte g, byte b)
+        {
+            R = r;
+            G = g;
+            B = b;
+        }
     }
 }

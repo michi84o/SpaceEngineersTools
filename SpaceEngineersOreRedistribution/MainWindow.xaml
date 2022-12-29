@@ -62,7 +62,7 @@
                 Grid.Row="0"
                 Header="Selected Ore Type" MinWidth="350" Margin="3">
                 <ListView
-                ItemsSource="{Binding OreMappings}">
+                    ItemsSource="{Binding OreMappings}">
                     <ListView.ItemTemplate>
                         <DataTemplate>
                             <Grid>
@@ -73,6 +73,7 @@
                                     <ColumnDefinition Width="50"/>
                                     <ColumnDefinition Width="50"/>
                                     <ColumnDefinition Width="50"/>
+                                    <ColumnDefinition Width="10"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="Value" Grid.Column="0" HorizontalAlignment="Center" />
                                 <TextBox Text="{Binding Value}" Grid.Column="1" HorizontalAlignment="Stretch" />
@@ -80,6 +81,7 @@
                                 <TextBox Text="{Binding Start}" Grid.Column="3" HorizontalAlignment="Stretch" />
                                 <TextBlock Text="Depth" Grid.Column="4" HorizontalAlignment="Center" />
                                 <TextBox Text="{Binding Depth}" Grid.Column="5" HorizontalAlignment="Stretch" />
+                                <Rectangle Grid.Column="6" VerticalAlignment="Center" HorizontalAlignment="Center" Width="10" Height="10" Fill="{Binding MapBrush}" Margin="3,0,3,0"/>
                             </Grid>
                         </DataTemplate>
                     </ListView.ItemTemplate>
@@ -150,12 +152,12 @@
             Grid.Row="1" Grid.Column="3" Grid.RowSpan="3" Header="Map" Margin="3">
             <Border Margin="3" x:Name="BorderView" ClipToBounds="True" Background="Gray">
                 <Canvas x:Name="ImageView" Width="8192" Height="6144" Background="DarkGray">
-                    <Image Width="2048" Height="2048" Canvas.Left="0" Canvas.Top="0" Source="{Binding TileUp}" />
-                    <Image Width="2048" Height="2048" Canvas.Left="0" Canvas.Top="2048" Source="{Binding TileFront}"/>
-                    <Image Width="2048" Height="2048" Canvas.Left="2048" Canvas.Top="2048" Source="{Binding TileRight}" />
-                    <Image Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="2048" Source="{Binding TileBack}"/>
-                    <Image Width="2048" Height="2048" Canvas.Left="6144" Canvas.Top="2048" Source="{Binding TileLeft}"/>
-                    <Image Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="4096" Source="{Binding TileDown}"/>
+                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="0" Canvas.Top="0" Source="{Binding TileUp}" />
+                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="0" Canvas.Top="2048" Source="{Binding TileFront}"/>
+                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="2048" Canvas.Top="2048" Source="{Binding TileRight}" />
+                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="2048" Source="{Binding TileBack}"/>
+                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="6144" Canvas.Top="2048" Source="{Binding TileLeft}"/>
+                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="4096" Source="{Binding TileDown}"/>
                 </Canvas>
             </Border>
         </GroupBox>
