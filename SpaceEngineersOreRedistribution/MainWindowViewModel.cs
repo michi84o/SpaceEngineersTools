@@ -420,8 +420,8 @@ namespace SpaceEngineersOreRedistribution
 
         public ICommand NoiseMapGeneratorCommand => new RelayCommand(o =>
         {
-            var ng = new NoiseGeneratorView();
-            ng.Show();
+            //var ng = new NoiseGeneratorView();
+            //ng.Show();
         });
 
     }

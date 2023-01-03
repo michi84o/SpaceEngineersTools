@@ -5,7 +5,7 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SpaceEngineersOreRedistribution
+namespace Noise
 {
     // https://stackoverflow.com/questions/8659351/2d-perlin-noise/8659483#8659483
 
@@ -120,7 +120,7 @@ namespace SpaceEngineersOreRedistribution
             /// rebuild the permutation table to get a different noise pattern.
             /// Leave this out if you want to play with changing the number of octaves while
             /// maintaining the same overall pattern.
-            Noise2d.Reseed();
+            Reseed();
 
             var frequency = 0.5f;
             var amplitude = 1f;
@@ -134,7 +134,7 @@ namespace SpaceEngineersOreRedistribution
                     {
                         var i = offset % width;
                         var j = offset / width;
-                        var noise = Noise2d.Noise(i * frequency * 1f / width, j * frequency * 1f / height);
+                        var noise = Noise(i * frequency * 1f / width, j * frequency * 1f / height);
                         noise = data[j * width + i] += noise * amplitude;
 
                         min = Math.Min(min, noise);
@@ -163,11 +163,11 @@ namespace SpaceEngineersOreRedistribution
             lockBitmap.LockBits();
 
             int z = 0;
-            for (int x=0; x<width; x++)
+            for (int x = 0; x < width; x++)
             {
-                for (int y=0; y<height; y++)
+                for (int y = 0; y < height; y++)
                 {
-                    lockBitmap.SetPixel(x,y,colors[z++]);
+                    lockBitmap.SetPixel(x, y, colors[z++]);
                 }
             }
 
