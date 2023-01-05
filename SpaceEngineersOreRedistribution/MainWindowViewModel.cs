@@ -567,13 +567,13 @@ namespace SpaceEngineersOreRedistribution
                         var depth = info.TypicalDepth;
                         // Randomize if not set by user
                         if (spawnSize == 0) spawnSize = rnd.Next(5, 26);
-                        if (depth == -1) depth = rnd.Next(0, info.VeryDeepOre ? 11 : 10);
+                        if (depth == -1) depth = rnd.Next(0, info.VeryDeepOre ? 9:10);
                         // Gauss randomizer
                         var stdDevPercentage = setup.ViewModel.StdDev / 100.0;
                         spawnSize = (int)(normal.Next(spawnSize, 50 * stdDevPercentage) + 0.5);
                         if (spawnSize < 1) spawnSize = 1; else if (spawnSize > 50) spawnSize = 50;
                         depth = (int)(normal.Next(depth, 10 * stdDevPercentage) + 0.5);
-                        if (depth < 0) depth = 0; else if (depth > 9) depth = info.VeryDeepOre ? 10 : 9;
+                        if (depth < 0) depth = 0; else if (depth > 9) depth = info.VeryDeepOre ? 9 : 8;
 
                         // Get allowed list of depths from tier list
                         List<int> allowedDepths;
@@ -655,6 +655,8 @@ namespace SpaceEngineersOreRedistribution
                             }
                             if (!foundFreePixel) break; // Bye bye. Don't hammer your head against a wall
 
+                            lastX = nextOreToDraw.X;
+                            lastY = nextOreToDraw.Y;
                             drawnOre.Add(nextOreToDraw);
                             var depthMod = rnd.NextDouble();
                             // Give a 75% chance of staying at the same height if height is starting height
