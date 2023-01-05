@@ -28,14 +28,18 @@ namespace SpaceEngineersOreRedistribution
             return new System.Drawing.Bitmap(image);
         }
 
-        public Bitmap CalculateGradients()
+        public Bitmap CalculateGradients(bool drawLakes = true)
         {
             var bmap = GetHeightMap();
             if (bmap == null) return null;
 
             var oreMap = GetBitmap();
-            var lOreMap = new LockBitmap(oreMap);
-            lOreMap.LockBits();
+            LockBitmap lOreMap = null;
+            if (drawLakes)
+            {
+                lOreMap = new LockBitmap(oreMap);
+                lOreMap.LockBits();
+            }
 
             var gMap = new Bitmap(2048,2048);
             var lgMap = new LockBitmap(gMap);
@@ -69,15 +73,21 @@ namespace SpaceEngineersOreRedistribution
 
                     int ig = (int)(maxGradient*20); // Don't know max value of all gradients for stretching. Vanilla Earthlike: 24, but most are 12 or less
                     if (ig > 255) ig = 255;
-                    int r = lOreMap.GetPixel(x,y).R;
-                    if (r != 82) r = ig;
+                    int r = ig;
+                    if (drawLakes)
+                    {
+                        r = lOreMap.GetPixel(x, y).R;
+                        if (r != 82) r = ig;
+                    }
                     lgMap.SetPixel(x, y, Color.FromArgb(r,ig,ig));
                 });
             });
 
             lbmap.UnlockBits();
             lgMap.UnlockBits();
-            lOreMap.UnlockBits();
+
+            if (drawLakes)
+                lOreMap.UnlockBits();
 
             bmap.Dispose();
             oreMap.Dispose();

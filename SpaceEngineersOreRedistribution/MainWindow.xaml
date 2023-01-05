@@ -29,10 +29,11 @@
             </MenuItem>
             <!--<MenuItem Header="Noise Map Generator" Command="{Binding NoiseMapGeneratorCommand}"/>-->
             <MenuItem Header="Map">
-                <CheckBox Content="Show Ore Locations" IsChecked="{Binding ShowOreLocations}" />
-                <CheckBox Content="Show Gradients" IsChecked="{Binding ShowGradients}" />
-                <CheckBox Content="Show TerrainTypes" IsChecked="{Binding ShowTerrainTypes}" />
+                <CheckBox Content="Show Ore Locations" IsChecked="{Binding ShowOreLocations, UpdateSourceTrigger=PropertyChanged}" />
+                <CheckBox Content="Show Gradients" IsChecked="{Binding ShowGradients, UpdateSourceTrigger=PropertyChanged}" />
+                <!--<CheckBox Content="Show TerrainTypes" IsChecked="{Binding ShowTerrainTypes}" />-->
             </MenuItem>
+            <MenuItem Header="Redistribute Ore" Command="{Binding RedistributeOreCommand}" />
         </Menu>
         <GroupBox
             Grid.Row="1" Grid.Column="0" MinWidth="150" Header="Planets" Margin="3">
@@ -61,31 +62,45 @@
             <GroupBox
                 Grid.Row="0"
                 Header="Selected Ore Type" MinWidth="350" Margin="3">
-                <ListView
-                    ItemsSource="{Binding OreMappings}">
-                    <ListView.ItemTemplate>
-                        <DataTemplate>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="50"/>
-                                    <ColumnDefinition Width="50"/>
-                                    <ColumnDefinition Width="50"/>
-                                    <ColumnDefinition Width="50"/>
-                                    <ColumnDefinition Width="50"/>
-                                    <ColumnDefinition Width="50"/>
-                                    <ColumnDefinition Width="10"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Value" Grid.Column="0" HorizontalAlignment="Center" />
-                                <TextBox Text="{Binding Value}" Grid.Column="1" HorizontalAlignment="Stretch" />
-                                <TextBlock Text="Start" Grid.Column="2" HorizontalAlignment="Center" />
-                                <TextBox Text="{Binding Start}" Grid.Column="3" HorizontalAlignment="Stretch" />
-                                <TextBlock Text="Depth" Grid.Column="4" HorizontalAlignment="Center" />
-                                <TextBox Text="{Binding Depth}" Grid.Column="5" HorizontalAlignment="Stretch" />
-                                <Rectangle Grid.Column="6" VerticalAlignment="Center" HorizontalAlignment="Center" Width="10" Height="10" Fill="{Binding MapBrush}" Margin="3,0,3,0"/>
-                            </Grid>
-                        </DataTemplate>
-                    </ListView.ItemTemplate>
-                </ListView>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <ListView
+                        Grid.Row="0" ItemsSource="{Binding OreMappings}"
+                        SelectedItem="{Binding SelectedOreMapping}">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="50"/>
+                                        <ColumnDefinition Width="50"/>
+                                        <ColumnDefinition Width="50"/>
+                                        <ColumnDefinition Width="50"/>
+                                        <ColumnDefinition Width="50"/>
+                                        <ColumnDefinition Width="50"/>
+                                        <ColumnDefinition Width="10"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Value" Grid.Column="0" HorizontalAlignment="Center" />
+                                    <TextBox IsReadOnly="True" Text="{Binding Value}" Grid.Column="1" HorizontalAlignment="Stretch" />
+                                    <TextBlock Text="Start" Grid.Column="2" HorizontalAlignment="Center" />
+                                    <TextBox IsReadOnly="True" Text="{Binding Start}" Grid.Column="3" HorizontalAlignment="Stretch" />
+                                    <TextBlock Text="Depth" Grid.Column="4" HorizontalAlignment="Center" />
+                                    <TextBox IsReadOnly="True" Text="{Binding Depth}" Grid.Column="5" HorizontalAlignment="Stretch" />
+                                    <Rectangle Grid.Column="6" VerticalAlignment="Center" HorizontalAlignment="Center" Width="10" Height="10" Fill="{Binding MapBrush}" Margin="3,0,3,0"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <Grid
+                        Grid.Row="1">
+                        <TextBlock
+                            FontSize="10"
+                            Text="List above will not be used for ore redistribution feature!"/>
+                    </Grid>
+                </Grid>
+
             </GroupBox>
             <GroupBox
                 Grid.Row="1" Header="Selected Environment Item" Margin="3">

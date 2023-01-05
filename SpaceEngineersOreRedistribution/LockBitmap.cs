@@ -30,43 +30,36 @@ namespace SpaceEngineersOreRedistribution
         /// </summary>
         public void LockBits()
         {
-            try
+            // Get width and height of bitmap
+            Width = _source.Width;
+            Height = _source.Height;
+
+            // get total locked pixels count
+            int PixelCount = Width * Height;
+
+            // Create rectangle to lock
+            Rectangle rect = new Rectangle(0, 0, Width, Height);
+
+            // get source bitmap pixel format size
+            Depth = Bitmap.GetPixelFormatSize(_source.PixelFormat);
+
+            // Check if bpp (Bits Per Pixel) is 8, 24, or 32
+            if (Depth != 8 && Depth != 24 && Depth != 32)
             {
-                // Get width and height of bitmap
-                Width = _source.Width;
-                Height = _source.Height;
-
-                // get total locked pixels count
-                int PixelCount = Width * Height;
-
-                // Create rectangle to lock
-                Rectangle rect = new Rectangle(0, 0, Width, Height);
-
-                // get source bitmap pixel format size
-                Depth = Bitmap.GetPixelFormatSize(_source.PixelFormat);
-
-                // Check if bpp (Bits Per Pixel) is 8, 24, or 32
-                if (Depth != 8 && Depth != 24 && Depth != 32)
-                {
-                    throw new ArgumentException("Only 8, 24 and 32 bpp images are supported.");
-                }
-
-                // Lock bitmap and return bitmap data
-                _bitmapData = _source.LockBits(rect, ImageLockMode.ReadWrite,
-                                             _source.PixelFormat);
-
-                // create byte array to copy pixel values
-                int step = Depth / 8;
-                Pixels = new byte[PixelCount * step];
-                _iptr = _bitmapData.Scan0;
-
-                // Copy data from pointer to array
-                Marshal.Copy(_iptr, Pixels, 0, Pixels.Length);
+                throw new ArgumentException("Only 8, 24 and 32 bpp images are supported.");
             }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
+
+            // Lock bitmap and return bitmap data
+            _bitmapData = _source.LockBits(rect, ImageLockMode.ReadWrite,
+                                            _source.PixelFormat);
+
+            // create byte array to copy pixel values
+            int step = Depth / 8;
+            Pixels = new byte[PixelCount * step];
+            _iptr = _bitmapData.Scan0;
+
+            // Copy data from pointer to array
+            Marshal.Copy(_iptr, Pixels, 0, Pixels.Length);
         }
 
         /// <summary>
@@ -74,18 +67,11 @@ namespace SpaceEngineersOreRedistribution
         /// </summary>
         public void UnlockBits()
         {
-            try
-            {
-                // Copy data from byte array to pointer
-                Marshal.Copy(Pixels, 0, _iptr, Pixels.Length);
+            // Copy data from byte array to pointer
+            Marshal.Copy(Pixels, 0, _iptr, Pixels.Length);
 
-                // Unlock bitmap data
-                _source.UnlockBits(_bitmapData);
-            }
-            catch (Exception ex)
-            {
-                throw ex;
-            }
+            // Unlock bitmap data
+            _source.UnlockBits(_bitmapData);
         }
 
         /// <summary>
@@ -115,14 +101,14 @@ namespace SpaceEngineersOreRedistribution
                 byte a = Pixels[i + 3]; // a
                 clr = Color.FromArgb(a, r, g, b);
             }
-            if (Depth == 24) // For 24 bpp get Red, Green and Blue
+            else if (Depth == 24) // For 24 bpp get Red, Green and Blue
             {
                 byte b = Pixels[i];
                 byte g = Pixels[i + 1];
                 byte r = Pixels[i + 2];
                 clr = Color.FromArgb(r, g, b);
             }
-            if (Depth == 8)
+            else if (Depth == 8)
             // For 8 bpp get color value (Red, Green and Blue values are the same)
             {
                 byte c = Pixels[i];

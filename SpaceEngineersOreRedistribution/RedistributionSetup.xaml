@@ -1,0 +1,82 @@
+﻿<Window x:Class="SpaceEngineersOreRedistribution.RedistributionSetup"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:SpaceEngineersOreRedistribution"
+        mc:Ignorable="d"
+        Title="Redistribution Setup"
+        ResizeMode="CanResize" SizeToContent="WidthAndHeight">
+    <Window.DataContext>
+        <local:RedistributionSetupViewModel x:Name="ViewModel"/>
+    </Window.DataContext>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <GroupBox
+            Grid.Row="0" Header="Ores" MinWidth="320" MinHeight="240" MaxHeight="720">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <ListView
+                    Grid.Row="0" Margin="3"
+                    ItemsSource="{Binding OreInfos}">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="{x:Type ListViewItem}">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="Name" Width="90" DisplayMemberBinding="{Binding Name}" />
+                            <GridViewColumn Header="Spawn Weight" Width="90">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBox Text="{Binding SpawnWeight}" HorizontalAlignment="Stretch" />
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+                            <GridViewColumn Header="Typical Size" Width="90">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBox Text="{Binding TypicalSize}" HorizontalAlignment="Stretch" />
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+                            <GridViewColumn Header="Typical Depth" Width="90">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBox Text="{Binding TypicalDepth}"  HorizontalAlignment="Stretch" />
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+                <StackPanel
+                    Grid.Row="1" Orientation="Horizontal">
+                    <Button Content="Add" Margin="3" Width="100"/>
+                    <Button Content="Remove" Margin="3" Width="100"/>
+                </StackPanel>
+                <TextBlock Grid.Row="2" Text="Multiple definition of same ore allowed.&#x0d;&#x0a;Weight: Spawn probability relative to other ore. Weights will be summed up to use relative %.&#x0d;&#x0a;Size: 0-100% | Depth: 0-100% | -1 for fully random.&#x0d;&#x0a;Size + Depth will be randomized using a Gauss distribution if set."/>
+                <StackPanel Orientation="Horizontal" Grid.Row="3" >
+                    <TextBlock Text="Standard Deviation (1-50, default: 10): "/>
+                    <TextBox Width="50" Text="{Binding StdDev}"/>
+                </StackPanel>
+            </Grid>
+        </GroupBox>
+        <StackPanel
+            Grid.Row="1" Orientation="Horizontal">
+            <Button Content="Abort" Width="150" Height="28" Margin="5" Click="ButtonAbort_Click" />
+            <Button Content="Confirm" Width="150" Height="28" Margin="5" Click="ButtonConfirm_Click"/>
+        </StackPanel>
+
+    </Grid>
+</Window>

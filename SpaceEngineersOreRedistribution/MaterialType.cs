@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace SpaceEngineersOreRedistribution
 {
+    // Only used for the Environment Item List display.
     public class MaterialType
     {
         public string Name { get; set; }

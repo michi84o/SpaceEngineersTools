@@ -62,7 +62,7 @@ namespace SpaceEngineersOreRedistribution
             System.Windows.Media.Colors.Orange,
             System.Windows.Media.Colors.BlueViolet,
             System.Windows.Media.Colors.Magenta,
-            System.Windows.Media.Colors.SpringGreen,
+            System.Windows.Media.Colors.Green,
             System.Windows.Media.Colors.Gold,
             System.Windows.Media.Colors.MediumPurple,
             System.Windows.Media.Colors.Blue,
@@ -106,6 +106,18 @@ namespace SpaceEngineersOreRedistribution
         }
 
         public ObservableCollection<OreMapping> OreMappings { get; } = new();
+        OreMapping _selectedOreMapping;
+        public OreMapping SelectedOreMapping
+        {
+            get => _selectedOreMapping;
+            set => SetProp(ref _selectedOreMapping, value);
+        }
+        bool _ignoreOreMappingsForRedestribution = true;
+        public bool IgnoreOreMappingsForRedestribution
+        {
+            get => _ignoreOreMappingsForRedestribution;
+            set => SetProp(ref _ignoreOreMappingsForRedestribution, value);
+        }
 
         public ObservableCollection<EnvironmentItem> EnvironmentItems { get; } = new();
         EnvironmentItem _selectedEnvironmentItem;
@@ -133,17 +145,6 @@ namespace SpaceEngineersOreRedistribution
             set
             {
                 if (!SetProp(ref _showGradients, value)) return;
-                UpdateImages();
-            }
-        }
-
-        bool _showEnvironmentData;
-        public bool ShowEnvironmentData
-        {
-            get => _showEnvironmentData;
-            set
-            {
-                if (!SetProp(ref _showEnvironmentData, value)) return;
                 UpdateImages();
             }
         }
@@ -423,6 +424,105 @@ namespace SpaceEngineersOreRedistribution
             //var ng = new NoiseGeneratorView();
             //ng.Show();
         });
+
+        public ICommand RedistributeOreCommand => new RelayCommand(o =>
+        {
+            MessageBox.Show("WIP, Sorry not implemented yet!");
+            return;
+
+            var sfd = new SaveFileDialog();
+            sfd.Filter = "PNG Files|*.png";
+            sfd.FileName = "specifyFolder.png";
+            if (sfd.ShowDialog() != true)
+                return;
+
+            int nextOreValue = 1;
+
+            // Collect ore info
+            var setup = new RedistributionSetup();
+            var existingOreDefs = SelectedPlanetDefinition.OreMappings.Select(o => o.Type).Distinct().ToList();
+            foreach (var oredef in existingOreDefs)
+            {
+                setup.ViewModel.OreInfos.Add(new() { Name = oredef });
+            }
+            if (setup.ShowDialog() != true)
+                return;
+
+            // Build the ore mapping list.
+            // See the OreMappings.png in the screenshots folder of this repository to see the design of the mapping.
+            //Dictionary<>
+
+            // WIP
+
+
+            var directory = Path.GetDirectoryName(sfd.FileName);
+            var keys = _images.Keys;
+            var rnd = new Random(0);
+            foreach (var key in keys)
+            {
+                if (!_images.TryGetValue(key, out var value)) return;
+
+                var fileName = Path.Combine(directory, key + "_mat.png");
+                if (File.Exists(fileName))
+                {
+                    if (MessageBox.Show("File \r\n'" + fileName + "'\r\n already exists. " +
+                        "Override?\r\nProcess will abort if 'No' is selected.", "File found", MessageBoxButton.YesNo) != MessageBoxResult.Yes)
+                        return;
+                }
+
+                using var gradients = value.CalculateGradients();
+                using var materialMap = value.GetBitmap();
+
+                var g = new LockBitmap(gradients);
+                var m = new LockBitmap(materialMap);
+                g.LockBits();
+                m.LockBits();
+
+                // Clear ores: Blue = 255
+                for (int x=0;x<2048;++x)
+                {
+                    for (int y = 0; y < 2048; ++y)
+                    {
+                        var px = m.GetPixel(x, y);
+                        m.SetPixel(x,y, System.Drawing.Color.FromArgb(px.R, px.G, 255));
+                    }
+                }
+
+                // In original file each ore deposit is about 28 pixel away from the next deposit
+                // in a checkboard pattern.
+                // Lets randomize this a bit:
+                // Square of 2*28 pixels width and length with 1 ore means:
+                // 1 ore in 3136 pixels
+                double prop = 1.0 / (3136);
+                double nBaseMin = 0.72; // This is just a random number I picked
+                double nBaseMax = nBaseMin + prop;
+                for (int x = 0; x < 2048; ++x)
+                {
+                    for (int y = 0; y < 2048; ++y)
+                    {
+                        // Check if ore spawns at this location
+                        var r = rnd.NextDouble();
+                        if (r < nBaseMin || r > nBaseMax) continue;
+
+                        // Spawn ore:
+                        // Steps:
+                        // - Decide which ore to spawn
+                        // - Generate a vein using multiple [Start,Depth] sets.
+
+                       //var chosenOreType = OreTypes[rnd.Next(OreTypes.Count)];
+                       var px = m.GetPixel(x, y);
+                    }
+                }
+
+                g.UnlockBits();
+                m.UnlockBits();
+
+                materialMap.Save(fileName);
+
+            }
+
+        },
+        o => SelectedPlanetDefinition != null);
 
     }
 }
