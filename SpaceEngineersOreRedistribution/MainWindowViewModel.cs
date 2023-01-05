@@ -491,24 +491,24 @@ namespace SpaceEngineersOreRedistribution
                 if (MessageBox.Show("File \r\n'" + xmlFileName + "'\r\n already exists. " +
                         "Override?\r\nProcess will abort if 'No' is selected.", "File found", MessageBoxButton.YesNo) != MessageBoxResult.Yes)
                     return;
-                try
+            }
+            try
+            {
+                var node = new XElement("OreMappings");
+                foreach (var kv in mappingsDictionary)
                 {
-                    var node = new XElement("OreMappings");
-                    foreach (var kv in mappingsDictionary)
+                    foreach (var mapping in kv.Value)
                     {
-                        foreach (var mapping in kv.Value)
-                        {
-                            node.Add(mapping.ToXElement());
-                        }
+                        node.Add(mapping.ToXElement());
                     }
-                    var doc = new XDocument(node);
-                    doc.Save(xmlFileName);
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
+                var doc = new XDocument(node);
+                doc.Save(xmlFileName);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
             }
 
 

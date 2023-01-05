@@ -90,7 +90,7 @@
         <StackPanel
             Grid.Row="1" Orientation="Horizontal">
             <Button Content="Abort" Width="150" Height="28" Margin="5" Click="ButtonAbort_Click" />
-            <Button Content="Confirm" Width="150" Height="28" Margin="5" />
+            <Button Content="Confirm" Width="150" Height="28" Margin="5" Command="{Binding ConfirmCommand}" />
             <TextBlock Text="Values Count (max: 254):" VerticalAlignment="Center" Margin="5,3,3,3"/>
             <TextBlock Text="{Binding ValuesCount}" VerticalAlignment="Center"/>
         </StackPanel>

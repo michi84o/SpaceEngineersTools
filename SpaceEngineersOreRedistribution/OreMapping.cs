@@ -46,10 +46,10 @@ namespace SpaceEngineersOreRedistribution
         {
             return new XElement("Ore",
                 new XAttribute("Value", Value),
-                new XAttribute("Start", Value),
-                new XAttribute("Depth", Value),
-                new XAttribute("TargetColor", Value),
-                new XAttribute("ColorInfluence", Value));
+                new XAttribute("Start", Start),
+                new XAttribute("Depth", Depth),
+                new XAttribute("TargetColor", TargetColor),
+                new XAttribute("ColorInfluence", ColorInfluence));
         }
     }
 
