@@ -45,6 +45,7 @@ namespace SpaceEngineersOreRedistribution
         public XElement ToXElement()
         {
             return new XElement("Ore",
+                new XAttribute("Type", Type),
                 new XAttribute("Value", Value),
                 new XAttribute("Start", Start),
                 new XAttribute("Depth", Depth),

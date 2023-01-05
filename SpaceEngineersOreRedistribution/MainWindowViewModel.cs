@@ -527,6 +527,13 @@ namespace SpaceEngineersOreRedistribution
                         return;
                 }
 
+                // Final touch: Create the 'add' file:
+                // All ore locations are drawn with a red value of 144 onto a black image
+                var addFileName = Path.Combine(directory, key + "_add.png");
+                using var bmap = new System.Drawing.Bitmap(2048, 2048, PixelFormat.Format32bppArgb);
+                var lbmap = new LockBitmap(bmap);
+                lbmap.LockBits();
+
                 using var gradients = value.CalculateGradients();
                 using var materialMap = value.GetBitmap();
 
@@ -542,6 +549,7 @@ namespace SpaceEngineersOreRedistribution
                     {
                         var px = m.GetPixel(x, y);
                         m.SetPixel(x, y, System.Drawing.Color.FromArgb(px.R, px.G, 255));
+                        lbmap.SetPixel(x, y, System.Drawing.Color.FromArgb(255, 0, 0, 0));
                     }
                 }
 
@@ -699,8 +707,8 @@ namespace SpaceEngineersOreRedistribution
                         {
                             var px = m.GetPixel(drawn.X, drawn.Y);
                             m.SetPixel(drawn.X, drawn.Y, System.Drawing.Color.FromArgb(px.R, px.G, drawn.Value));
+                            lbmap.SetPixel(drawn.X, drawn.Y, System.Drawing.Color.FromArgb(255,144, 0, 0));
                         }
-
                     }
                 }
 
@@ -708,8 +716,12 @@ namespace SpaceEngineersOreRedistribution
                 m.UnlockBits();
 
                 materialMap.Save(fileName);
-            }
 
+                lbmap.UnlockBits();
+                bmap.Save(addFileName);
+
+            }
+            MessageBox.Show("Finished!\r\nPlease copy the pngs to the 'PlanetDataFiles\\PlanetName' folder.\r\nThen open the planet definition SBC\r\nand copy the content of 'oremappings.xml' to the corresponding section.", "Ore Redistribution", MessageBoxButton.OK, MessageBoxImage.Information);
         },
         o => SelectedPlanetDefinition != null);
 
