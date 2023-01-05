@@ -6,15 +6,15 @@ Ignore the noise and generator stuff. Thats just an experiment.
 This is a viewer for the planet definition files, specifically ore.
 
 Default ore distribution in SE follows a fixed pattern as seen here:
-
 ![Screenshot of viewer](Screenshots/SE_Ore.png)
 
 This is nice for new players because they can find anything they need within 5km.
 I wanted to add more randomness and motivate exploration. This tool can generate new material maps with randomized ores and a XML file with the corresponding ore mappings. These files can be used to create a modded planet. Creating a mod is still a manual process.
 
+Screenshot of a modded planet:
 ![Screenshot of viewer modded](Screenshots/SE_Ore_Modded.png)
 
-This the program takes a list of ore types to spawn and lets you change some variables to influence the size and depth of the ore veins. I might add additional parameters later. I need balance the probabilities a bit more.
+The program takes a list of ore types to spawn and lets you change some variables to influence the size and depth of the ore veins. I might add additional parameters later. I need balance the probabilities a bit more.
 
 
 ![Screenshot of redistribution setup](Screenshots/Redistribution_Setup.png)
