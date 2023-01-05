@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:SpaceEngineersOreRedistribution"
         mc:Ignorable="d"
         Title="Redistribution Setup"
-        ResizeMode="CanResize" SizeToContent="WidthAndHeight">
+        ResizeMode="NoResize" SizeToContent="WidthAndHeight" MaxHeight="960">
     <Window.DataContext>
         <local:RedistributionSetupViewModel x:Name="ViewModel"/>
     </Window.DataContext>
@@ -35,7 +35,13 @@
                     </ListView.ItemContainerStyle>
                     <ListView.View>
                         <GridView>
-                            <GridViewColumn Header="Name" Width="90" DisplayMemberBinding="{Binding Name}" />
+                            <GridViewColumn Header="Name" Width="90" >
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBox Text="{Binding Name}" HorizontalAlignment="Stretch" />
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
                             <GridViewColumn Header="Spawn Weight" Width="90">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
@@ -57,17 +63,26 @@
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
+                            <GridViewColumn Header="Very Deep Ore" Width="90">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding VeryDeepOre}"  HorizontalAlignment="Center" />
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
                         </GridView>
                     </ListView.View>
                 </ListView>
                 <StackPanel
                     Grid.Row="1" Orientation="Horizontal">
-                    <Button Content="Add" Margin="3" Width="100"/>
-                    <Button Content="Remove" Margin="3" Width="100"/>
+                    <Button Content="Add" Margin="3" Width="100" Command="{Binding AddOreCommand}"/>
+                    <Button Content="Remove" Margin="3" Width="100" Command="{Binding RemoveOreCommand}"/>
+                    <Button Content="Import" Margin="3" Width="100" Command="{Binding ImportCommand}"/>
+                    <Button Content="Export" Margin="3" Width="100" Command="{Binding ExportCommand}"/>
                 </StackPanel>
-                <TextBlock Grid.Row="2" Text="Multiple definition of same ore allowed.&#x0d;&#x0a;Weight: Spawn probability relative to other ore. Weights will be summed up to use relative %.&#x0d;&#x0a;Size: 0-100% | Depth: 0-100% | -1 for fully random.&#x0d;&#x0a;Size + Depth will be randomized using a Gauss distribution if set."/>
+                <TextBlock Grid.Row="2" Text="Multiple definition of same ore allowed.&#x0d;&#x0a;Weight: Spawn probability relative to other ore. Weights will be summed up to use relative %.&#x0d;&#x0a;Size: 1-50 ore patches per vein, 0 for random (5-25), default: 15&#x0d;&#x0a;Depth: 0-9 (9 only if deep ore enabled!), -1 for random (0-9), default: -1&#x0d;&#x0a;Size + Depth will still be randomized using a Gauss distribution."/>
                 <StackPanel Orientation="Horizontal" Grid.Row="3" >
-                    <TextBlock Text="Standard Deviation (1-50, default: 10): "/>
+                    <TextBlock Text="Standard Deviation for Gauss (1-50% rel. to max, default: 10%): "/>
                     <TextBox Width="50" Text="{Binding StdDev}"/>
                 </StackPanel>
             </Grid>
@@ -75,7 +90,9 @@
         <StackPanel
             Grid.Row="1" Orientation="Horizontal">
             <Button Content="Abort" Width="150" Height="28" Margin="5" Click="ButtonAbort_Click" />
-            <Button Content="Confirm" Width="150" Height="28" Margin="5" Click="ButtonConfirm_Click"/>
+            <Button Content="Confirm" Width="150" Height="28" Margin="5" />
+            <TextBlock Text="Values Count (max: 254):" VerticalAlignment="Center" Margin="5,3,3,3"/>
+            <TextBlock Text="{Binding ValuesCount}" VerticalAlignment="Center"/>
         </StackPanel>
 
     </Grid>

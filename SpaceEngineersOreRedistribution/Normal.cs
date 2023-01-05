@@ -13,20 +13,24 @@ namespace SpaceEngineersOreRedistribution
         public double StdDev { get; }
 
         Random _rnd;
-        public Normal(double mean, double stdDev)
+        public Normal(double mean, double stdDev, int seed)
         {
-            _rnd = new Random();
+            _rnd = new Random(seed);
             Mean = mean;
             StdDev = stdDev;
         }
 
         public double Next()
         {
+            return Next(Mean, StdDev);
+        }
+
+        public double Next(double mean, double stdDev)
+        {
             double u1 = 1.0 - _rnd.NextDouble(); //uniform(0,1] random doubles
             double u2 = 1.0 - _rnd.NextDouble();
-            double randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) *
-                         Math.Sin(2.0 * Math.PI * u2); //random normal(0,1)
-            return Mean + StdDev * randStdNormal; //random normal(mean,stdDev^2)
+            double randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Sin(2.0 * Math.PI * u2); //random normal(0,1)
+            return mean + stdDev * randStdNormal; //random normal(mean,stdDev^2)
         }
     }
 }

@@ -46,7 +46,7 @@ namespace SpaceEngineersOreRedistribution
                 foreach (var type in types)
                     OreTypes.Add(type);
 
-                foreach(var item in value.EnvironmentItems)
+                foreach (var item in value.EnvironmentItems)
                 {
                     EnvironmentItems.Add(item);
                 }
@@ -427,16 +427,14 @@ namespace SpaceEngineersOreRedistribution
 
         public ICommand RedistributeOreCommand => new RelayCommand(o =>
         {
-            MessageBox.Show("WIP, Sorry not implemented yet!");
-            return;
+            //MessageBox.Show("WIP, Sorry not implemented yet!");
+            //return;
 
             var sfd = new SaveFileDialog();
             sfd.Filter = "PNG Files|*.png";
             sfd.FileName = "specifyFolder.png";
             if (sfd.ShowDialog() != true)
                 return;
-
-            int nextOreValue = 1;
 
             // Collect ore info
             var setup = new RedistributionSetup();
@@ -448,16 +446,75 @@ namespace SpaceEngineersOreRedistribution
             if (setup.ShowDialog() != true)
                 return;
 
+            setup.ViewModel.FinalizeList();
             // Build the ore mapping list.
             // See the OreMappings.png in the screenshots folder of this repository to see the design of the mapping.
-            //Dictionary<>
-
-            // WIP
-
+            Dictionary<string, List<OreMapping>> mappingsDictionary = new();
+            var oreTypeList = setup.ViewModel.OreInfos.Select(o => o.Name).Distinct().ToList();
+            int nextOreValue = 1;
+            foreach (var oreType in oreTypeList)
+            {
+                List<OreMapping> mList = new();
+                // Tier 1: Flat surface ore. Depth: 1m - 12m
+                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 1, Depth = 3, ColorInfluence = "15", TargetColor = "616c83" });
+                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 3, Depth = 5, ColorInfluence = "15", TargetColor = "616c83" });
+                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 5, Depth = 7, ColorInfluence = "15", TargetColor = "616c83" });
+                // Tier 2: Medium deep veins. Depth: 40m - 102m
+                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 40, Depth = 12, ColorInfluence = "15", TargetColor = "616c83" });
+                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 50, Depth = 22, ColorInfluence = "15", TargetColor = "616c83" });
+                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 70, Depth = 32, ColorInfluence = "15", TargetColor = "616c83" });
+                // Tier 3: Very deep veins. Depth: 140m - 372m
+                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 140, Depth = 62, ColorInfluence = "15", TargetColor = "616c83" });
+                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 200, Depth = 72, ColorInfluence = "15", TargetColor = "616c83" });
+                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 370, Depth = 102, ColorInfluence = "15", TargetColor = "616c83" });
+                // Bonus: Very deep ore. Depth: 370m - 450m
+                if (setup.ViewModel.OreInfos.Any(o => o.Name == oreType && o.VeryDeepOre))
+                    mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 370, Depth = 80, ColorInfluence = "15", TargetColor = "616c83" });
+                mappingsDictionary[oreType] = mList;
+            }
+            List<int> tier1 = new List<int> { 0, 1, 2 };
+            List<int> tier2 = new List<int> { 3, 4, 5 };
+            List<int> tier3 = new List<int> { 6, 7, 8 };
+            if (nextOreValue > 255)
+            {
+                MessageBox.Show("Oops! Something went wrong. We have too many ore definitions. Please try again.",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
 
             var directory = Path.GetDirectoryName(sfd.FileName);
+
+            // Save ore mappings as XML
+            var xmlFileName = Path.Combine(directory, "oremappings.xml");
+            if (File.Exists(xmlFileName))
+            {
+                if (MessageBox.Show("File \r\n'" + xmlFileName + "'\r\n already exists. " +
+                        "Override?\r\nProcess will abort if 'No' is selected.", "File found", MessageBoxButton.YesNo) != MessageBoxResult.Yes)
+                    return;
+                try
+                {
+                    var node = new XElement("OreMappings");
+                    foreach (var kv in mappingsDictionary)
+                    {
+                        foreach (var mapping in kv.Value)
+                        {
+                            node.Add(mapping.ToXElement());
+                        }
+                    }
+                    var doc = new XDocument(node);
+                    doc.Save(xmlFileName);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+            }
+
+
             var keys = _images.Keys;
-            var rnd = new Random(0);
+            var rnd = new Random(0); // Seed 0 is better for debugging.
+            var normal = new Normal(50, 10, 0);
             foreach (var key in keys)
             {
                 if (!_images.TryGetValue(key, out var value)) return;
@@ -479,12 +536,12 @@ namespace SpaceEngineersOreRedistribution
                 m.LockBits();
 
                 // Clear ores: Blue = 255
-                for (int x=0;x<2048;++x)
+                for (int x = 0; x < 2048; ++x)
                 {
                     for (int y = 0; y < 2048; ++y)
                     {
                         var px = m.GetPixel(x, y);
-                        m.SetPixel(x,y, System.Drawing.Color.FromArgb(px.R, px.G, 255));
+                        m.SetPixel(x, y, System.Drawing.Color.FromArgb(px.R, px.G, 255));
                     }
                 }
 
@@ -504,13 +561,144 @@ namespace SpaceEngineersOreRedistribution
                         var r = rnd.NextDouble();
                         if (r < nBaseMin || r > nBaseMax) continue;
 
-                        // Spawn ore:
-                        // Steps:
-                        // - Decide which ore to spawn
-                        // - Generate a vein using multiple [Start,Depth] sets.
+                        // Decide which ore is spawned
+                        var info = setup.ViewModel.PickRandomOreWeighted(rnd);
+                        var spawnSize = info.TypicalSize;
+                        var depth = info.TypicalDepth;
+                        // Randomize if not set by user
+                        if (spawnSize == 0) spawnSize = rnd.Next(5, 26);
+                        if (depth == -1) depth = rnd.Next(0, info.VeryDeepOre ? 11 : 10);
+                        // Gauss randomizer
+                        var stdDevPercentage = setup.ViewModel.StdDev / 100.0;
+                        spawnSize = (int)(normal.Next(spawnSize, 50 * stdDevPercentage) + 0.5);
+                        if (spawnSize < 1) spawnSize = 1; else if (spawnSize > 50) spawnSize = 50;
+                        depth = (int)(normal.Next(depth, 10 * stdDevPercentage) + 0.5);
+                        if (depth < 0) depth = 0; else if (depth > 9) depth = info.VeryDeepOre ? 10 : 9;
 
-                       //var chosenOreType = OreTypes[rnd.Next(OreTypes.Count)];
-                       var px = m.GetPixel(x, y);
+                        // Get allowed list of depths from tier list
+                        List<int> allowedDepths;
+                        if (depth < 3) allowedDepths = tier1.ToList();
+                        else if (depth < 6) allowedDepths = tier2.ToList();
+                        else
+                        {
+                            allowedDepths = tier3.ToList();
+                            if (info.VeryDeepOre) allowedDepths.Add(9);
+                        }
+                        int defaultDepthIndex = allowedDepths.IndexOf(depth);
+
+                        // Get mapping info for pixel value
+                        var mappings = mappingsDictionary[info.Name];
+
+                        HashSet<OreToDraw> drawnOre = new();
+                        drawnOre.Add(new OreToDraw { X = x, Y = y, Value = mappings[allowedDepths[defaultDepthIndex]].Value });
+                        int lastDepthIndex = defaultDepthIndex;
+                        int lastX = x;
+                        int lastY = y;
+
+                        // Draw ore
+                        // Strategy:
+                        // - Start at X,Y
+                        // - Select random neighbor and draw if not already drawn
+                        // - If all neighbors are already drawn, escape in straight random direction until a non drawn field is available
+                        // - While drawing
+                        // - If last drawn height is not starting height give a 30% to jump back to starting height. 20% Chance of getting further away.
+                        //   50% of staying at same height.
+
+                        for (int i=0;i<spawnSize;++i)
+                        {
+                            var direction = rnd.Next(4);
+                            var nextOreToDraw = new OreToDraw();
+                            // Check if that pixel is already painted:
+                            int directionTries = 0;
+                            bool foundFreePixel = false;
+                            while (directionTries < 4)
+                            {
+                                ++direction;
+                                if (direction > 3) direction = 0;
+                                // direction: 0 -> left, 1 -> up, 2 -> right, 3 -> down
+                                int dx, dy;
+                                GetDeltas(direction, out dx, out dy);
+                                nextOreToDraw.X = lastX + dx;
+                                nextOreToDraw.Y = lastY + dy;
+
+                                if (!drawnOre.Contains(nextOreToDraw))
+                                {
+                                    foundFreePixel = true;
+                                    break;
+                                }
+                                ++directionTries;
+                            }
+                            if (!foundFreePixel)
+                            {
+                                int newX = lastX;
+                                int newY = lastY;
+                                // We're stuck. Get unstuck by going into random direction, brute force
+                                int pleaseDontHang = 0;
+                                int dx, dy;
+                                GetDeltas(direction, out dx, out dy);
+                                if (lastX < 500 && dx < 0) dx = 1;
+                                if (lastY < 500 && dy < 0) dy = 1;
+                                if (lastX > 1800 && dx > 0) dx = -1;
+                                if (lastY > 1800 && dy > 0) dy = -1;
+                                nextOreToDraw.X = lastX;
+                                nextOreToDraw.Y = lastY;
+                                while (pleaseDontHang++ < 1000)
+                                {
+                                    nextOreToDraw.X += dx;
+                                    nextOreToDraw.Y += dy;
+                                    if (!drawnOre.Contains(nextOreToDraw))
+                                    {
+                                        foundFreePixel = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (!foundFreePixel) break; // Bye bye. Don't hammer your head against a wall
+
+                            drawnOre.Add(nextOreToDraw);
+                            var depthMod = rnd.NextDouble();
+                            // Give a 75% chance of staying at the same height if height is starting height
+                            if (lastDepthIndex == defaultDepthIndex)
+                            {
+                                if (depthMod >= 0.75)
+                                {
+                                    // Flip to neighbor index
+                                    if (lastDepthIndex <= 0) lastDepthIndex++;
+                                    else if (lastDepthIndex >= allowedDepths.Count - 1) lastDepthIndex--;
+                                    else { /* both directions possible */ if (rnd.Next(2) == 0) lastDepthIndex--; else lastDepthIndex++; }
+                                }
+                            }
+                            // Give a 30% chance to jump back to starting height and 20% chance of getting further away
+                            else
+                            {
+                                if (depthMod <= 0.3)
+                                {
+                                    lastDepthIndex += Math.Sign(defaultDepthIndex - lastDepthIndex);
+                                }
+                                else if (depthMod <= 0.5)
+                                {
+                                    if (lastDepthIndex < defaultDepthIndex)
+                                    {
+                                        lastDepthIndex--;
+                                    }
+                                    else
+                                    {
+                                        lastDepthIndex++;
+                                    }
+                                }
+                            }
+                            if (lastDepthIndex >= allowedDepths.Count) lastDepthIndex = allowedDepths.Count - 1;
+                            else if (lastDepthIndex < 0) lastDepthIndex = 0;
+                            // Get value for depth
+                            nextOreToDraw.Value = mappings[allowedDepths[lastDepthIndex]].Value;
+                        }
+
+                        foreach (var drawn in drawnOre)
+                        {
+                            var px = m.GetPixel(drawn.X, drawn.Y);
+                            m.SetPixel(drawn.X, drawn.Y, System.Drawing.Color.FromArgb(px.R, px.G, drawn.Value));
+                        }
+
                     }
                 }
 
@@ -518,11 +706,72 @@ namespace SpaceEngineersOreRedistribution
                 m.UnlockBits();
 
                 materialMap.Save(fileName);
-
             }
 
         },
         o => SelectedPlanetDefinition != null);
 
+        void GetDeltas(int direction, out int dx, out int dy)
+        {
+            switch (direction)
+            {
+                case 0: // Left
+                    dx = -1;
+                    dy = 0;
+                    return;
+                case 1: // Up
+                    dx = 0;
+                    dy = -1;
+                    return;
+                case 2: // Right
+                    dx = 1;
+                    dy = 0;
+                    return;
+                case 3: // Down
+                    dx = 0;
+                    dy = 1;
+                    return;
+            }
+            dx = 0;
+            dy = 0;
+        }
+
+        class OreToDraw
+        {
+            int _x,_y;
+
+            public int X
+            {
+                get => _x;
+                set
+                {
+                    if (value < 0) _x = 0;
+                    else if (value > 2047) _x = 2047;
+                    else _x = value;
+                }
+            }
+            public int Y
+            {
+                get => _y;
+                set
+                {
+                    if (value < 0) _y = 0;
+                    else if (value > 2047) _y = 2047;
+                    else _y = value;
+                }
+            }
+            public int Value; // Selectively ignored for hash
+
+            public override bool Equals(object obj)
+            {
+                if (obj is not OreToDraw ore) return false;
+                return X == ore.X && Y == ore.Y;
+            }
+
+            public override int GetHashCode()
+            {
+                return X.GetHashCode() ^ Y.GetHashCode();
+            }
+        }
     }
 }

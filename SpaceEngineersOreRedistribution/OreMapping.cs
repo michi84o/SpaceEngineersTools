@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace SpaceEngineersOreRedistribution
 {
@@ -40,6 +41,16 @@ namespace SpaceEngineersOreRedistribution
             get;
             protected set;
         } = new(System.Windows.Media.Color.FromRgb(0, 255, 0));
+
+        public XElement ToXElement()
+        {
+            return new XElement("Ore",
+                new XAttribute("Value", Value),
+                new XAttribute("Start", Value),
+                new XAttribute("Depth", Value),
+                new XAttribute("TargetColor", Value),
+                new XAttribute("ColorInfluence", Value));
+        }
     }
 
     public class RgbValue

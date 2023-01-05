@@ -22,6 +22,7 @@ namespace SpaceEngineersOreRedistribution
         public RedistributionSetup()
         {
             InitializeComponent();
+            ViewModel.ConfirmAction = ConfirmAction;
         }
 
         private void ButtonAbort_Click(object sender, RoutedEventArgs e)
@@ -30,17 +31,8 @@ namespace SpaceEngineersOreRedistribution
             Close();
         }
 
-        private void ButtonConfirm_Click(object sender, RoutedEventArgs e)
+        private void ConfirmAction()
         {
-            var ores = ViewModel.OreInfos.Select(o => o.Name).Distinct().ToList();
-            if (ores.Count > 17)
-            {
-                MessageBox.Show(
-                    "You defined more than 17 different ores.\r\nEach ore definition uses a set of 15 different values.\r\nWe can only store 255 different values in the map file.\r\nPlease reduce the number of ores!",
-                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
             DialogResult = true;
             Close();
         }
