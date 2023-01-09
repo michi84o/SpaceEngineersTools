@@ -472,9 +472,12 @@ namespace SpaceEngineersOreRedistribution
                     mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 370, Depth = 80, ColorInfluence = "15", TargetColor = "616c83" });
                 mappingsDictionary[oreType] = mList;
             }
-            List<int> tier1 = new List<int> { 0, 1, 2 };
-            List<int> tier2 = new List<int> { 3, 4, 5 };
-            List<int> tier3 = new List<int> { 6, 7, 8 };
+            Func<int, int> GetTier = (d) =>
+            {
+                if (d <= 2) return 1;
+                if (d <= 5) return 2;
+                return 3;
+            };
             if (nextOreValue > 255)
             {
                 MessageBox.Show("Oops! Something went wrong. We have too many ore definitions. Please try again.",
@@ -581,24 +584,17 @@ namespace SpaceEngineersOreRedistribution
                         spawnSize = (int)(normal.Next(spawnSize, 50 * stdDevPercentage) + 0.5);
                         if (spawnSize < 1) spawnSize = 1; else if (spawnSize > 50) spawnSize = 50;
                         depth = (int)(normal.Next(depth, 10 * stdDevPercentage) + 0.5);
-                        if (depth < 0) depth = 0; else if (depth > 9) depth = info.VeryDeepOre ? 9 : 8;
+                        int maxDepthIndex = info.VeryDeepOre ? 9 : 8;
+                        if (depth < 0) depth = 0; else if (depth > 8) depth = maxDepthIndex;
 
-                        // Get allowed list of depths from tier list
-                        List<int> allowedDepths;
-                        if (depth < 3) allowedDepths = tier1.ToList();
-                        else if (depth < 6) allowedDepths = tier2.ToList();
-                        else
-                        {
-                            allowedDepths = tier3.ToList();
-                            if (info.VeryDeepOre) allowedDepths.Add(9);
-                        }
-                        int defaultDepthIndex = allowedDepths.IndexOf(depth);
+                        int defaultTier = GetTier(depth);
+                        int defaultDepthIndex = depth;
 
                         // Get mapping info for pixel value
                         var mappings = mappingsDictionary[info.Name];
 
                         HashSet<OreToDraw> drawnOre = new();
-                        drawnOre.Add(new OreToDraw { X = x, Y = y, Value = mappings[allowedDepths[defaultDepthIndex]].Value });
+                        drawnOre.Add(new OreToDraw { X = x, Y = y, Value = mappings[defaultDepthIndex].Value });
                         int lastDepthIndex = defaultDepthIndex;
                         int lastX = x;
                         int lastY = y;
@@ -674,8 +670,31 @@ namespace SpaceEngineersOreRedistribution
                                 {
                                     // Flip to neighbor index
                                     if (lastDepthIndex <= 0) lastDepthIndex++;
-                                    else if (lastDepthIndex >= allowedDepths.Count - 1) lastDepthIndex--;
-                                    else { /* both directions possible */ if (rnd.Next(2) == 0) lastDepthIndex--; else lastDepthIndex++; }
+                                    else if (lastDepthIndex >= maxDepthIndex) lastDepthIndex--;
+                                    else
+                                    {
+                                        // both directions possible
+                                        // 70% chance of staying in the same tier
+                                        if (rnd.NextDouble() > 0.7)
+                                        {
+                                            if (rnd.Next(2) == 0) lastDepthIndex--; else lastDepthIndex++;
+                                        }
+                                        else
+                                        {
+                                            var oldTier = GetTier(lastDepthIndex);
+                                            var tierDown = GetTier(lastDepthIndex + 1);
+                                            var tierUp = GetTier(lastDepthIndex - 1);
+                                            if (tierDown != oldTier && tierUp == oldTier)
+                                                lastDepthIndex--;
+                                            else if (tierDown == oldTier && tierUp != oldTier)
+                                                lastDepthIndex++;
+                                            else
+                                            {   /* Same as random above. Reaching this shouldn't be possible though */
+                                                if (rnd.Next(2) == 0) lastDepthIndex--; else lastDepthIndex++;
+                                            }
+                                        }
+
+                                    }
                                 }
                             }
                             // Give a 30% chance to jump back to starting height and 20% chance of getting further away
@@ -685,7 +704,7 @@ namespace SpaceEngineersOreRedistribution
                                 {
                                     lastDepthIndex += Math.Sign(defaultDepthIndex - lastDepthIndex);
                                 }
-                                else if (depthMod <= 0.5)
+                                else if (depthMod <= 0.5) // 0.5-0.3 -> 20%
                                 {
                                     if (lastDepthIndex < defaultDepthIndex)
                                     {
@@ -696,11 +715,12 @@ namespace SpaceEngineersOreRedistribution
                                         lastDepthIndex++;
                                     }
                                 }
+                                // else: 50% chance of staying
                             }
-                            if (lastDepthIndex >= allowedDepths.Count) lastDepthIndex = allowedDepths.Count - 1;
+                            if (lastDepthIndex > maxDepthIndex) lastDepthIndex = maxDepthIndex;
                             else if (lastDepthIndex < 0) lastDepthIndex = 0;
                             // Get value for depth
-                            nextOreToDraw.Value = mappings[allowedDepths[lastDepthIndex]].Value;
+                            nextOreToDraw.Value = mappings[lastDepthIndex].Value;
                         }
 
                         foreach (var drawn in drawnOre)
