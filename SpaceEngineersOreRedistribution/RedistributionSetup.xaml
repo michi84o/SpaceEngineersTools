@@ -24,6 +24,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <ListView
                     Grid.Row="0" Margin="3"
@@ -84,6 +85,11 @@
                 <StackPanel Orientation="Horizontal" Grid.Row="3" >
                     <TextBlock Text="Standard Deviation for Gauss (1-50% rel. to max, default: 10%): "/>
                     <TextBox Width="50" Text="{Binding StdDev}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Grid.Row="4" >
+                    <TextBlock Text="Randomly spawn ore every "/>
+                    <TextBox Width="40" Text="{Binding OreSpawnRate}" HorizontalContentAlignment="Center"/>
+                    <TextBlock Text="pixels on average. (Default: 2000) "/>
                 </StackPanel>
             </Grid>
         </GroupBox>

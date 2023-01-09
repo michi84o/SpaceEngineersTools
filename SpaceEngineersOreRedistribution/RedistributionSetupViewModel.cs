@@ -33,7 +33,7 @@ namespace SpaceEngineersOreRedistribution
         {
             OreInfos.Remove(SelectedInfo);
             SelectedInfo = null;
-        }, o=> SelectedInfo != null);
+        }, o => SelectedInfo != null);
 
         public ICommand ExportCommand => new RelayCommand(o =>
         {
@@ -58,7 +58,7 @@ namespace SpaceEngineersOreRedistribution
             {
                 MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
-        }, o=>OreInfos.Count > 0);
+        }, o => OreInfos.Count > 0);
 
         public ICommand ImportCommand => new RelayCommand(o =>
         {
@@ -97,6 +97,18 @@ namespace SpaceEngineersOreRedistribution
                     if (value > 50) StdDev = 50;
                 }
             }
+        }
+
+        // In original file each ore deposit is about 28 pixel away from the next deposit
+        // in a checkboard pattern.
+        // Lets randomize this a bit:
+        // Square of 2*28 pixels width and length with 1 ore means:
+        // 1 ore in 3136 pixels
+        int _oreSpawnRate = 2000;
+        public int OreSpawnRate
+        {
+            get => _oreSpawnRate;
+            set => SetProp(ref _oreSpawnRate, value);
         }
 
         public Action ConfirmAction;

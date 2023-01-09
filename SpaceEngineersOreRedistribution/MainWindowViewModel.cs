@@ -455,10 +455,10 @@ namespace SpaceEngineersOreRedistribution
             foreach (var oreType in oreTypeList)
             {
                 List<OreMapping> mList = new();
-                // Tier 1: Flat surface ore. Depth: 1m - 12m
-                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 1, Depth = 3, ColorInfluence = "15", TargetColor = "616c83" });
-                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 3, Depth = 5, ColorInfluence = "15", TargetColor = "616c83" });
-                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 5, Depth = 7, ColorInfluence = "15", TargetColor = "616c83" });
+                // Tier 1: Flat surface ore. Depth: 3m - 15m
+                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 3, Depth = 3, ColorInfluence = "15", TargetColor = "616c83" });
+                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 5, Depth = 5, ColorInfluence = "15", TargetColor = "616c83" });
+                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 8, Depth = 7, ColorInfluence = "15", TargetColor = "616c83" });
                 // Tier 2: Medium deep veins. Depth: 40m - 102m
                 mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 40, Depth = 12, ColorInfluence = "15", TargetColor = "616c83" });
                 mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 50, Depth = 22, ColorInfluence = "15", TargetColor = "616c83" });
@@ -515,16 +515,18 @@ namespace SpaceEngineersOreRedistribution
             var keys = _images.Keys;
             var rnd = new Random(0); // Seed 0 is better for debugging.
             var normal = new Normal(50, 10, 0);
+            bool overridefiles = false;
             foreach (var key in keys)
             {
                 if (!_images.TryGetValue(key, out var value)) return;
 
                 var fileName = Path.Combine(directory, key + "_mat.png");
-                if (File.Exists(fileName))
+                if (!overridefiles && File.Exists(fileName))
                 {
                     if (MessageBox.Show("File \r\n'" + fileName + "'\r\n already exists. " +
-                        "Override?\r\nProcess will abort if 'No' is selected.", "File found", MessageBoxButton.YesNo) != MessageBoxResult.Yes)
+                        "Override this and any other PNG files?\r\nProcess will abort if 'No' is selected.", "File found", MessageBoxButton.YesNo) != MessageBoxResult.Yes)
                         return;
+                    overridefiles = true;
                 }
 
                 // Final touch: Create the 'add' file:
@@ -552,13 +554,11 @@ namespace SpaceEngineersOreRedistribution
                         lbmap.SetPixel(x, y, System.Drawing.Color.FromArgb(255, 0, 0, 0));
                     }
                 }
+                int spawnRate = setup.ViewModel.OreSpawnRate; // Default 3000
+                if (spawnRate < 100) spawnRate = 100;
+                else if (spawnRate > 2000000) spawnRate = 2000000;
 
-                // In original file each ore deposit is about 28 pixel away from the next deposit
-                // in a checkboard pattern.
-                // Lets randomize this a bit:
-                // Square of 2*28 pixels width and length with 1 ore means:
-                // 1 ore in 3136 pixels
-                double prop = 1.0 / (3136);
+                double prop = 1.0 / spawnRate;//(3136);
                 double nBaseMin = 0.72; // This is just a random number I picked
                 double nBaseMax = nBaseMin + prop;
                 for (int x = 0; x < 2048; ++x)
