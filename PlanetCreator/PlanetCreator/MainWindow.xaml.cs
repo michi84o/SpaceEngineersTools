@@ -27,7 +27,14 @@ namespace PlanetCreator
             ImageView.MouseWheel += ImageView_MouseWheel;
             BorderView.MouseLeftButtonDown += ImageView_MouseLeftButtonDown; ;
             BorderView.MouseLeftButtonUp += ImageView_MouseLeftButtonUp; ;
-            BorderView.MouseMove += ImageView_MouseMove; ;
+            BorderView.MouseMove += ImageView_MouseMove;
+
+            Loaded += MainWindow_Loaded;
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            ViewModel.LoadPictures();
         }
 
         private Point _origin;

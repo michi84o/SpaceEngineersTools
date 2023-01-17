@@ -53,7 +53,8 @@ namespace NoiseTest
             long xMax = 2048;
             long yMax = 2048;
 
-            var image = new Image<Rgb48>((int)xMax, (int)yMax);
+            //var image = new Image<Rgb48>((int)xMax, (int)yMax);
+            var image = new Image<L16>((int)xMax, (int)yMax);
 
             double min = 0;
             double max = 0;
@@ -89,7 +90,7 @@ namespace NoiseTest
                     value += offset;
                     value /= stretch;
                     ushort v = (ushort)(value * 65535);
-                    image[x, y] = new Rgb48(v, v, v);
+                    image[x, y] = new L16(v);
                 }
             }
 

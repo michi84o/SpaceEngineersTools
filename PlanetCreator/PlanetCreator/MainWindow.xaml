@@ -10,7 +10,16 @@
         <local:MainWindowViewModel x:Name="ViewModel"/>
     </Window.DataContext>
     <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Menu
+            Grid.Row="0">
+            <MenuItem Header="Generate" Command="{Binding GenerateCommand}"/>
+        </Menu>
         <GroupBox
+            Grid.Row="1"
             Header="Map" Margin="3">
             <Border Margin="3" x:Name="BorderView" ClipToBounds="True" Background="Gray">
                 <Canvas x:Name="ImageView" Width="8192" Height="6144" Background="DarkGray">
