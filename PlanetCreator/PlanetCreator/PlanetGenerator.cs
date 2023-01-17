@@ -56,12 +56,9 @@ namespace PlanetCreator
             // Layers of diferent noise frequencies
             List<NoiseMaker> list = new()
             {
-                new(0, 1.0 / 20, 1),
-                new(1, 1.0 / 10, .6),
-                new(2, 1.0 / 5, .2),
-                //new(0, 1.0 / 200, 1),
-                //new(1, 1.0 / 100, .6),
-                //new(2, 1.0 / 50, .2),
+                new(0, 1.0 / 200, 1),
+                new(1, 1.0 / 100, .6),
+                new(2, 1.0 / 50, .2),
             };
             double sphereRadius = 1000;
             double max = 0;
@@ -72,11 +69,10 @@ namespace PlanetCreator
             {
                 var face = kv.Key;
                 var tile = kv.Value;
-                for (int x = 0; x < _tileWidth; ++x)
+                Parallel.For(0, _tileWidth, x =>
                 {
-                    for (int y = 0; y < _tileWidth; ++y)
+                    Parallel.For(0, _tileWidth, y =>
                     {
-                        // TODO: The pixels at the edges repeat. Looks like we have to cut out a pixel line at the edges.
                         var point = GetNormalizedSphereCoordinates(face, x, y);
                         double value = 0;
                         foreach (var nm in list)
@@ -86,8 +82,9 @@ namespace PlanetCreator
                         if (value < min) min = value;
                         if (value > max) max = value;
                         tile[x, y] = value;
-                    }
-                }
+                    });
+
+                });
             }
 
             // Normalize noise to 0....1
@@ -98,16 +95,16 @@ namespace PlanetCreator
             {
                 var face = kv.Key;
                 var tile = kv.Value;
-                for (int x = 0; x < _tileWidth; ++x)
+                Parallel.For(0, _tileWidth, x =>
                 {
-                    for (int y = 0; y < _tileWidth; ++y)
+                    Parallel.For(0, _tileWidth, y =>
                     {
-                        double value = tile[x,y];
+                        double value = tile[x, y];
                         value += offset;
                         value /= stretch;
                         tile[x, y] = value;
-                    }
-                }
+                    });
+                });
                 TileToImage(tile, face);
             }
 
@@ -147,6 +144,11 @@ namespace PlanetCreator
             // w=5: [0][1][2][3][4] -> middle = 2,   [0] on 3d axis = -2
             //             | middle (0 in xyz)
             // w=4   [0][1]|[2][3]  -> middle = 1.5, [0] on 3d axis = -1.5
+
+            // offset at 2048 -> 1023.5
+            // Problem: Edges between 2 tiles will have duplicate pixels
+            // Solution: Move all tiles further from the center
+            offset += .5;
 
             switch (face)
             {
