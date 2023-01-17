@@ -56,6 +56,7 @@ namespace PlanetCreator
             // Layers of diferent noise frequencies
             List<NoiseMaker> list = new()
             {
+                //new(0, 1.0, 1), // Static noise for checking textures
                 new(0, 1.0 / 200, 1),
                 new(1, 1.0 / 100, .6),
                 new(2, 1.0 / 50, .2),
@@ -122,14 +123,17 @@ namespace PlanetCreator
         void TileToImage(double[,] tile, CubeMapFace face)
         {
             var image = new Image<L16>(_tileWidth, _tileWidth);
-            for (int x = 0; x < _tileWidth; ++x)
+            Parallel.For(0, _tileWidth, x =>
             {
-                for (int y = 0; y < _tileWidth; ++y)
+                Parallel.For(0, _tileWidth, y =>
                 {
-                    ushort value = (ushort)(tile[x, y] * 65535);
+                    // Using full spectrum is too exteme
+                    // Smooth v
+                    var v = 0.6 * tile[x, y] + 0.3; // Values between 0.3 and 0.9
+                    ushort value = (ushort)(v * 65535);
                     image[x, y] = new L16(value);
-                }
-            }
+                });
+            });
             string filename = face.ToString().ToLower() + ".png";
             image.SaveAsPng(filename);
         }
@@ -147,8 +151,8 @@ namespace PlanetCreator
 
             // offset at 2048 -> 1023.5
             // Problem: Edges between 2 tiles will have duplicate pixels
-            // Solution: Move all tiles further from the center
-            offset += .5;
+            // What did NOT work so far:
+            // - Moving faces closer or further away from sphere by using an offset for 1 axis
 
             switch (face)
             {
