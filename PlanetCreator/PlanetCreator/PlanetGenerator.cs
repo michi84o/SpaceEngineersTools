@@ -2,9 +2,12 @@
 using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Media.Media3D;
 
 namespace PlanetCreator
@@ -60,6 +63,7 @@ namespace PlanetCreator
                 new(0, 1.0 / 200, 1),
                 new(1, 1.0 / 100, .6),
                 new(2, 1.0 / 50, .2),
+                new(2, 1.0 / 25, .1),
             };
             double sphereRadius = 1000;
             double max = 0;
@@ -80,7 +84,7 @@ namespace PlanetCreator
                         {
                             value += nm.GetValue3D(point.X * sphereRadius, point.Y * sphereRadius, point.Z * sphereRadius);
                         }
-                        if (value < min) min = value;
+                        if (value < min) min = value; // Non-Thread safe access! TODO?
                         if (value > max) max = value;
                         tile[x, y] = value;
                     });
@@ -106,7 +110,69 @@ namespace PlanetCreator
                         tile[x, y] = value;
                     });
                 });
-                TileToImage(tile, face);
+            }
+
+            // Apply erosion
+            // Place a water droplet on each pixel. Let droplet move 'down' (determined by gradient).
+            // When droplet moves, it will take 1/65535 of height with it. When it reaches the lowest point, add 1/65536 to terrain height.
+            bool erode = true;
+            if (erode)
+            {
+                //double erMin = 0;
+                //double erMax = 0;
+                var rnd = new Random(0);
+                var ff = _faces[CubeMapFace.Up];
+
+                HashSet<int> xxx = new();
+
+                // ii: Number of erosion iterations
+                for (int ii = 0; ii < 5; ++ii)
+                {
+                    Debug.WriteLine("ii: " + ii);
+                    // Lets work on every pixel in parallel but make sure we have some distance:
+                    // First run   0 -> 16 -> 32 -> ... -> 2032
+                    // Second run  1 -> 17 -> 33 -> ... -> 2033
+                    // Last run   15 -> 31 -> 47 -> ... -> 2047
+                    int skipWidth = 16;
+
+                    long cnt = 0;
+
+                    for (int skipX = 0; skipX < skipWidth; ++skipX)
+                    {
+                        Parallel.For(0, _tileWidth / skipWidth, new ParallelOptions { MaxDegreeOfParallelism = 8 }, xx =>
+                        {
+                            for (int skipY = 0; skipY < skipWidth; ++skipY)
+                            {
+                                Parallel.For(0, _tileWidth / skipWidth, new ParallelOptions { MaxDegreeOfParallelism = 8 }, yy =>
+                                {
+                                    Interlocked.Increment(ref cnt);
+
+                                    var x = xx * skipWidth + skipX;
+                                    var y = yy * skipWidth + skipY;
+
+                                    if (x > 512 || y > 512) return;
+
+                                    Erode(ff, x, y, 0);
+                                });
+                            }
+                        });
+
+                    }
+                }
+
+                //// Normalize noise to 0....1
+                //offset = -1 * erMin;
+                //stretch = Math.Abs(erMax - erMin);
+                //Parallel.For(0, _tileWidth, x =>
+                //{
+                //    Parallel.For(0, _tileWidth, y =>
+                //    {
+                //        double value = ff2[x, y];
+                //        value += offset;
+                //        value /= stretch;
+                //        ff[x, y] = value;
+                //    });
+                //});
             }
 
             // WIP, TODO
@@ -115,9 +181,128 @@ namespace PlanetCreator
             // B: Mountains around 45°
             // C: Flat poles
             // - Weighten noise based on location
-            // - Apply some erosion to generate canyons
+            // - Apply some erosion to generate canyons (rain by using gradients + east-west wind)
             // - Add lakes
+
+            // Create pictures
+            foreach (var kv in _faces)
+            {
+                var face = kv.Key;
+                var tile = kv.Value;
+                TileToImage(tile, face);
+            }
+            MessageBox.Show("Done");
         }
+
+        void Erode(double[,] ff, int x, int y, int iteration)
+        {
+            var xp = x;
+            var yp = y;
+            // =========================================================================================
+            // Surrounding gradients: (using simplified math here, substraction instead of division)
+            List<NeighborGradient> neighbors = new();
+            if (xp > 0)
+            {
+                neighbors.Add(new NeighborGradient { X = xp - 1, Y = yp }); // Left
+                if (yp > 0) neighbors.Add(new NeighborGradient { X = xp - 1, Y = yp - 1 }); // Top Left
+                if (yp < 2047) neighbors.Add(new NeighborGradient { X = xp - 1, Y = yp + 1 }); // Bottom Left
+            }
+            if (yp > 0) neighbors.Add(new NeighborGradient { X = xp, Y = yp - 1 }); // Top
+            if (yp < 2047) neighbors.Add(new NeighborGradient { X = xp, Y = yp + 1 }); // Bottom
+            if (xp < 2047)
+            {
+                neighbors.Add(new NeighborGradient { X = xp + 1, Y = yp }); // Right
+                if (yp > 0) neighbors.Add(new NeighborGradient { X = xp + 1, Y = yp - 1 }); // Top Right
+                if (yp < 2047) neighbors.Add(new NeighborGradient { X = xp + 1, Y = yp + 1 }); // Bottom Right
+            }
+            // =========================================================================================
+            // Loop all neighbors and calculate gradient
+            double maxGradient = 0;
+            foreach (var neighbor in neighbors)
+            {
+                neighbor.Gradient = ff[neighbor.X, neighbor.Y] - ff[xp, yp];
+                if (neighbor.Gradient < maxGradient)
+                {
+                    maxGradient = neighbor.Gradient;
+                }
+            }
+            // Remove all neighbors that are higher
+            neighbors.RemoveAll(o => o.Gradient >= 0);
+            // =========================================================================================
+            if (neighbors.Count == 0)
+                return;
+            maxGradient = Math.Abs(maxGradient); // Number will always be 0 or less
+            // Apply erosion
+            // Take some material away and wash it onto neighbors
+            // Amount of material washed away is 1/65535 or maxGradient, whatever is less
+            var matValue = (150.0 / 65535) / iteration;
+            if (maxGradient < matValue) matValue = maxGradient;
+
+            var decrement = matValue / 16;
+
+            // Give part of material to random neighbors.
+            // Stop if neighbor reached same height
+            List<NeighborGradient> lowerNeighbors = new List<NeighborGradient>(neighbors);
+            Random rnd = new Random();
+            while (matValue > 0 && lowerNeighbors.Count > 0)
+            {
+                var val = ff[xp, yp] - decrement;
+                var index = rnd.Next(lowerNeighbors.Count);
+                var n = lowerNeighbors[index];
+                var nVal = ff[n.X, n.Y] + decrement*0.8; // Some material gets lost
+                if (nVal >= val)
+                {
+                    nVal = val = (nVal + val) / 2;
+                    lowerNeighbors.RemoveAt(index);
+                }
+                if (val < 0) val = 0;
+                if (nVal < 0) nVal = 0;
+
+                ff[xp, yp] = val;
+                ff[n.X, n.Y] = nVal;
+                matValue -= decrement;
+            }
+
+            // Don't iterate when all neighbors are equalized
+            if (lowerNeighbors.Count == 0) return;
+
+            // Abort on too many iterations
+            if (iteration >= 16) return;
+
+            // All lower neighbors:
+            foreach (var neighbor in lowerNeighbors)
+            {
+                Erode(ff, neighbor.X, neighbor.Y, iteration + lowerNeighbors.Count);
+            }
+
+            //++iteration;
+            // Lowest neigbor only:
+            // Find lowest neighbot and let it continue
+            //NeighborGradient lowest = lowerNeighbors[0];
+
+            //if (lowerNeighbors.Count > 1)
+            //{
+            //    for (int i=1;i<lowerNeighbors.Count; i++)
+            //    {
+            //        var n = lowerNeighbors[i];
+            //        if (ff[n.X,n.Y] < ff[lowest.X, lowest.Y])
+            //            lowest = n;
+            //    }
+            //}
+            //Erode(ff, lowest.X, lowest.Y, iteration);
+        }
+
+        class NeighborGradient
+        {
+            public int X;
+            public int Y;
+            public double Gradient;
+        }
+        //class XY
+        //{
+        //    public double X;
+        //    public double Y;
+        //}
 
         // tiles must be normalized to 0...1 !!!
         void TileToImage(double[,] tile, CubeMapFace face)
