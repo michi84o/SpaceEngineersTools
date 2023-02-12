@@ -54,6 +54,8 @@ namespace PlanetCreator
         public double[,] TileLeft { get; private set; }
         public double[,] TileBack { get; private set; }
 
+        double[,] _debugTile = new double[2048, 2048];
+
         public void GeneratePlanet()
         {
             // Layers of diferent noise frequencies
@@ -118,47 +120,14 @@ namespace PlanetCreator
             bool erode = true;
             if (erode)
             {
-                //double erMin = 0;
-                //double erMax = 0;
                 var rnd = new Random(0);
-                var ff = _faces[CubeMapFace.Up];
+                var facesValues = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToArray();
 
-                HashSet<int> xxx = new();
-
-                // ii: Number of erosion iterations
-                for (int ii = 0; ii < 5; ++ii)
+                Parallel.For(0, 500, new ParallelOptions { MaxDegreeOfParallelism = 8 }, pit =>
                 {
-                    Debug.WriteLine("ii: " + ii);
-                    // Lets work on every pixel in parallel but make sure we have some distance:
-                    // First run   0 -> 16 -> 32 -> ... -> 2032
-                    // Second run  1 -> 17 -> 33 -> ... -> 2033
-                    // Last run   15 -> 31 -> 47 -> ... -> 2047
-                    int skipWidth = 16;
+                    Erode(rnd);
+                });
 
-                    long cnt = 0;
-
-                    for (int skipX = 0; skipX < skipWidth; ++skipX)
-                    {
-                        Parallel.For(0, _tileWidth / skipWidth, new ParallelOptions { MaxDegreeOfParallelism = 8 }, xx =>
-                        {
-                            for (int skipY = 0; skipY < skipWidth; ++skipY)
-                            {
-                                Parallel.For(0, _tileWidth / skipWidth, new ParallelOptions { MaxDegreeOfParallelism = 8 }, yy =>
-                                {
-                                    Interlocked.Increment(ref cnt);
-
-                                    var x = xx * skipWidth + skipX;
-                                    var y = yy * skipWidth + skipY;
-
-                                    if (x > 512 || y > 512) return;
-
-                                    Erode(ff, x, y, 0);
-                                });
-                            }
-                        });
-
-                    }
-                }
 
                 //// Normalize noise to 0....1
                 //offset = -1 * erMin;
@@ -185,124 +154,493 @@ namespace PlanetCreator
             // - Add lakes
 
             // Create pictures
-            foreach (var kv in _faces)
-            {
-                var face = kv.Key;
-                var tile = kv.Value;
-                TileToImage(tile, face);
-            }
+            //foreach (var kv in _faces)
+            //{
+            //    var face = kv.Key;
+            //    var tile = kv.Value;
+            //    TileToImage(tile, face);
+            //}
+
+            TileToImage(_faces[CubeMapFace.Up], CubeMapFace.Up);
+            TileToImage(_debugTile, CubeMapFace.Down);
+
             MessageBox.Show("Done");
         }
 
-        void Erode(double[,] ff, int x, int y, int iteration)
+        void Erode(Random rnd)
         {
-            var xp = x;
-            var yp = y;
-            // =========================================================================================
-            // Surrounding gradients: (using simplified math here, substraction instead of division)
-            List<NeighborGradient> neighbors = new();
-            if (xp > 0)
+            CubeMapPoint point;
+            double volume = 1f;
+            double sediment = 0;
+            double minCapacity = 0.1;
+            double waterLossFactor = 0.99;
+            double erodeFactor = 0.3;
+            int maxDropletLifetime = 30;
+            CubeMapFace face;
+
+            lock (rnd)
             {
-                neighbors.Add(new NeighborGradient { X = xp - 1, Y = yp }); // Left
-                if (yp > 0) neighbors.Add(new NeighborGradient { X = xp - 1, Y = yp - 1 }); // Top Left
-                if (yp < 2047) neighbors.Add(new NeighborGradient { X = xp - 1, Y = yp + 1 }); // Bottom Left
+                /*
+                 point = new CubeMapPoint(
+                     _faces,
+                     rnd.Next(0, _tileWidth),
+                     rnd.Next(0, _tileWidth),
+                     facesValues[rnd.Next(0, facesValues.Length)]);
+                */
+                // DEBUG:
+                point = new CubeMapPoint(
+                     _faces,
+                     rnd.Next(0, 512),
+                     rnd.Next(0, 512),
+                     CubeMapFace.Up);
             }
-            if (yp > 0) neighbors.Add(new NeighborGradient { X = xp, Y = yp - 1 }); // Top
-            if (yp < 2047) neighbors.Add(new NeighborGradient { X = xp, Y = yp + 1 }); // Bottom
-            if (xp < 2047)
+
+            PointD lastGradient = new PointD();
+            for (int i = 0; i < maxDropletLifetime; ++i)
             {
-                neighbors.Add(new NeighborGradient { X = xp + 1, Y = yp }); // Right
-                if (yp > 0) neighbors.Add(new NeighborGradient { X = xp + 1, Y = yp - 1 }); // Top Right
-                if (yp < 2047) neighbors.Add(new NeighborGradient { X = xp + 1, Y = yp + 1 }); // Bottom Right
-            }
-            // =========================================================================================
-            // Loop all neighbors and calculate gradient
-            double maxGradient = 0;
-            foreach (var neighbor in neighbors)
-            {
-                neighbor.Gradient = ff[neighbor.X, neighbor.Y] - ff[xp, yp];
-                if (neighbor.Gradient < maxGradient)
+                int velocityDirX, velocityDirY;
+                CubeMapPoint.CalculateDirection(point.VelocityX, point.VelocityY, out velocityDirX, out velocityDirY);
+
+                _debugTile[point.PosX, point.PosY] = volume;
+
+                var nextPoint = CubeMapPoint.GetPointRelativeTo(point, velocityDirX, velocityDirY, _faces);
+                var oldPoint = point.Clone();
+                point.PosX = nextPoint.PosX;
+                point.PosY = nextPoint.PosY;
+                point.Face = nextPoint.Face;
+
+                if (i > 0 && velocityDirX == 0 && velocityDirY == 0)
                 {
-                    maxGradient = neighbor.Gradient;
+                    return;
                 }
-            }
-            // Remove all neighbors that are higher
-            neighbors.RemoveAll(o => o.Gradient >= 0);
-            // =========================================================================================
-            if (neighbors.Count == 0)
-                return;
-            maxGradient = Math.Abs(maxGradient); // Number will always be 0 or less
-            // Apply erosion
-            // Take some material away and wash it onto neighbors
-            // Amount of material washed away is 1/65535 or maxGradient, whatever is less
-            var matValue = (150.0 / 65535) / iteration;
-            if (maxGradient < matValue) matValue = maxGradient;
 
-            var decrement = matValue / 16;
+                // =======================================================================
+                // STEP 1: Apply erosion
+                // =======================================================================
+                var heightDiff = point.Value - oldPoint.Value;
 
-            // Give part of material to random neighbors.
-            // Stop if neighbor reached same height
-            List<NeighborGradient> lowerNeighbors = new List<NeighborGradient>(neighbors);
-            Random rnd = new Random();
-            while (matValue > 0 && lowerNeighbors.Count > 0)
-            {
-                var val = ff[xp, yp] - decrement;
-                var index = rnd.Next(lowerNeighbors.Count);
-                var n = lowerNeighbors[index];
-                var nVal = ff[n.X, n.Y] + decrement*0.8; // Some material gets lost
-                if (nVal >= val)
+                // Capacity for sediment
+                double capacity = Math.Max(lastGradient.Length * volume * oldPoint.VelocityLength, minCapacity);
+                double sedimentDelta;
+
+                if (sediment > capacity || heightDiff > 0)
                 {
-                    nVal = val = (nVal + val) / 2;
-                    lowerNeighbors.RemoveAt(index);
+                    // Fill up if uphill, else deposit what is too much
+                    sedimentDelta = (-1) * (heightDiff > 0 ? Math.Min(heightDiff, sediment) : (sediment - capacity));
                 }
-                if (val < 0) val = 0;
-                if (nVal < 0) nVal = 0;
+                else
+                {
+                    // No erosion on flat terrain (heightDiff = 0)
+                    sedimentDelta = -1 * Math.Min((capacity - sediment) * erodeFactor, -heightDiff);
+                }
+                // Apply erosion/fill:
+                // - Current pixel gets 50%
+                // - Give rest other neightbors
+                //   - Horizontal and vertical neigbors get more than diagonal ones
+                //     - Imagine a circle of radius 1 around current point and the surface of neighbors it covers
+                if (sedimentDelta != 0)
+                {
+                    double horVert = 0.17857 / 2; // /2 because 50%
+                    double diag = 0.071428 / 2;
+                    // If you multiply each number above by 4 and add them, this should result in 0.5
+                    for (int x = -1; x <= 1; ++x)
+                    {
+                        for (int y = -1; y <= 1; ++y)
+                        {
+                            if (x == 0 && y == 0)
+                            {
+                                oldPoint.Value += sedimentDelta;
+                            }
+                            var pxy = CubeMapPoint.GetPointRelativeTo(oldPoint, x, y, _faces);
+                            if (x != 0 && y != 0)
+                                pxy.Value += diag * sedimentDelta;
+                            else
+                                pxy.Value += horVert * sedimentDelta;
+                        }
+                    }
+                    sediment += sedimentDelta;
+                }
+                volume *= waterLossFactor;
 
-                ff[xp, yp] = val;
-                ff[n.X, n.Y] = nVal;
-                matValue -= decrement;
+                // =======================================================================
+                // STEP 2: Add acceleration added by gradient and move point
+                // =======================================================================
+                lastGradient = point.GetGradient();
+                int gradientDirX, gradientDirY;
+                CubeMapPoint.CalculateDirection(lastGradient.X, lastGradient.Y, out gradientDirX, out gradientDirY);
+                var gPoint = CubeMapPoint.GetPointRelativeTo(point, gradientDirX, gradientDirY, _faces);
+                double gDist = 1;
+                if (gradientDirX != 0 && gradientDirY != 0) gDist = 1.414;
+
+                var gg = point.Value - gPoint.Value;
+                // Calculate force applied by gradient: F = sin(alpha)*m*g
+                // g = gravity, m = mass. Let's set both to 1
+                // For simplification use this triangle:
+                //     /|
+                //    / | gg
+                //   /a)|
+                //  -----
+                //   dDist (1 or 1.414)
+                // alpha = atan(G)
+                // F = sin(atan(G)) = G/(SQRT(d^2+G^2))
+                // F = mass * acceleration
+                // Since mass = 1:
+                var acceleration = gg / (Math.Sqrt(gDist * gDist + gg * gg));
+
+                point.VelocityX += gg * (lastGradient.X / lastGradient.Length);
+                point.VelocityY += gg * (lastGradient.Y / lastGradient.Length);
+
+                // Add some friction: (would normally be based on speed and other factors)
+                point.VelocityX *= 0.95;
+                point.VelocityY *= 0.95;
             }
-
-            // Don't iterate when all neighbors are equalized
-            if (lowerNeighbors.Count == 0) return;
-
-            // Abort on too many iterations
-            if (iteration >= 16) return;
-
-            // All lower neighbors:
-            foreach (var neighbor in lowerNeighbors)
-            {
-                Erode(ff, neighbor.X, neighbor.Y, iteration + lowerNeighbors.Count);
-            }
-
-            //++iteration;
-            // Lowest neigbor only:
-            // Find lowest neighbot and let it continue
-            //NeighborGradient lowest = lowerNeighbors[0];
-
-            //if (lowerNeighbors.Count > 1)
-            //{
-            //    for (int i=1;i<lowerNeighbors.Count; i++)
-            //    {
-            //        var n = lowerNeighbors[i];
-            //        if (ff[n.X,n.Y] < ff[lowest.X, lowest.Y])
-            //            lowest = n;
-            //    }
-            //}
-            //Erode(ff, lowest.X, lowest.Y, iteration);
         }
 
-        class NeighborGradient
+        class CubeMapPoint
         {
-            public int X;
-            public int Y;
-            public double Gradient;
+            public CubeMapFace Face { get; set; } = CubeMapFace.Up;
+
+            public double Value
+            {
+                get => _faces[Face][PosX, PosY];
+                set => _faces[Face][PosX, PosY] = value;
+            }
+
+            public int PosX { get; set; }
+            public int PosY { get; set; }
+
+            public PointD GetGradient()
+            {
+                CalcGradient(out var gx, out var gy);
+                return new PointD { X = gx, Y = gy };
+            }
+
+            public double VelocityX;
+            public double VelocityY;
+            public double VelocityLength => Math.Sqrt(VelocityX * VelocityX + VelocityY * VelocityY);
+
+            Dictionary<CubeMapFace, double[,]> _faces;
+
+            public CubeMapPoint(Dictionary<CubeMapFace, double[,]> faces, int posX = 0, int posY = 0, CubeMapFace face = CubeMapFace.Up)
+            {
+                _faces = faces;
+                Face = face;
+                PosX = posX;
+                PosY = posY;
+            }
+
+            public CubeMapPoint Clone()
+            {
+                return new CubeMapPoint(_faces, PosX, PosY, Face)
+                {
+                    VelocityX = VelocityX,
+                    VelocityY = VelocityY
+                };
+            }
+
+            void CalcGradient(out double gx, out double gy)
+            {
+                // Gradient is steepness of terrain. Consider this matrix:
+                // | G00 G10 G20 |
+                // | G01 G11 G21 |
+                // | G02 G12 G22 |
+                //
+                // Our current position is G11.
+                // The gradient to each neighbor is: Gxx-G11/distance
+                // The points G10,G01,G21 and G12 have a distance of 1
+                // The other points are diagonal and have a distance of Sqrt(2) = 1.414 (Pythagoras)
+                //
+                // Each gradient causes a force that drags the water droplet towards it
+                // We can just sum the gradients up indepentently for each axis to get the final gradient vector
+
+                var g00 = (GetPointRelativeTo(this, -1, -1, _faces).Value - Value) / 1.414;
+                var g10 = GetPointRelativeTo(this, 0, -1, _faces).Value - Value;
+                var g20 = (GetPointRelativeTo(this, 1, -1, _faces).Value - Value) / 1.414;
+                var g01 = GetPointRelativeTo(this, -1, 0, _faces).Value - Value;
+                var g21 = GetPointRelativeTo(this, 1, 0, _faces).Value - Value;
+                var g02 = (GetPointRelativeTo(this, -1, 1, _faces).Value - Value) / 1.414;
+                var g12 = GetPointRelativeTo(this, 0, 1, _faces).Value - Value;
+                var g22 = (GetPointRelativeTo(this, 1, 1, _faces).Value - Value) / 1.414;
+
+                gx = (g00 + g01 + g02) - (g20 + g21 + g22);
+                gy = (g00 + g10 + g20) - (g02 + g12 + g22);
+            }
+
+            public static void CalculateDirection(double vx, double vy, out int dx, out int dy)
+            {
+                dx = 0;
+                dy = 0;
+
+                if (vy == 0 && vx == 0) return;
+
+                var angle = Math.Atan2(vy, vx) * 180 / Math.PI; ;
+                if (angle >= -22.5 && angle < 22.5)
+                {
+                    dx = 1;
+                }
+                else if (angle >= 22.5 && angle < 67.5)
+                {
+                    dx = 1;
+                    dy = 1;
+                }
+                else if (angle >= 67.5 && angle < 112.5)
+                {
+                    dy = 1;
+                }
+                else if (angle >= 112.5 && angle < 157.5)
+                {
+                    dx = -1;
+                    dy = 1;
+                }
+                else if (angle >= 157.5 || angle < -157.5)
+                {
+                    dx = -1;
+                }
+                else if (angle >= -157.5 && angle < -112.5)
+                {
+                    dx = -1;
+                    dy = -1;
+                }
+                else if (angle >= -112.5 && angle < -67.5)
+                {
+                    dy = -1;
+                }
+                else
+                {
+                    dx = 1;
+                    dy = -1;
+                }
+            }
+
+            /// <summary>
+            /// Do not use dx or dy values greater than 2048!!!
+            /// </summary>
+            /// <param name="origin"></param>
+            /// <param name="dx"></param>
+            /// <param name="dy"></param>
+            /// <returns></returns>
+            public static CubeMapPoint GetPointRelativeTo(CubeMapPoint origin, int dx, int dy, Dictionary<CubeMapFace, double[,]> faces)
+            {
+                if (dx == 0 && dy == 0)
+                    return origin;
+
+                int backup;
+                // Move in X direction first:
+                var currentFace = origin.Face;
+                var currentX = origin.PosX + dx;
+                var currentY = origin.PosY;
+                if (currentX < 0) // West
+                {
+                    switch (origin.Face)
+                    {
+                        case CubeMapFace.Up:
+                            // West of 'Up' is 'Left', rotated clockwise by 90°
+                            // x/y flipped!
+                            backup = currentX;
+                            currentX = origin.PosY;
+                            currentY = (-1 * backup) - 1;
+                            return GetPointRelativeTo(
+                                new CubeMapPoint(faces, currentX, currentY, CubeMapFace.Left)
+                                {
+                                    VelocityX = origin.VelocityY,
+                                    VelocityY = -1 * origin.VelocityX
+                                }, dy, 0, faces);
+                        case CubeMapFace.Down:
+                            // West of 'Down' is 'Right', rotated counterclockwise by 90°
+                            // x/y flipped!
+                            currentY = 2048 + currentX;
+                            currentX = 2047 - origin.PosY;
+                            return GetPointRelativeTo(
+                                new CubeMapPoint(faces, currentX, currentY, CubeMapFace.Right)
+                                {
+                                    VelocityX = -1 * origin.VelocityY,
+                                    VelocityY = origin.VelocityX
+                                }, -dy, 0, faces);
+                        case CubeMapFace.Left:
+                            // West of 'Left' is 'Back'
+                            currentX += 2048;
+                            currentFace = CubeMapFace.Back;
+                            break;
+                        case CubeMapFace.Right:
+                            // West of 'Right' is 'Front'
+                            currentX += 2048;
+                            currentFace = CubeMapFace.Front;
+                            break;
+                        case CubeMapFace.Front:
+                            // West of 'Right' is 'Left'
+                            currentX += 2048;
+                            currentFace = CubeMapFace.Left;
+                            break;
+                        case CubeMapFace.Back:
+                            // West of 'Back' is 'Right'
+                            currentX += 2048;
+                            currentFace = CubeMapFace.Right;
+                            break;
+                    }
+                }
+                else if (currentX > 2047) // East
+                {
+                    switch (origin.Face)
+                    {
+                        case CubeMapFace.Up:
+                            // East of 'Up' is 'Right' rotated counterclockwise by 90°
+                            // x/y flipped! dy & velocityXY must be converted!
+                            currentY = currentX - 2048;
+                            currentX = 2047 - origin.PosY;
+                            return GetPointRelativeTo(
+                                new CubeMapPoint(faces, currentX, currentY, CubeMapFace.Right)
+                                {
+                                    VelocityX = -1 * origin.VelocityY,
+                                    VelocityY = origin.VelocityX,
+                                }, -dy, 0, faces);
+                        case CubeMapFace.Down:
+                            // East of 'Down' is 'Left', rotated clockwise by 90°
+                            // x/y flipped! dy & velocityXY must be converted!
+                            currentY = (2047 + 2048) - currentX; // range: 2047..->..0 bottom to top
+                            currentX = origin.PosY;
+                            currentFace = CubeMapFace.Left;
+                            return GetPointRelativeTo(
+                                new CubeMapPoint(faces, currentX, currentY, CubeMapFace.Left)
+                                {
+                                    VelocityX = origin.VelocityY,
+                                    VelocityY = -1 * origin.VelocityX,
+                                }, dy, 0, faces);
+                        case CubeMapFace.Left:
+                            // East of 'Left' is 'Front'
+                            currentX = currentX - 2048;
+                            currentFace = CubeMapFace.Front;
+                            break;
+                        case CubeMapFace.Right:
+                            // East of 'Right' is 'Back'
+                            currentX = currentX - 2048;
+                            currentFace = CubeMapFace.Back;
+                            break;
+                        case CubeMapFace.Front:
+                            // East of 'Front' is 'Right'
+                            currentX = currentX - 2048;
+                            currentFace = CubeMapFace.Right;
+                            break;
+                        case CubeMapFace.Back:
+                            // East of 'Back' is 'Left'
+                            currentX = currentX - 2048;
+                            currentFace = CubeMapFace.Back;
+                            break;
+                    }
+                }
+
+                // Now move in Y direction:
+                currentY = currentY + dy;
+                var currentVelocityX = origin.VelocityX;
+                var currentVelocityY = origin.VelocityY;
+                if (currentY < 0) // North
+                {
+                    switch (origin.Face)
+                    {
+                        case CubeMapFace.Up:
+                            // North of 'Up' is 'Back' rotated by 180°
+                            currentX = 2047 - currentX;
+                            currentY = (-1 * currentY) - 1;
+                            currentVelocityX = -1 * origin.VelocityX;
+                            currentVelocityY = -1 * origin.VelocityY;
+                            currentFace = CubeMapFace.Back;
+                            break;
+                        case CubeMapFace.Down:
+                            // North of 'Down' is 'Back'
+                            currentY = 2048 + currentY;
+                            currentFace = CubeMapFace.Back;
+                            break;
+                        case CubeMapFace.Left:
+                            // North of 'Left' is 'Up' rotated counterclockwise by 90°
+                            backup = currentX;
+                            currentX = (-1 * currentY) - 1;
+                            currentY = backup;
+                            currentVelocityX = -1 * origin.VelocityY;
+                            currentVelocityY = origin.VelocityX;
+                            currentFace = CubeMapFace.Up;
+                            break;
+                        case CubeMapFace.Right:
+                            // North of 'Right' is 'Up' rotated clockwise by 90!
+                            backup = currentX;
+                            currentX = currentY + 2048;
+                            currentY = 2047 - backup;
+                            currentVelocityX = origin.VelocityY;
+                            currentVelocityY = -1 * origin.VelocityX;
+                            currentFace = CubeMapFace.Up;
+                            break;
+                        case CubeMapFace.Front:
+                            // North of 'Front' is 'Up'
+                            currentY = currentY + 2048;
+                            currentFace = CubeMapFace.Up;
+                            break;
+                        case CubeMapFace.Back:
+                            // North of 'Back is 'Up' rotated by 180°
+                            backup = currentX;
+                            currentX = 2047 - currentX;
+                            currentY = (-1 * currentY) - 1;
+                            currentVelocityX = -1 * origin.VelocityX;
+                            currentVelocityY = -1 * origin.VelocityY;
+                            currentFace = CubeMapFace.Up;
+                            break;
+                    }
+                }
+                else if (currentY > 2047) // South
+                {
+                    switch (origin.Face)
+                    {
+                        case CubeMapFace.Up:
+                            // South of 'Up' is 'Front'
+                            currentY = 2048 - currentY;
+                            currentFace = CubeMapFace.Front;
+                            break;
+                        case CubeMapFace.Down:
+                            // South of 'Down' is 'Front' rotated by 180°
+                            currentX = 2047 - currentX;
+                            currentY = (2047 + 2048) - currentY;
+                            currentVelocityX = currentVelocityX * -1;
+                            currentVelocityY = currentVelocityY * -1;
+                            currentFace = CubeMapFace.Front;
+                            break;
+                        case CubeMapFace.Left:
+                            // South of 'Left' is 'Down' rotated counterclockwise by 90°
+                            backup = currentX;
+                            currentX = (2047 + 2048) - currentY;
+                            currentY = backup;
+                            currentVelocityX = -1 * origin.VelocityY;
+                            currentVelocityY = origin.VelocityX;
+                            currentFace = CubeMapFace.Down;
+                            break;
+                        case CubeMapFace.Right:
+                            // South of 'Right' is 'Down' rotated clockwise by 90°
+                            backup = currentX;
+                            currentX = currentY - 2048;
+                            currentY = 2047 - backup;
+                            currentVelocityX = origin.VelocityY;
+                            currentVelocityY = -1 * origin.VelocityX;
+                            currentFace = CubeMapFace.Down;
+                            break;
+                        case CubeMapFace.Front:
+                            // South of 'Right' is 'Down' rotated by 180°
+                            backup = currentX;
+                            currentX = 2047 - currentX;
+                            currentY = (2047 + 2048) - currentY;
+                            currentVelocityX = -1 * origin.VelocityX;
+                            currentVelocityY = -1 * origin.VelocityY;
+                            currentFace = CubeMapFace.Down;
+                            break;
+                        case CubeMapFace.Back:
+                            // South of 'Back' is 'Down'
+                            currentY = currentY - 2048;
+                            break;
+                    }
+                }
+                return new CubeMapPoint(faces, currentX, currentY, currentFace)
+                {
+                    VelocityX = currentVelocityX,
+                    VelocityY = currentVelocityY,
+                };
+            }
+
         }
-        //class XY
-        //{
-        //    public double X;
-        //    public double Y;
-        //}
 
         // tiles must be normalized to 0...1 !!!
         void TileToImage(double[,] tile, CubeMapFace face)
@@ -353,7 +691,7 @@ namespace PlanetCreator
                     break;
                 case CubeMapFace.Left: // X-
                     origin.X = -offset;
-                    origin.Y = offset -x;
+                    origin.Y = offset - x;
                     origin.Z = offset - y;
                     break;
                 case CubeMapFace.Right: // X+
@@ -387,6 +725,13 @@ namespace PlanetCreator
         Right,
         Up,
         Down
+    }
+
+    class PointD
+    {
+        public double X;
+        public double Y;
+        public double Length => Math.Sqrt(X* X + Y* Y);
     }
 
     class NoiseMaker
