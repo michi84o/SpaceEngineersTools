@@ -123,7 +123,7 @@ namespace PlanetCreator
                 var rnd = new Random(0);
                 var facesValues = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToArray();
 
-                Parallel.For(0, 500, new ParallelOptions { MaxDegreeOfParallelism = 8 }, pit =>
+                Parallel.For(0, 10000, new ParallelOptions { MaxDegreeOfParallelism = 8 }, pit =>
                 {
                     Erode(rnd);
                 });
@@ -221,47 +221,84 @@ namespace PlanetCreator
 
                 // Capacity for sediment
                 double capacity = Math.Max(lastGradient.Length * volume * oldPoint.VelocityLength, minCapacity);
-                double sedimentDelta;
 
                 if (sediment > capacity || heightDiff > 0)
                 {
+                    // Apply fill
+                    double sedimentDelta = 0;
                     // Fill up if uphill, else deposit what is too much
-                    sedimentDelta = (-1) * (heightDiff > 0 ? Math.Min(heightDiff, sediment) : (sediment - capacity));
+                    if (heightDiff > 0)
+                    {
+                        sedimentDelta = -1* Math.Min(heightDiff, sediment);
+                        oldPoint.Value += sediment; // TODO: Could cause sudden jumps
+                    }
+                    else
+                    {
+                        // Try to distribute the sediment around point to even out terrrain
+                        sedimentDelta = capacity - sediment; // this number is <0
+                        List<CubeMapPoint> cell = new List<CubeMapPoint>();
+                        cell.Add(oldPoint);
+                        for (int x = -1; x <= 1; ++x)
+                        {
+                            for (int y = -1; y <= 1; ++y)
+                            {
+                                if (x == 0 && y == 0) continue;
+                                cell.Add(CubeMapPoint.GetPointRelativeTo(oldPoint, x, y, _faces));
+                            }
+                        }
+                        // Get average heigt
+                        var avgHeight = 0.0;
+                        foreach (var p in cell)
+                            avgHeight += p.Value;
+                        avgHeight /= 9;
+                        // Fill up anything below average height
+                        var lowerPoints = cell.Where(p => p.Value < avgHeight).ToList();
+                        lowerPoints.Sort((a,b)=> a.Value.CompareTo(b.Value));
+                        var sedimentLeft = -sedimentDelta;
+                        foreach (var p in lowerPoints)
+                        {
+                            var sedimentToUse = Math.Min(sedimentLeft, avgHeight - p.Value);
+                            sedimentLeft -= sedimentToUse;
+                            p.Value += sedimentToUse;
+                            if (sedimentLeft <= 0) break;
+                        }
+
+                    }
+                    sediment += sedimentDelta;
                 }
                 else
                 {
                     // No erosion on flat terrain (heightDiff = 0)
-                    sedimentDelta = -1 * Math.Min((capacity - sediment) * erodeFactor, -heightDiff);
-                }
-                // Apply erosion/fill:
-                // - Current pixel gets 50%
-                // - Give rest other neightbors
-                //   - Horizontal and vertical neigbors get more than diagonal ones
-                //     - Imagine a circle of radius 1 around current point and the surface of neighbors it covers
-                if (sedimentDelta != 0)
-                {
-                    double horVert = 0.17857 / 2; // /2 because 50%
-                    double diag = 0.071428 / 2;
-                    // If you multiply each number above by 4 and add them, this should result in 0.5
-                    for (int x = -1; x <= 1; ++x)
+                    double sedimentDelta = -1 * Math.Min((capacity - sediment) * erodeFactor, -heightDiff);
+                    // Apply erosion:
+                    // - Current pixel gets 50%
+                    // - Give rest other neightbors
+                    //   - Horizontal and vertical neigbors get more than diagonal ones
+                    //     - Imagine a circle of radius 1 around current point and the surface of neighbors it covers
+                    if (sedimentDelta != 0)
                     {
-                        for (int y = -1; y <= 1; ++y)
+                        double horVert = 0.17857 / 2; // /2 because 50%
+                        double diag = 0.071428 / 2;
+                        // If you multiply each number above by 4 and add them, this should result in 0.5
+                        for (int x = -1; x <= 1; ++x)
                         {
-                            if (x == 0 && y == 0)
+                            for (int y = -1; y <= 1; ++y)
                             {
-                                oldPoint.Value += sedimentDelta;
+                                if (x == 0 && y == 0)
+                                {
+                                    oldPoint.Value += sedimentDelta;
+                                }
+                                var pxy = CubeMapPoint.GetPointRelativeTo(oldPoint, x, y, _faces);
+                                if (x != 0 && y != 0)
+                                    pxy.Value += diag * sedimentDelta;
+                                else
+                                    pxy.Value += horVert * sedimentDelta;
                             }
-                            var pxy = CubeMapPoint.GetPointRelativeTo(oldPoint, x, y, _faces);
-                            if (x != 0 && y != 0)
-                                pxy.Value += diag * sedimentDelta;
-                            else
-                                pxy.Value += horVert * sedimentDelta;
                         }
+                        sediment += -sedimentDelta;
                     }
-                    sediment += sedimentDelta;
                 }
                 volume *= waterLossFactor;
-
                 // =======================================================================
                 // STEP 2: Add acceleration added by gradient and move point
                 // =======================================================================
@@ -291,8 +328,8 @@ namespace PlanetCreator
                 point.VelocityY += gg * (lastGradient.Y / lastGradient.Length);
 
                 // Add some friction: (would normally be based on speed and other factors)
-                point.VelocityX *= 0.95;
-                point.VelocityY *= 0.95;
+                //point.VelocityX *= 0.95;
+                //point.VelocityY *= 0.95;
             }
         }
 
