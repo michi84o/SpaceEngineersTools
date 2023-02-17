@@ -82,16 +82,19 @@ namespace PlanetCreator
         }
         BitmapImage GetImage(string filename)
         {
-            var imageBytes = System.IO.File.ReadAllBytes(GetLocalFileName(filename)  );
+            try
+            {
+                var imageBytes = System.IO.File.ReadAllBytes(GetLocalFileName(filename));
 
-            var stream = new MemoryStream(imageBytes);
-            var img = new System.Windows.Media.Imaging.BitmapImage();
+                var stream = new MemoryStream(imageBytes);
+                var img = new System.Windows.Media.Imaging.BitmapImage();
 
-            img.BeginInit();
-            img.StreamSource = stream;
-            img.EndInit();
-
-            return img;
+                img.BeginInit();
+                img.StreamSource = stream;
+                img.EndInit();
+                return img;
+            }
+            catch { return null; }
         }
 
     }

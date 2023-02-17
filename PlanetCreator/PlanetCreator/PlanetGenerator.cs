@@ -86,8 +86,8 @@ namespace PlanetCreator
                         {
                             value += nm.GetValue3D(point.X * sphereRadius, point.Y * sphereRadius, point.Z * sphereRadius);
                         }
-                        if (value < min) min = value; // Non-Thread safe access! TODO?
-                        if (value > max) max = value;
+                        if (value < min) Interlocked.Exchange(ref min, value);
+                        if (value > max) Interlocked.Exchange(ref max, value);
                         tile[x, y] = value;
                     });
 
@@ -121,27 +121,46 @@ namespace PlanetCreator
             if (erode)
             {
                 var rnd = new Random(0);
-                var facesValues = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToArray();
-
-                Parallel.For(0, 10000, new ParallelOptions { MaxDegreeOfParallelism = 8 }, pit =>
+                Parallel.For(0, 1000000, new ParallelOptions { MaxDegreeOfParallelism = 8 }, pit =>
                 {
-                    Erode(rnd);
+                    Erode(rnd, pit);
                 });
 
+                //// Normalize to 0....1
+                min = 0;
+                max = 0;
+                foreach (var kv in _faces)
+                {
+                    var face = kv.Key;
+                    var tile = kv.Value;
+                    Parallel.For(0, _tileWidth, x =>
+                    {
+                        Parallel.For(0, _tileWidth, y =>
+                        {
+                            double value = tile[x, y];
+                            if (value < min) Interlocked.Exchange(ref min, value);
+                            if (value > max) Interlocked.Exchange(ref max, value);
+                        });
+                    });
+                }
+                offset = -1 * min;
+                stretch = Math.Abs(max - min);
+                foreach (var kv in _faces)
+                {
+                    var face = kv.Key;
+                    var tile = kv.Value;
+                    Parallel.For(0, _tileWidth, x =>
+                    {
+                        Parallel.For(0, _tileWidth, y =>
+                        {
+                            double value = tile[x, y];
+                            value += offset;
+                            value /= stretch;
+                            tile[x, y] = value;
+                        });
+                    });
+                }
 
-                //// Normalize noise to 0....1
-                //offset = -1 * erMin;
-                //stretch = Math.Abs(erMax - erMin);
-                //Parallel.For(0, _tileWidth, x =>
-                //{
-                //    Parallel.For(0, _tileWidth, y =>
-                //    {
-                //        double value = ff2[x, y];
-                //        value += offset;
-                //        value /= stretch;
-                //        ff[x, y] = value;
-                //    });
-                //});
             }
 
             // WIP, TODO
@@ -154,183 +173,255 @@ namespace PlanetCreator
             // - Add lakes
 
             // Create pictures
-            //foreach (var kv in _faces)
-            //{
-            //    var face = kv.Key;
-            //    var tile = kv.Value;
-            //    TileToImage(tile, face);
-            //}
+            foreach (var kv in _faces)
+            {
+                var face = kv.Key;
+                var tile = kv.Value;
+                TileToImage(tile, face);
+            }
 
-            TileToImage(_faces[CubeMapFace.Up], CubeMapFace.Up);
-            TileToImage(_debugTile, CubeMapFace.Down);
+            //TileToImage(_faces[CubeMapFace.Up], CubeMapFace.Up);
+            //TileToImage(_debugTile, "debug.png");
 
             MessageBox.Show("Done");
         }
 
-        void Erode(Random rnd)
+        void Erode(Random rnd, int iteration)
         {
-            CubeMapPoint point;
-            double volume = 1f;
-            double sediment = 0;
-            double minCapacity = 0.1;
-            double waterLossFactor = 0.99;
-            double erodeFactor = 0.3;
+            // Code based on Sebastian Lague
+            // https://www.youtube.com/watch?v=eaXk97ujbPQ
+            // https://github.com/SebLague/Hydraulic-Erosion
+            // which is based on a paper by Hans Theobald Beyer
+            // https://www.firespark.de/resources/downloads/implementation%20of%20a%20methode%20for%20hydraulic%20erosion.pdf
+            // which is based on a blog entry Alexey Volynskov
+            // http://ranmantaru.com/blog/2011/10/08/water-erosion-on-heightmap-terrain/
+
             int maxDropletLifetime = 30;
-            CubeMapFace face;
+            double inertia = 0.005;
+            double speed = 1;
+            double water = 1;
+            double sediment = 0;
+            double sedimentCapacityFactor = 100;
+            double minSedimentCapacity = .01;
+            double depositSpeed = 0.3;
+            double erodeSpeed = 0.3;
+            double brushRadius = 1;
+            double evaporateSpeed = 0.01;
+            double gravity = 4;
+
+            CubeMapFace face = CubeMapFace.Up;
+            PointD pos = new();
+            PointD dir = new();
+            var facesValues = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToArray();
 
             lock (rnd)
             {
-                /*
-                 point = new CubeMapPoint(
-                     _faces,
-                     rnd.Next(0, _tileWidth),
-                     rnd.Next(0, _tileWidth),
-                     facesValues[rnd.Next(0, facesValues.Length)]);
-                */
-                // DEBUG:
-                point = new CubeMapPoint(
-                     _faces,
-                     rnd.Next(0, 512),
-                     rnd.Next(0, 512),
-                     CubeMapFace.Up);
+                pos.X = rnd.NextDouble() * 2047;
+                pos.Y = rnd.NextDouble() * 2047;
+                face = facesValues[rnd.Next(0, facesValues.Length)];
+
+                // Debug:
+                //pos.X = rnd.NextDouble() * 500;
+                //pos.Y = rnd.NextDouble() * 500;
+                face = CubeMapFace.Up;
             }
 
-            PointD lastGradient = new PointD();
+            #region Code based on Sebastian Lague
+
+
+
             for (int i = 0; i < maxDropletLifetime; ++i)
             {
-                int velocityDirX, velocityDirY;
-                CubeMapPoint.CalculateDirection(point.VelocityX, point.VelocityY, out velocityDirX, out velocityDirY);
+                // Calculate droplet's offset inside the cell (0,0) = at NW node, (1,1) = at SE node
+                PointD cellOffset = pos.IntegerOffset(); // 0 <= offset < 1
 
-                _debugTile[point.PosX, point.PosY] = volume;
+                // Calculate droplet's height and direction of flow with bilinear interpolation of surrounding heights
+                HeightAndGradient heightAndGradient = CalculateHeightAndGradient(pos, face);
 
-                var nextPoint = CubeMapPoint.GetPointRelativeTo(point, velocityDirX, velocityDirY, _faces);
-                var oldPoint = point.Clone();
-                point.PosX = nextPoint.PosX;
-                point.PosY = nextPoint.PosY;
-                point.Face = nextPoint.Face;
+                // Update the droplet's direction and position (move position 1 unit regardless of speed)
+                dir = (dir * inertia - heightAndGradient.Gradient * (1 - inertia));
 
-                if (i > 0 && velocityDirX == 0 && velocityDirY == 0)
+                // Normalize direction
+                dir = dir.Normalize();
+                CubeMapFace faceOld = face;
+                PointD posOld = pos;
+                pos += dir;
+
+                // Stop simulating droplet if it's not moving
+                if (dir.X == 0 && dir.Y == 0) break;
+
+                var posI = pos.ToIntegerPoint();
+                var posOldI = posOld.ToIntegerPoint();
+
+                //_debugTile[posOldI.X, posOldI.Y] = water;
+
+                if (posI.X >= _tileWidth || posI.X < 0 || posI.Y >= _tileWidth || posI.Y < 0)
                 {
-                    return;
+                    // We left the tile! Check in which tile we are now:
+                    var newPosPoint = CubeMapPoint.GetPointRelativeTo(
+                        new CubeMapPoint(_faces, posOldI.X, posOldI.Y, face) { VelocityX = dir.X, VelocityY = dir.Y, OffsetX = cellOffset.X, OffsetY = cellOffset.Y },
+                            posI.X - posOldI.X,
+                            posI.Y - posOldI.Y,
+                            _faces);
+                    // Update face, position, speed and offset:
+                    //Debug.WriteLine("Face {0};{1}", face, newPosPoint.Face);
+                    if (newPosPoint.Face != face)
+                    {
+                        if (newPosPoint.PosX >= _tileWidth || newPosPoint.PosX < 0 || newPosPoint.PosY >= _tileWidth || newPosPoint.PosY < 0)
+                        {
+                            Debugger.Break();
+                        }
+                        face = newPosPoint.Face;
+                        pos.X = newPosPoint.PosX;
+                        pos.Y = newPosPoint.PosY;
+                        //Debug.WriteLine("Pos {0};{1}", pos.X, pos.Y);
+                        dir.X = newPosPoint.VelocityX;
+                        dir.Y = newPosPoint.VelocityY;
+                        cellOffset.X = newPosPoint.OffsetX;
+                        cellOffset.Y = newPosPoint.OffsetY;
+                    }
                 }
+                //if (pos.X >= _tileWidth || pos.X < 0 || pos.Y >= _tileWidth || pos.Y < 0)
+                //{
+                //    Debugger.Break();
+                //    return;
+                //}
 
-                // =======================================================================
-                // STEP 1: Apply erosion
-                // =======================================================================
-                var heightDiff = point.Value - oldPoint.Value;
+                // Find the droplet's new height and calculate the deltaHeight
+                double newHeight = CalculateHeightAndGradient(pos, face).Height;
+                double deltaHeight = newHeight - heightAndGradient.Height;
 
-                // Capacity for sediment
-                double capacity = Math.Max(lastGradient.Length * volume * oldPoint.VelocityLength, minCapacity);
+                // Calculate the droplet's sediment capacity (higher when moving fast down a slope and contains lots of water)
+                double sedimentCapacity = Math.Max(-deltaHeight * speed * water * sedimentCapacityFactor, minSedimentCapacity);
 
-                if (sediment > capacity || heightDiff > 0)
+                // If carrying more sediment than capacity, or if flowing uphill:
+                var oldPoint = new CubeMapPoint(_faces, (int)posOld.X, (int)posOld.Y, faceOld);
+                if (sediment > sedimentCapacity || deltaHeight > 0)
                 {
-                    // Apply fill
-                    double sedimentDelta = 0;
-                    // Fill up if uphill, else deposit what is too much
-                    if (heightDiff > 0)
-                    {
-                        sedimentDelta = -1* Math.Min(heightDiff, sediment);
-                        oldPoint.Value += sediment; // TODO: Could cause sudden jumps
-                    }
-                    else
-                    {
-                        // Try to distribute the sediment around point to even out terrrain
-                        sedimentDelta = capacity - sediment; // this number is <0
-                        List<CubeMapPoint> cell = new List<CubeMapPoint>();
-                        cell.Add(oldPoint);
-                        for (int x = -1; x <= 1; ++x)
-                        {
-                            for (int y = -1; y <= 1; ++y)
-                            {
-                                if (x == 0 && y == 0) continue;
-                                cell.Add(CubeMapPoint.GetPointRelativeTo(oldPoint, x, y, _faces));
-                            }
-                        }
-                        // Get average heigt
-                        var avgHeight = 0.0;
-                        foreach (var p in cell)
-                            avgHeight += p.Value;
-                        avgHeight /= 9;
-                        // Fill up anything below average height
-                        var lowerPoints = cell.Where(p => p.Value < avgHeight).ToList();
-                        lowerPoints.Sort((a,b)=> a.Value.CompareTo(b.Value));
-                        var sedimentLeft = -sedimentDelta;
-                        foreach (var p in lowerPoints)
-                        {
-                            var sedimentToUse = Math.Min(sedimentLeft, avgHeight - p.Value);
-                            sedimentLeft -= sedimentToUse;
-                            p.Value += sedimentToUse;
-                            if (sedimentLeft <= 0) break;
-                        }
+                    // If moving uphill (deltaHeight > 0) try fill up to the current height, otherwise deposit a fraction of the excess sediment
+                    double amountToDeposit = (deltaHeight > 0) ? Math.Min(deltaHeight, sediment) : (sediment - sedimentCapacity) * depositSpeed;
+                    sediment -= amountToDeposit;
 
-                    }
-                    sediment += sedimentDelta;
+                    // Add the sediment to the four nodes of the current cell using bilinear interpolation
+                    // Deposition is not distributed over a radius (like erosion) so that it can fill small pits
+                    oldPoint.Value += amountToDeposit * (1 - cellOffset.X) * (1 - cellOffset.Y);
+                    CubeMapPoint.GetPointRelativeTo(oldPoint, 1,0, _faces).Value += amountToDeposit * cellOffset.X * (1 - cellOffset.Y);
+                    CubeMapPoint.GetPointRelativeTo(oldPoint, 0, 1, _faces).Value += amountToDeposit * (1 - cellOffset.X) * cellOffset.Y;
+                    CubeMapPoint.GetPointRelativeTo(oldPoint, 1, 1, _faces).Value += amountToDeposit * cellOffset.X * cellOffset.Y;
                 }
                 else
                 {
-                    // No erosion on flat terrain (heightDiff = 0)
-                    double sedimentDelta = -1 * Math.Min((capacity - sediment) * erodeFactor, -heightDiff);
-                    // Apply erosion:
-                    // - Current pixel gets 50%
-                    // - Give rest other neightbors
-                    //   - Horizontal and vertical neigbors get more than diagonal ones
-                    //     - Imagine a circle of radius 1 around current point and the surface of neighbors it covers
-                    if (sedimentDelta != 0)
+                    // Erode a fraction of the droplet's current carry capacity.
+                    // Clamp the erosion to the change in height so that it doesn't dig a hole in the terrain behind the droplet
+                    double amountToErode = Math.Min((sedimentCapacity - sediment) * erodeSpeed, -deltaHeight);
+
+                    // Original code use some precomputed weights for a brush. Since we have multiple cubemaps,
+                    // that doesn't work properly.
+                    // Alternative concept:
+                    // - Use the exact position
+                    // - Draw a circle of brush radius
+                    // - Split every grid point into 16 subgrids and calculate if the center of the subgrid is inside the circle.
+                    //   - If subgrid is in circle, assign weight off 1 - distance/radius to that grid point
+                    List<CubeMapPoint> brushPoints = new();
+                    List<double> brushWeights = new();
+                    int brushDelta = (int)(brushRadius + 0.5);
+                    double brushWeightSum = 0;
+                    // Cycle through all points within radius
+                    for (int dx = -brushDelta; dx <= brushDelta; ++dx)
                     {
-                        double horVert = 0.17857 / 2; // /2 because 50%
-                        double diag = 0.071428 / 2;
-                        // If you multiply each number above by 4 and add them, this should result in 0.5
-                        for (int x = -1; x <= 1; ++x)
+                        for (int dy = -brushDelta; dy <= brushDelta; ++dy)
                         {
-                            for (int y = -1; y <= 1; ++y)
+                            var pt = CubeMapPoint.GetPointRelativeTo(oldPoint, dx, dy, _faces);
+                            double brushWeight = 0;
+                            // Split grid into 16 chunks, divide by 4 on each axis. Vector goes to center of subgrid
+                            for (double subDx = -0.375; subDx <= 0.3751; subDx+= 0.25)
                             {
-                                if (x == 0 && y == 0)
+                                for (double subDy = -0.375; subDy <= 0.3751; subDy += 0.25)
                                 {
-                                    oldPoint.Value += sedimentDelta;
+                                    PointD vector = new PointD
+                                    {
+                                        X = pt.PosX + subDx - posOld.X,
+                                        Y = pt.PosY + subDy - posOld.Y,
+                                    };
+                                    var distance = vector.Length;
+                                    if (distance <= brushRadius)
+                                    {
+                                        double newWeight = 1 - distance / brushRadius;
+                                        brushWeight += newWeight;
+                                        brushWeightSum += newWeight;
+                                    }
                                 }
-                                var pxy = CubeMapPoint.GetPointRelativeTo(oldPoint, x, y, _faces);
-                                if (x != 0 && y != 0)
-                                    pxy.Value += diag * sedimentDelta;
-                                else
-                                    pxy.Value += horVert * sedimentDelta;
                             }
+                            brushPoints.Add(pt);
+                            brushWeights.Add(brushWeight);
+                            //Debug.WriteLine("brushWeight: " + brushWeight);
+                            //Debug.WriteLine("brushWeightSum: " + brushWeightSum);
                         }
-                        sediment += -sedimentDelta;
                     }
+                    double test = 0;
+                    for (int ii = 0; ii < brushWeights.Count; ++ii)
+                    {
+                        double erodeAmount = amountToErode * brushWeights[ii] / brushWeightSum;
+                        test += brushWeights[ii];
+                        if (brushPoints[ii].Value < erodeAmount)
+                            erodeAmount = brushPoints[ii].Value;
+                        brushPoints[ii].Value -= erodeAmount;
+                        sediment += erodeAmount;
+                    }
+                    deltaHeight += amountToErode;
                 }
-                volume *= waterLossFactor;
-                // =======================================================================
-                // STEP 2: Add acceleration added by gradient and move point
-                // =======================================================================
-                lastGradient = point.GetGradient();
-                int gradientDirX, gradientDirY;
-                CubeMapPoint.CalculateDirection(lastGradient.X, lastGradient.Y, out gradientDirX, out gradientDirY);
-                var gPoint = CubeMapPoint.GetPointRelativeTo(point, gradientDirX, gradientDirY, _faces);
-                double gDist = 1;
-                if (gradientDirX != 0 && gradientDirY != 0) gDist = 1.414;
 
-                var gg = point.Value - gPoint.Value;
-                // Calculate force applied by gradient: F = sin(alpha)*m*g
-                // g = gravity, m = mass. Let's set both to 1
-                // For simplification use this triangle:
-                //     /|
-                //    / | gg
-                //   /a)|
-                //  -----
-                //   dDist (1 or 1.414)
-                // alpha = atan(G)
-                // F = sin(atan(G)) = G/(SQRT(d^2+G^2))
-                // F = mass * acceleration
-                // Since mass = 1:
-                var acceleration = gg / (Math.Sqrt(gDist * gDist + gg * gg));
+                // Update droplet's speed and water content
+                double oldSpeed = speed;
+                double gravityDelta = (-deltaHeight) * gravity;
+                double speedSquared = speed*speed;
+                // Prevent speed from becomming double.NaN
+                // None of the authors this code was based on noticed this flaw
+                if (gravityDelta < 0 && -gravityDelta > speedSquared)
+                {
+                    speed = Math.Sqrt(-gravityDelta);
+                    dir.X = -dir.X;
+                    dir.Y = -dir.Y;
+                }
+                else
+                    speed = Math.Sqrt(speedSquared + gravityDelta);
+                water *= (1 - evaporateSpeed);
 
-                point.VelocityX += gg * (lastGradient.X / lastGradient.Length);
-                point.VelocityY += gg * (lastGradient.Y / lastGradient.Length);
-
-                // Add some friction: (would normally be based on speed and other factors)
-                //point.VelocityX *= 0.95;
-                //point.VelocityY *= 0.95;
             }
+
+            #endregion
+        }
+
+        HeightAndGradient CalculateHeightAndGradient(PointD pos, CubeMapFace face)
+        {
+            int coordX = (int)pos.X;
+            int coordY = (int)pos.Y;
+            // Calculate droplet's offset inside the cell (0,0) = at NW node, (1,1) = at SE node
+            double x = pos.X - coordX;
+            double y = pos.Y - coordY;
+
+            var point = new CubeMapPoint(_faces, coordX, coordY, face);
+
+            // Calculate heights of the four nodes of the droplet's cell
+            double heightNW = CubeMapPoint.GetPointRelativeTo(point,-1,-1,_faces).Value;
+            double heightNE = CubeMapPoint.GetPointRelativeTo(point, 1, 0, _faces).Value;
+            double heightSW = CubeMapPoint.GetPointRelativeTo(point, -1, 1, _faces).Value;
+            double heightSE = CubeMapPoint.GetPointRelativeTo(point, 1, 1, _faces).Value;
+
+            // Calculate droplet's direction of flow with bilinear interpolation of height difference along the edges
+            double gradientX = (heightNE - heightNW) * (1 - y) + (heightSE - heightSW) * y;
+            double gradientY = (heightSW - heightNW) * (1 - x) + (heightSE - heightNE) * x;
+
+            // Calculate height with bilinear interpolation of the heights of the nodes of the cell
+            double height = heightNW * (1 - x) * (1 - y) + heightNE * x * (1 - y) + heightSW * (1 - x) * y + heightSE * x * y;
+
+            return new HeightAndGradient() { Height = height, Gradient = { X = gradientX, Y = gradientY } };
+        }
+
+        struct HeightAndGradient
+        {
+            public double Height;
+            public PointD Gradient;
         }
 
         class CubeMapPoint
@@ -342,6 +433,11 @@ namespace PlanetCreator
                 get => _faces[Face][PosX, PosY];
                 set => _faces[Face][PosX, PosY] = value;
             }
+
+            // 0 <= offset < 1
+            public double OffsetX { get; set; }
+            public double OffsetY { get; set; }
+
 
             public int PosX { get; set; }
             public int PosY { get; set; }
@@ -462,6 +558,7 @@ namespace PlanetCreator
                     return origin;
 
                 int backup;
+                double backupD;
                 // Move in X direction first:
                 var currentFace = origin.Face;
                 var currentX = origin.PosX + dx;
@@ -480,7 +577,9 @@ namespace PlanetCreator
                                 new CubeMapPoint(faces, currentX, currentY, CubeMapFace.Left)
                                 {
                                     VelocityX = origin.VelocityY,
-                                    VelocityY = -1 * origin.VelocityX
+                                    VelocityY = -1 * origin.VelocityX,
+                                    OffsetX = origin.OffsetY,
+                                    OffsetY = 1 - origin.OffsetX
                                 }, dy, 0, faces);
                         case CubeMapFace.Down:
                             // West of 'Down' is 'Right', rotated counterclockwise by 90°
@@ -491,7 +590,9 @@ namespace PlanetCreator
                                 new CubeMapPoint(faces, currentX, currentY, CubeMapFace.Right)
                                 {
                                     VelocityX = -1 * origin.VelocityY,
-                                    VelocityY = origin.VelocityX
+                                    VelocityY = origin.VelocityX,
+                                    OffsetX = 1 - origin.OffsetY,
+                                    OffsetY = origin.OffsetX,
                                 }, -dy, 0, faces);
                         case CubeMapFace.Left:
                             // West of 'Left' is 'Back'
@@ -529,18 +630,21 @@ namespace PlanetCreator
                                 {
                                     VelocityX = -1 * origin.VelocityY,
                                     VelocityY = origin.VelocityX,
+                                    OffsetX = 1 - origin.OffsetY,
+                                    OffsetY = origin.OffsetX
                                 }, -dy, 0, faces);
                         case CubeMapFace.Down:
                             // East of 'Down' is 'Left', rotated clockwise by 90°
                             // x/y flipped! dy & velocityXY must be converted!
                             currentY = (2047 + 2048) - currentX; // range: 2047..->..0 bottom to top
                             currentX = origin.PosY;
-                            currentFace = CubeMapFace.Left;
                             return GetPointRelativeTo(
                                 new CubeMapPoint(faces, currentX, currentY, CubeMapFace.Left)
                                 {
                                     VelocityX = origin.VelocityY,
                                     VelocityY = -1 * origin.VelocityX,
+                                    OffsetX = origin.OffsetY,
+                                    OffsetY = 1 - origin.OffsetX
                                 }, dy, 0, faces);
                         case CubeMapFace.Left:
                             // East of 'Left' is 'Front'
@@ -560,7 +664,7 @@ namespace PlanetCreator
                         case CubeMapFace.Back:
                             // East of 'Back' is 'Left'
                             currentX = currentX - 2048;
-                            currentFace = CubeMapFace.Back;
+                            currentFace = CubeMapFace.Left;
                             break;
                     }
                 }
@@ -569,6 +673,8 @@ namespace PlanetCreator
                 currentY = currentY + dy;
                 var currentVelocityX = origin.VelocityX;
                 var currentVelocityY = origin.VelocityY;
+                var currentOffsetX = origin.OffsetX;
+                var currentOffsetY = origin.OffsetY;
                 if (currentY < 0) // North
                 {
                     switch (origin.Face)
@@ -579,6 +685,8 @@ namespace PlanetCreator
                             currentY = (-1 * currentY) - 1;
                             currentVelocityX = -1 * origin.VelocityX;
                             currentVelocityY = -1 * origin.VelocityY;
+                            currentOffsetX = 1 - origin.OffsetX;
+                            currentOffsetY = 1 - origin.OffsetY;
                             currentFace = CubeMapFace.Back;
                             break;
                         case CubeMapFace.Down:
@@ -593,6 +701,8 @@ namespace PlanetCreator
                             currentY = backup;
                             currentVelocityX = -1 * origin.VelocityY;
                             currentVelocityY = origin.VelocityX;
+                            currentOffsetX = 1 - origin.OffsetY;
+                            currentOffsetY = origin.OffsetX;
                             currentFace = CubeMapFace.Up;
                             break;
                         case CubeMapFace.Right:
@@ -602,6 +712,8 @@ namespace PlanetCreator
                             currentY = 2047 - backup;
                             currentVelocityX = origin.VelocityY;
                             currentVelocityY = -1 * origin.VelocityX;
+                            currentOffsetX = origin.OffsetY;
+                            currentOffsetY = 1 - origin.OffsetX;
                             currentFace = CubeMapFace.Up;
                             break;
                         case CubeMapFace.Front:
@@ -616,6 +728,8 @@ namespace PlanetCreator
                             currentY = (-1 * currentY) - 1;
                             currentVelocityX = -1 * origin.VelocityX;
                             currentVelocityY = -1 * origin.VelocityY;
+                            currentOffsetX = 1 - origin.OffsetX;
+                            currentOffsetY = 1 - origin.OffsetY;
                             currentFace = CubeMapFace.Up;
                             break;
                     }
@@ -635,6 +749,8 @@ namespace PlanetCreator
                             currentY = (2047 + 2048) - currentY;
                             currentVelocityX = currentVelocityX * -1;
                             currentVelocityY = currentVelocityY * -1;
+                            currentOffsetX = 1 - origin.OffsetX;
+                            currentOffsetY = 1 - origin.OffsetY;
                             currentFace = CubeMapFace.Front;
                             break;
                         case CubeMapFace.Left:
@@ -644,6 +760,8 @@ namespace PlanetCreator
                             currentY = backup;
                             currentVelocityX = -1 * origin.VelocityY;
                             currentVelocityY = origin.VelocityX;
+                            currentOffsetX = 1 - origin.OffsetY;
+                            currentOffsetY = origin.OffsetX;
                             currentFace = CubeMapFace.Down;
                             break;
                         case CubeMapFace.Right:
@@ -653,20 +771,25 @@ namespace PlanetCreator
                             currentY = 2047 - backup;
                             currentVelocityX = origin.VelocityY;
                             currentVelocityY = -1 * origin.VelocityX;
+                            currentOffsetX = origin.OffsetY;
+                            currentOffsetY = 1 - origin.OffsetX;
                             currentFace = CubeMapFace.Down;
                             break;
                         case CubeMapFace.Front:
-                            // South of 'Right' is 'Down' rotated by 180°
+                            // South of 'Front' is 'Down' rotated by 180°
                             backup = currentX;
                             currentX = 2047 - currentX;
                             currentY = (2047 + 2048) - currentY;
                             currentVelocityX = -1 * origin.VelocityX;
                             currentVelocityY = -1 * origin.VelocityY;
+                            currentOffsetX = 1 - origin.OffsetX;
+                            currentOffsetY = 1 - origin.OffsetY;
                             currentFace = CubeMapFace.Down;
                             break;
                         case CubeMapFace.Back:
                             // South of 'Back' is 'Down'
                             currentY = currentY - 2048;
+                            currentFace = CubeMapFace.Down;
                             break;
                     }
                 }
@@ -674,6 +797,8 @@ namespace PlanetCreator
                 {
                     VelocityX = currentVelocityX,
                     VelocityY = currentVelocityY,
+                    OffsetX = currentOffsetX,
+                    OffsetY = currentOffsetY,
                 };
             }
 
@@ -681,6 +806,10 @@ namespace PlanetCreator
 
         // tiles must be normalized to 0...1 !!!
         void TileToImage(double[,] tile, CubeMapFace face)
+        {
+            TileToImage(tile, face.ToString().ToLower() + ".png");
+        }
+        void TileToImage(double[,] tile, string fileName)
         {
             var image = new Image<L16>(_tileWidth, _tileWidth);
             Parallel.For(0, _tileWidth, x =>
@@ -694,8 +823,7 @@ namespace PlanetCreator
                     image[x, y] = new L16(value);
                 });
             });
-            string filename = face.ToString().ToLower() + ".png";
-            image.SaveAsPng(filename);
+            image.SaveAsPng(fileName);
         }
 
         Point3D GetNormalizedSphereCoordinates(CubeMapFace face, int x, int y)
@@ -764,11 +892,38 @@ namespace PlanetCreator
         Down
     }
 
-    class PointD
+    struct PointD
     {
         public double X;
         public double Y;
+
+        public static PointD operator +(PointD p1, PointD p2) => new PointD { X = p1.X + p2.X, Y = p1.Y + p2.Y };
+        public static PointD operator +(PointD p1) => p1;
+        public static PointD operator -(PointD p1, PointD p2) => new PointD { X = p1.X - p2.X, Y = p1.Y - p2.Y };
+        public static PointD operator -(PointD p1) => new PointD { X = -p1.X, Y = -p1.Y };
+        public static PointD operator /(PointD p1, double d) => new PointD { X = p1.X / d, Y = p1.Y / d };
+        public static PointD operator /(PointD p1, PointD p2) => new PointD { X = p1.X / p2.X, Y = p1.Y / p2.Y };
+        public static PointD operator *(PointD p1, double d) => new PointD { X = p1.X * d, Y = p1.Y * d };
+        public static PointD operator *(PointD p1, PointD p2) => new PointD { X = p1.X * p2.X, Y = p1.Y * p2.Y };
+
         public double Length => Math.Sqrt(X* X + Y* Y);
+
+        public PointD Normalize()
+        {
+            var len = Length;
+            if (len == 0) return this;
+            return this / len;
+        }
+
+        // !!! (int)(-0.1) = 0 !!! But we want -1 !!!
+        public PointI ToIntegerPoint() => new PointI() { X = X < 0? (int)(X-1) : (int)X, Y = Y < 0 ? (int)(Y - 1) : (int)Y };
+        public PointD IntegerOffset() => new PointD() { X = X - (int)X, Y = Y - (int)Y };
+    }
+
+    struct PointI
+    {
+        public int X;
+        public int Y;
     }
 
     class NoiseMaker
