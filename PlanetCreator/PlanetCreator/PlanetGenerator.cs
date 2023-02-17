@@ -121,7 +121,7 @@ namespace PlanetCreator
             if (erode)
             {
                 var rnd = new Random(0);
-                Parallel.For(0, 1000000, new ParallelOptions { MaxDegreeOfParallelism = 8 }, pit =>
+                Parallel.For(0, 100000, new ParallelOptions { MaxDegreeOfParallelism = 8 }, pit =>
                 {
                     Erode(rnd, pit);
                 });
@@ -201,7 +201,7 @@ namespace PlanetCreator
             double speed = 1;
             double water = 1;
             double sediment = 0;
-            double sedimentCapacityFactor = 100;
+            double sedimentCapacityFactor = 8;
             double minSedimentCapacity = .01;
             double depositSpeed = 0.3;
             double erodeSpeed = 0.3;
@@ -295,7 +295,7 @@ namespace PlanetCreator
                 double sedimentCapacity = Math.Max(-deltaHeight * speed * water * sedimentCapacityFactor, minSedimentCapacity);
 
                 // If carrying more sediment than capacity, or if flowing uphill:
-                var oldPoint = new CubeMapPoint(_faces, (int)posOld.X, (int)posOld.Y, faceOld);
+                var oldPoint = new CubeMapPoint(_faces, posOldI.X, posOldI.Y, faceOld);
                 if (sediment > sedimentCapacity || deltaHeight > 0)
                 {
                     // If moving uphill (deltaHeight > 0) try fill up to the current height, otherwise deposit a fraction of the excess sediment
@@ -740,7 +740,7 @@ namespace PlanetCreator
                     {
                         case CubeMapFace.Up:
                             // South of 'Up' is 'Front'
-                            currentY = 2048 - currentY;
+                            currentY = currentY - 2048;
                             currentFace = CubeMapFace.Front;
                             break;
                         case CubeMapFace.Down:
