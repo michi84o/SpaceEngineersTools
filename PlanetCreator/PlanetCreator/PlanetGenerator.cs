@@ -205,7 +205,7 @@ namespace PlanetCreator
             double minSedimentCapacity = .01;
             double depositSpeed = 0.3;
             double erodeSpeed = 0.3;
-            double brushRadius = 1;
+            double brushRadius = 2;
             double evaporateSpeed = 0.01;
             double gravity = 4;
 
