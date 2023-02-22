@@ -31,6 +31,6 @@ Tools restarting and stopping an Space Engineers server.
 For more info read the README of that project.
 
 ## PlanetCreator
-This is an attempt in generating procedural height maps based for new planets. It's still work in progress.
+This is an attempt in generating procedural height maps for new planets. It's still work in progress.
 
 ![Screenshot of planet creator](Screenshots/PlanetGen1.jpg)
