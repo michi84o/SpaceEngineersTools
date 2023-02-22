@@ -54,7 +54,9 @@ namespace PlanetCreator
         public double[,] TileLeft { get; private set; }
         public double[,] TileBack { get; private set; }
 
-        double[,] _debugTile = new double[2048, 2048];
+        double[,] _debugTileR = new double[2048, 2048];
+        double[,] _debugTileG = new double[2048, 2048];
+        double[,] _debugTileB = new double[2048, 2048];
 
         public void GeneratePlanet()
         {
@@ -62,10 +64,11 @@ namespace PlanetCreator
             List<NoiseMaker> list = new()
             {
                 //new(0, 1.0, 1), // Static noise for checking textures
-                new(0, 1.0 / 200, 1),
-                new(1, 1.0 / 100, .6),
-                new(2, 1.0 / 50, .2),
-                new(2, 1.0 / 25, .1),
+                new(0, 1.0 / 50, 1),
+                new(1, 2.0 / 50, .5),
+                new(1, 4.0 / 50, 0.25),
+                new(1, 8.0 / 50, 0.125),
+
             };
             double sphereRadius = 1000;
             double max = 0;
@@ -121,7 +124,7 @@ namespace PlanetCreator
             if (erode)
             {
                 var rnd = new Random(0);
-                Parallel.For(0, 100000, new ParallelOptions { MaxDegreeOfParallelism = 8 }, pit =>
+                Parallel.For(0, 1000000, new ParallelOptions { MaxDegreeOfParallelism = 16 }, pit =>
                 {
                     Erode(rnd, pit);
                 });
@@ -143,23 +146,26 @@ namespace PlanetCreator
                         });
                     });
                 }
-                offset = -1 * min;
-                stretch = Math.Abs(max - min);
-                foreach (var kv in _faces)
-                {
-                    var face = kv.Key;
-                    var tile = kv.Value;
-                    Parallel.For(0, _tileWidth, x =>
-                    {
-                        Parallel.For(0, _tileWidth, y =>
-                        {
-                            double value = tile[x, y];
-                            value += offset;
-                            value /= stretch;
-                            tile[x, y] = value;
-                        });
-                    });
-                }
+
+                Normalize(_faces.Values.ToList());
+
+                //offset = -1 * min;
+                //stretch = Math.Abs(max - min);
+                //foreach (var kv in _faces)
+                //{
+                //    var face = kv.Key;
+                //    var tile = kv.Value;
+                //    Parallel.For(0, _tileWidth, x =>
+                //    {
+                //        Parallel.For(0, _tileWidth, y =>
+                //        {
+                //            double value = tile[x, y];
+                //            value += offset;
+                //            value /= stretch;
+                //            tile[x, y] = value;
+                //        });
+                //    });
+                //}
 
             }
 
@@ -181,7 +187,20 @@ namespace PlanetCreator
             }
 
             //TileToImage(_faces[CubeMapFace.Up], CubeMapFace.Up);
+
             //TileToImage(_debugTile, "debug.png");
+            //var image = new Image<Rgb48>(_tileWidth, _tileWidth);
+            //Normalize(new List<double[,]> { _debugTileR });
+            //Normalize(new List<double[,]> { _debugTileG });
+            //Normalize(new List<double[,]> { _debugTileB });
+            //Parallel.For(0, _tileWidth, x =>
+            //{
+            //    Parallel.For(0, _tileWidth, y =>
+            //    {
+            //        image[x, y] = new Rgb48((ushort)(_debugTileR[x,y]*65535), (ushort)(_debugTileG[x, y] * 65535), (ushort)(_debugTileB[x, y] * 65535));
+            //    });
+            //});
+            //image.SaveAsPng("debug.png");
 
             MessageBox.Show("Done");
         }
@@ -197,15 +216,15 @@ namespace PlanetCreator
             // http://ranmantaru.com/blog/2011/10/08/water-erosion-on-heightmap-terrain/
 
             int maxDropletLifetime = 30;
-            double inertia = 0.005;
+            double inertia = 0.01;
             double speed = 1;
             double water = 1;
             double sediment = 0;
-            double sedimentCapacityFactor = 8;
+            double sedimentCapacityFactor = 4;
             double minSedimentCapacity = .01;
             double depositSpeed = 0.3;
             double erodeSpeed = 0.3;
-            double brushRadius = 2;
+            double brushRadius = 3;
             double evaporateSpeed = 0.01;
             double gravity = 4;
 
@@ -253,7 +272,7 @@ namespace PlanetCreator
                 var posI = pos.ToIntegerPoint();
                 var posOldI = posOld.ToIntegerPoint();
 
-                //_debugTile[posOldI.X, posOldI.Y] = water;
+                //_debugTileG[posOldI.X, posOldI.Y] = water;
 
                 if (posI.X >= _tileWidth || posI.X < 0 || posI.Y >= _tileWidth || posI.Y < 0)
                 {
@@ -304,10 +323,19 @@ namespace PlanetCreator
 
                     // Add the sediment to the four nodes of the current cell using bilinear interpolation
                     // Deposition is not distributed over a radius (like erosion) so that it can fill small pits
-                    oldPoint.Value += amountToDeposit * (1 - cellOffset.X) * (1 - cellOffset.Y);
-                    CubeMapPoint.GetPointRelativeTo(oldPoint, 1,0, _faces).Value += amountToDeposit * cellOffset.X * (1 - cellOffset.Y);
-                    CubeMapPoint.GetPointRelativeTo(oldPoint, 0, 1, _faces).Value += amountToDeposit * (1 - cellOffset.X) * cellOffset.Y;
-                    CubeMapPoint.GetPointRelativeTo(oldPoint, 1, 1, _faces).Value += amountToDeposit * cellOffset.X * cellOffset.Y;
+                    //var p10 = CubeMapPoint.GetPointRelativeTo(oldPoint, 1, 0, _faces);
+                    //var p01 = CubeMapPoint.GetPointRelativeTo(oldPoint, 0, 1, _faces);
+                    //var p11 = CubeMapPoint.GetPointRelativeTo(oldPoint, 1, 1, _faces);
+                    //oldPoint.Value += amountToDeposit * (1 - cellOffset.X) * (1 - cellOffset.Y);
+                    //p10.Value += amountToDeposit * cellOffset.X * (1 - cellOffset.Y);
+                    //p01.Value += amountToDeposit * (1 - cellOffset.X) * cellOffset.Y;
+                    //p11.Value += amountToDeposit * cellOffset.X * cellOffset.Y;
+
+                    //_debugTileB[oldPoint.PosX, oldPoint.PosY] += amountToDeposit * (1 - cellOffset.X) * (1 - cellOffset.Y);
+                    //_debugTileB[p10.PosX, p10.PosY] += amountToDeposit * cellOffset.X * (1 - cellOffset.Y);
+                    //_debugTileB[p01.PosX, p01.PosY] += amountToDeposit * (1 - cellOffset.X) * cellOffset.Y;
+                    //_debugTileB[p11.PosX, p11.PosY] += amountToDeposit * cellOffset.X * cellOffset.Y;
+
                 }
                 else
                 {
@@ -358,15 +386,18 @@ namespace PlanetCreator
                             //Debug.WriteLine("brushWeightSum: " + brushWeightSum);
                         }
                     }
-                    double test = 0;
+                    //double test = 0;
                     for (int ii = 0; ii < brushWeights.Count; ++ii)
                     {
+                        //_debugTile[brushPoints[ii].PosX, brushPoints[ii].PosY] = brushWeights[ii] / brushWeightSum;
                         double erodeAmount = amountToErode * brushWeights[ii] / brushWeightSum;
-                        test += brushWeights[ii];
+                        //test += brushWeights[ii];
                         if (brushPoints[ii].Value < erodeAmount)
                             erodeAmount = brushPoints[ii].Value;
                         brushPoints[ii].Value -= erodeAmount;
                         sediment += erodeAmount;
+
+                        //_debugTileR[brushPoints[ii].PosX, brushPoints[ii].PosY] += erodeAmount;
                     }
                     deltaHeight += amountToErode;
                 }
@@ -390,6 +421,53 @@ namespace PlanetCreator
             }
 
             #endregion
+        }
+
+        void Normalize(List<double[,]> images)
+        {
+            double max = images[0][0, 0];
+            double min = images[0][0, 0];
+            Parallel.For(0, _tileWidth, x =>
+            {
+                Parallel.For(0, _tileWidth, y =>
+                {
+                    foreach (var image in images)
+                    {
+                        var value = image[x, y];
+                        if (value < 0) value = 0;
+                        else if (value > 1) value = 1;
+                        if (value > max)
+                        {
+                            lock (images)
+                            {
+                                if (value > max) max = value;
+                            }
+                        }
+                        if (value < min)
+                        {
+                            lock (images)
+                            {
+                                if (value < min) min = value;
+                            }
+                        }
+                    }
+                });
+            });
+            double offset = -1 * min;
+            double stretch = Math.Abs(max - min);
+            Parallel.For(0, _tileWidth, x =>
+            {
+                Parallel.For(0, _tileWidth, y =>
+                {
+                    foreach (var image in images)
+                    {
+                        var value = image[x, y];
+                        value += offset;
+                        value /= stretch;
+                        image[x, y] = value;
+                    }
+                });
+            });
         }
 
         HeightAndGradient CalculateHeightAndGradient(PointD pos, CubeMapFace face)
@@ -819,6 +897,8 @@ namespace PlanetCreator
                     // Using full spectrum is too exteme
                     // Smooth v
                     var v = 0.6 * tile[x, y] + 0.3; // Values between 0.3 and 0.9
+                    if (v > 1) v = 1;
+                    else if (v < 0) v = 0;
                     ushort value = (ushort)(v * 65535);
                     image[x, y] = new L16(value);
                 });

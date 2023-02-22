@@ -1,7 +1,5 @@
 # SpaceEngineersTools
 
-Ignore the noise and generator stuff. Thats just an experiment.
-
 ## SpaceEngineersOreRedistribution:
 This is a viewer for the planet definition files, specifically ore.
 
@@ -31,3 +29,8 @@ Tools restarting and stopping an Space Engineers server.
 - Server Stopper: Shuts down server after specified time and notifies players via ingame chat.
 
 For more info read the README of that project.
+
+## PlanetCreator
+This is an attempt in generating procedural height maps based for new planets. It's still work in progress.
+
+![Screenshot of planet creator](Screenshots/PlanetGen1.jpg)
