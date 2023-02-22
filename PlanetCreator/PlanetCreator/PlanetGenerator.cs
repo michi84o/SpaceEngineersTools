@@ -61,13 +61,14 @@ namespace PlanetCreator
         public void GeneratePlanet()
         {
             // Layers of diferent noise frequencies
+            double resScale = 100;
             List<NoiseMaker> list = new()
             {
                 //new(0, 1.0, 1), // Static noise for checking textures
-                new(0, 1.0 / 50, 1),
-                new(1, 2.0 / 50, .5),
-                new(1, 4.0 / 50, 0.25),
-                new(1, 8.0 / 50, 0.125),
+                new(0, 1.0 / resScale, 1),
+                new(1, 2.0 / resScale, .5),
+                new(2, 4.0 / resScale, 0.25),
+                new(3, 8.0 / resScale, 0.125),
 
             };
             double sphereRadius = 1000;
@@ -112,6 +113,15 @@ namespace PlanetCreator
                         double value = tile[x, y];
                         value += offset;
                         value /= stretch;
+
+                        // TODO: Tweak these:
+                        // Apply an S-Curve for flatter plains and mountain tops
+                        value = 0.5*Math.Sin(Math.PI*(value-0.5)) + 0.5;
+                        // Use this line to modify further:
+                        value = Math.Pow(value, 3);
+                        if (value < 0) value = 0;
+                        if (value > 1) value = 1;
+
                         tile[x, y] = value;
                     });
                 });
@@ -242,12 +252,10 @@ namespace PlanetCreator
                 // Debug:
                 //pos.X = rnd.NextDouble() * 500;
                 //pos.Y = rnd.NextDouble() * 500;
-                face = CubeMapFace.Up;
+                face = CubeMapFace.Back;
             }
 
             #region Code based on Sebastian Lague
-
-
 
             for (int i = 0; i < maxDropletLifetime; ++i)
             {
@@ -320,6 +328,9 @@ namespace PlanetCreator
                     // If moving uphill (deltaHeight > 0) try fill up to the current height, otherwise deposit a fraction of the excess sediment
                     double amountToDeposit = (deltaHeight > 0) ? Math.Min(deltaHeight, sediment) : (sediment - sedimentCapacity) * depositSpeed;
                     sediment -= amountToDeposit;
+
+                    // TODO: Following lines are causing noise. Find a way to flatten the area
+                    // TODO: If following lines are disabled, we are digging deep holes!
 
                     // Add the sediment to the four nodes of the current cell using bilinear interpolation
                     // Deposition is not distributed over a radius (like erosion) so that it can fill small pits
@@ -896,6 +907,7 @@ namespace PlanetCreator
                 {
                     // Using full spectrum is too exteme
                     // Smooth v
+                    //var v = 0.78 * tile[x, y] + 0.2; // Values between 0.2 and 0.98
                     var v = 0.6 * tile[x, y] + 0.3; // Values between 0.3 and 0.9
                     if (v > 1) v = 1;
                     else if (v < 0) v = 0;

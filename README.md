@@ -32,5 +32,6 @@ For more info read the README of that project.
 
 ## PlanetCreator
 This is an attempt in generating procedural height maps for new planets. It's still work in progress.
+The map is generated using simplex noise. After that hydraulic erosion is performed. The erosion part isn't working properly yet.
 
 ![Screenshot of planet creator](Screenshots/PlanetGen1.jpg)
