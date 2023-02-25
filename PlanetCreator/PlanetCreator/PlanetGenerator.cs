@@ -57,6 +57,7 @@ namespace PlanetCreator
         double[,] _debugTileR = new double[2048, 2048];
         double[,] _debugTileG = new double[2048, 2048];
         double[,] _debugTileB = new double[2048, 2048];
+        bool _debug = false;
 
         public void GeneratePlanet()
         {
@@ -80,6 +81,7 @@ namespace PlanetCreator
             {
                 var face = kv.Key;
                 var tile = kv.Value;
+                if (_debug && face != CubeMapFace.Back) continue;
                 Parallel.For(0, _tileWidth, x =>
                 {
                     Parallel.For(0, _tileWidth, y =>
@@ -98,6 +100,18 @@ namespace PlanetCreator
                 });
             }
 
+            if (_debug)
+            {
+                Parallel.For(0, _tileWidth, x =>
+                {
+                    Parallel.For(0, _tileWidth, y =>
+                    {
+                        _debugTileR[x, y] = 0.5;
+                        _debugTileG[x, y] = 0.5;
+                        _debugTileB[x, y] = 0.5;
+                    });
+                });
+            }
             // Normalize noise to 0....1
             double offset = -1 * min;
             double stretch = Math.Abs(max - min);
@@ -133,10 +147,21 @@ namespace PlanetCreator
             bool erode = true;
             if (erode)
             {
+                int iterations = 1000000;
                 var rnd = new Random(0);
-                Parallel.For(0, 1000000, new ParallelOptions { MaxDegreeOfParallelism = 16 }, pit =>
+                int progress = 0;
+                Task.Run(async () =>
+                {
+                    while (progress < iterations-1)
+                    {
+                        await Task.Delay(1000);
+                        Debug.WriteLine("Progress: " + (progress * 100.0 / iterations) + "%");
+                    }
+                });
+                Parallel.For(0, iterations, new ParallelOptions { MaxDegreeOfParallelism = 16 }, pit =>
                 {
                     Erode(rnd, pit);
+                    Interlocked.Increment(ref progress);
                 });
 
                 //// Normalize to 0....1
@@ -187,30 +212,32 @@ namespace PlanetCreator
             // - Weighten noise based on location
             // - Apply some erosion to generate canyons (rain by using gradients + east-west wind)
             // - Add lakes
-
-            // Create pictures
-            foreach (var kv in _faces)
+            if (!_debug)
             {
-                var face = kv.Key;
-                var tile = kv.Value;
-                TileToImage(tile, face);
+                // Create pictures
+                foreach (var kv in _faces)
+                {
+                    var face = kv.Key;
+                    var tile = kv.Value;
+                    TileToImage(tile, face);
+                }
             }
-
-            //TileToImage(_faces[CubeMapFace.Up], CubeMapFace.Up);
-
-            //TileToImage(_debugTile, "debug.png");
-            //var image = new Image<Rgb48>(_tileWidth, _tileWidth);
-            //Normalize(new List<double[,]> { _debugTileR });
-            //Normalize(new List<double[,]> { _debugTileG });
-            //Normalize(new List<double[,]> { _debugTileB });
-            //Parallel.For(0, _tileWidth, x =>
-            //{
-            //    Parallel.For(0, _tileWidth, y =>
-            //    {
-            //        image[x, y] = new Rgb48((ushort)(_debugTileR[x,y]*65535), (ushort)(_debugTileG[x, y] * 65535), (ushort)(_debugTileB[x, y] * 65535));
-            //    });
-            //});
-            //image.SaveAsPng("debug.png");
+            else
+            {
+                TileToImage(_faces[CubeMapFace.Back], CubeMapFace.Back);
+                var image = new Image<Rgb48>(_tileWidth, _tileWidth);
+                Normalize(new List<double[,]> { _debugTileR });
+                Normalize(new List<double[,]> { _debugTileG });
+                Normalize(new List<double[,]> { _debugTileB });
+                Parallel.For(0, _tileWidth, x =>
+                {
+                    Parallel.For(0, _tileWidth, y =>
+                    {
+                        image[x, y] = new Rgb48((ushort)(_debugTileR[x, y] * 65535), (ushort)(_debugTileG[x, y] * 65535), (ushort)(_debugTileB[x, y] * 65535));
+                    });
+                });
+                image.SaveAsPng("debug.png");
+            }
 
             MessageBox.Show("Done");
         }
@@ -225,18 +252,29 @@ namespace PlanetCreator
             // which is based on a blog entry Alexey Volynskov
             // http://ranmantaru.com/blog/2011/10/08/water-erosion-on-heightmap-terrain/
 
-            int maxDropletLifetime = 30;
-            double inertia = 0.01;
+            int maxDropletLifetime = 40;
+            double inertia = 0.005;
             double speed = 1;
             double water = 1;
             double sediment = 0;
-            double sedimentCapacityFactor = 4;
-            double minSedimentCapacity = .01;
+            double sedimentCapacityFactor = 6;
+            double minSedimentCapacity = 0.5/65535; // Half a pixel value
             double depositSpeed = 0.3;
             double erodeSpeed = 0.3;
             double brushRadius = 3;
             double evaporateSpeed = 0.01;
             double gravity = 4;
+
+            // Make sure we have no water left at the end:
+            // Modify this exponential curve to become 0 at the end:
+            // water *= (1 - evaporateSpeed);
+            double waterX = water;
+            for (int i = 0; i < maxDropletLifetime-1; ++i)
+            {
+                waterX *= (1 - evaporateSpeed);
+            }
+            double evaporatePart = waterX;
+            // => waterModified = water - evaporatePart*iteration
 
             CubeMapFace face = CubeMapFace.Up;
             PointD pos = new();
@@ -245,20 +283,27 @@ namespace PlanetCreator
 
             lock (rnd)
             {
-                pos.X = rnd.NextDouble() * 2047;
-                pos.Y = rnd.NextDouble() * 2047;
-                face = facesValues[rnd.Next(0, facesValues.Length)];
-
-                // Debug:
-                //pos.X = rnd.NextDouble() * 500;
-                //pos.Y = rnd.NextDouble() * 500;
-                face = CubeMapFace.Back;
+                if (!_debug)
+                {
+                    pos.X = rnd.NextDouble() * 2047;
+                    pos.Y = rnd.NextDouble() * 2047;
+                    face = facesValues[rnd.Next(0, facesValues.Length)];
+                }
+                else
+                {
+                    //pos.X = 333;
+                    //pos.Y = 458;
+                    pos.X = rnd.NextDouble() * 500;
+                    pos.Y = rnd.NextDouble() * 500;
+                    face = CubeMapFace.Back;
+                }
             }
 
             #region Code based on Sebastian Lague
-
             for (int i = 0; i < maxDropletLifetime; ++i)
             {
+                double waterModified = water - (evaporatePart * i / (maxDropletLifetime-1)); // Will be 0 at last iteration
+
                 // Calculate droplet's offset inside the cell (0,0) = at NW node, (1,1) = at SE node
                 PointD cellOffset = pos.IntegerOffset(); // 0 <= offset < 1
 
@@ -280,7 +325,10 @@ namespace PlanetCreator
                 var posI = pos.ToIntegerPoint();
                 var posOldI = posOld.ToIntegerPoint();
 
-                //_debugTileG[posOldI.X, posOldI.Y] = water;
+                if (_debug)
+                {
+                    _debugTileG[posOldI.X, posOldI.Y] = waterModified;
+                }
 
                 if (posI.X >= _tileWidth || posI.X < 0 || posI.Y >= _tileWidth || posI.Y < 0)
                 {
@@ -308,18 +356,14 @@ namespace PlanetCreator
                         cellOffset.Y = newPosPoint.OffsetY;
                     }
                 }
-                //if (pos.X >= _tileWidth || pos.X < 0 || pos.Y >= _tileWidth || pos.Y < 0)
-                //{
-                //    Debugger.Break();
-                //    return;
-                //}
+
 
                 // Find the droplet's new height and calculate the deltaHeight
                 double newHeight = CalculateHeightAndGradient(pos, face).Height;
                 double deltaHeight = newHeight - heightAndGradient.Height;
 
                 // Calculate the droplet's sediment capacity (higher when moving fast down a slope and contains lots of water)
-                double sedimentCapacity = Math.Max(-deltaHeight * speed * water * sedimentCapacityFactor, minSedimentCapacity);
+                double sedimentCapacity = Math.Max(-deltaHeight * speed * waterModified * sedimentCapacityFactor, minSedimentCapacity);
 
                 // If carrying more sediment than capacity, or if flowing uphill:
                 var oldPoint = new CubeMapPoint(_faces, posOldI.X, posOldI.Y, faceOld);
@@ -327,26 +371,9 @@ namespace PlanetCreator
                 {
                     // If moving uphill (deltaHeight > 0) try fill up to the current height, otherwise deposit a fraction of the excess sediment
                     double amountToDeposit = (deltaHeight > 0) ? Math.Min(deltaHeight, sediment) : (sediment - sedimentCapacity) * depositSpeed;
+
+                    ApplyBrush(brushRadius, oldPoint, posOld, amountToDeposit);
                     sediment -= amountToDeposit;
-
-                    // TODO: Following lines are causing noise. Find a way to flatten the area
-                    // TODO: If following lines are disabled, we are digging deep holes!
-
-                    // Add the sediment to the four nodes of the current cell using bilinear interpolation
-                    // Deposition is not distributed over a radius (like erosion) so that it can fill small pits
-                    //var p10 = CubeMapPoint.GetPointRelativeTo(oldPoint, 1, 0, _faces);
-                    //var p01 = CubeMapPoint.GetPointRelativeTo(oldPoint, 0, 1, _faces);
-                    //var p11 = CubeMapPoint.GetPointRelativeTo(oldPoint, 1, 1, _faces);
-                    //oldPoint.Value += amountToDeposit * (1 - cellOffset.X) * (1 - cellOffset.Y);
-                    //p10.Value += amountToDeposit * cellOffset.X * (1 - cellOffset.Y);
-                    //p01.Value += amountToDeposit * (1 - cellOffset.X) * cellOffset.Y;
-                    //p11.Value += amountToDeposit * cellOffset.X * cellOffset.Y;
-
-                    //_debugTileB[oldPoint.PosX, oldPoint.PosY] += amountToDeposit * (1 - cellOffset.X) * (1 - cellOffset.Y);
-                    //_debugTileB[p10.PosX, p10.PosY] += amountToDeposit * cellOffset.X * (1 - cellOffset.Y);
-                    //_debugTileB[p01.PosX, p01.PosY] += amountToDeposit * (1 - cellOffset.X) * cellOffset.Y;
-                    //_debugTileB[p11.PosX, p11.PosY] += amountToDeposit * cellOffset.X * cellOffset.Y;
-
                 }
                 else
                 {
@@ -354,67 +381,13 @@ namespace PlanetCreator
                     // Clamp the erosion to the change in height so that it doesn't dig a hole in the terrain behind the droplet
                     double amountToErode = Math.Min((sedimentCapacity - sediment) * erodeSpeed, -deltaHeight);
 
-                    // Original code use some precomputed weights for a brush. Since we have multiple cubemaps,
-                    // that doesn't work properly.
-                    // Alternative concept:
-                    // - Use the exact position
-                    // - Draw a circle of brush radius
-                    // - Split every grid point into 16 subgrids and calculate if the center of the subgrid is inside the circle.
-                    //   - If subgrid is in circle, assign weight off 1 - distance/radius to that grid point
-                    List<CubeMapPoint> brushPoints = new();
-                    List<double> brushWeights = new();
-                    int brushDelta = (int)(brushRadius + 0.5);
-                    double brushWeightSum = 0;
-                    // Cycle through all points within radius
-                    for (int dx = -brushDelta; dx <= brushDelta; ++dx)
-                    {
-                        for (int dy = -brushDelta; dy <= brushDelta; ++dy)
-                        {
-                            var pt = CubeMapPoint.GetPointRelativeTo(oldPoint, dx, dy, _faces);
-                            double brushWeight = 0;
-                            // Split grid into 16 chunks, divide by 4 on each axis. Vector goes to center of subgrid
-                            for (double subDx = -0.375; subDx <= 0.3751; subDx+= 0.25)
-                            {
-                                for (double subDy = -0.375; subDy <= 0.3751; subDy += 0.25)
-                                {
-                                    PointD vector = new PointD
-                                    {
-                                        X = pt.PosX + subDx - posOld.X,
-                                        Y = pt.PosY + subDy - posOld.Y,
-                                    };
-                                    var distance = vector.Length;
-                                    if (distance <= brushRadius)
-                                    {
-                                        double newWeight = 1 - distance / brushRadius;
-                                        brushWeight += newWeight;
-                                        brushWeightSum += newWeight;
-                                    }
-                                }
-                            }
-                            brushPoints.Add(pt);
-                            brushWeights.Add(brushWeight);
-                            //Debug.WriteLine("brushWeight: " + brushWeight);
-                            //Debug.WriteLine("brushWeightSum: " + brushWeightSum);
-                        }
-                    }
-                    //double test = 0;
-                    for (int ii = 0; ii < brushWeights.Count; ++ii)
-                    {
-                        //_debugTile[brushPoints[ii].PosX, brushPoints[ii].PosY] = brushWeights[ii] / brushWeightSum;
-                        double erodeAmount = amountToErode * brushWeights[ii] / brushWeightSum;
-                        //test += brushWeights[ii];
-                        if (brushPoints[ii].Value < erodeAmount)
-                            erodeAmount = brushPoints[ii].Value;
-                        brushPoints[ii].Value -= erodeAmount;
-                        sediment += erodeAmount;
-
-                        //_debugTileR[brushPoints[ii].PosX, brushPoints[ii].PosY] += erodeAmount;
-                    }
-                    deltaHeight += amountToErode;
+                    ApplyBrush(brushRadius, oldPoint, posOld, -amountToErode);
+                    sediment += amountToErode;
                 }
+                // Update delta
+                deltaHeight = newHeight - CalculateHeightAndGradient(posOld, faceOld).Height;
 
                 // Update droplet's speed and water content
-                double oldSpeed = speed;
                 double gravityDelta = (-deltaHeight) * gravity;
                 double speedSquared = speed*speed;
                 // Prevent speed from becomming double.NaN
@@ -432,6 +405,59 @@ namespace PlanetCreator
             }
 
             #endregion
+        }
+
+        void ApplyBrush(double brushRadius, CubeMapPoint mapLocation, PointD exactLocation, double materialAmount)
+        {
+            List<CubeMapPoint> brushPoints = new();
+            List<double> brushWeights = new();
+            int brushDelta = (int)(brushRadius + 0.5);
+            double brushWeightSum = 0;
+            // Cycle through all points within radius
+            for (int dx = -brushDelta; dx <= brushDelta; ++dx)
+            {
+                for (int dy = -brushDelta; dy <= brushDelta; ++dy)
+                {
+                    var pt = CubeMapPoint.GetPointRelativeTo(mapLocation, dx, dy, _faces);
+                    double brushWeight = 0;
+                    // Split grid into 16 chunks, divide by 4 on each axis. Vector goes to center of subgrid
+                    for (double subDx = -0.375; subDx <= 0.3751; subDx += 0.25)
+                    {
+                        for (double subDy = -0.375; subDy <= 0.3751; subDy += 0.25)
+                        {
+                            PointD vector = new PointD
+                            {
+                                X = pt.PosX + subDx - exactLocation.X,
+                                Y = pt.PosY + subDy - exactLocation.Y,
+                            };
+                            var distance = vector.Length;
+                            if (distance <= brushRadius)
+                            {
+                                double newWeight = 1 - distance / brushRadius;
+                                brushWeight += newWeight;
+                                brushWeightSum += newWeight;
+                            }
+                        }
+                    }
+                    brushPoints.Add(pt);
+                    brushWeights.Add(brushWeight);
+                }
+            }
+            for (int ii = 0; ii < brushWeights.Count; ++ii)
+            {
+                double brushpart = materialAmount * brushWeights[ii] / brushWeightSum;
+                brushPoints[ii].Value += brushpart;
+                if (_debug)
+                {
+                    if (brushpart > 0)
+                        _debugTileB[brushPoints[ii].PosX, brushPoints[ii].PosY] += brushpart;
+                    else
+                        _debugTileR[brushPoints[ii].PosX, brushPoints[ii].PosY] += -brushpart;
+                }
+
+                if (brushPoints[ii].Value > 1) brushPoints[ii].Value = 1;
+                else if (brushPoints[ii].Value < 0) brushPoints[ii].Value = 0;
+            }
         }
 
         void Normalize(List<double[,]> images)
