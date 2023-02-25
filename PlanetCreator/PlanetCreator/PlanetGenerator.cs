@@ -12,9 +12,26 @@ using System.Windows.Media.Media3D;
 
 namespace PlanetCreator
 {
+    class ProgressEventArgs : EventArgs
+    {
+        public int Progress { get; }
+        public ProgressEventArgs(int progress)
+        {
+            Progress = progress;
+        }
+    }
+
     internal class PlanetGenerator
     {
         const int _tileWidth = 2048;
+
+        public event EventHandler<ProgressEventArgs> ProgressChanged;
+
+        public bool DebugMode
+        {
+            get => _debug;
+            set => _debug = value;
+        }
 
         public PlanetGenerator()
         {
@@ -58,24 +75,33 @@ namespace PlanetCreator
         bool _debug = false;
         CubeMapFace _debugFace = CubeMapFace.Back;
 
-        public void GeneratePlanet()
+        public int Seed { get; set; } = 0;
+        public int NoiseScale { get; set; } = 100;
+        public int Octaves { get; set; } = 4;
+        public int ErosionIterations { get; set; } = 1000000;
+
+        public void GeneratePlanet(CancellationToken token)
         {
             // Layers of diferent noise frequencies
-            double resScale = 100;
-            List<NoiseMaker> list = new()
+            List<NoiseMaker> list = new();
+            //{
+            //    new(Seed + 0, 1.0 / NoiseScale, 1),
+            //    new(Seed + 1, 2.0 / NoiseScale, .5),
+            //    new(Seed + 2, 4.0 / NoiseScale, 0.25),
+            //    new(Seed + 3, 8.0 / NoiseScale, 0.125),
+            //};
+            var octave = 1;
+            for (int i = 0; i < Octaves; ++i)
             {
-                //new(0, 1.0, 1), // Static noise for checking textures
-                new(0, 1.0 / resScale, 1),
-                new(1, 2.0 / resScale, .5),
-                new(2, 4.0 / resScale, 0.25),
-                new(3, 8.0 / resScale, 0.125),
-
-            };
+                list.Add(new(Seed + 0, 1.0 * octave / NoiseScale, 1.0 / (octave)));
+                octave *= 2;
+            }
             double sphereRadius = 1000;
 
             // Apply noise
             foreach (var kv in _faces)
             {
+                if (token.IsCancellationRequested) return;
                 var face = kv.Key;
                 var tile = kv.Value;
                 if (_debug && face != _debugFace) continue;
@@ -95,6 +121,7 @@ namespace PlanetCreator
                 });
             }
 
+            if (token.IsCancellationRequested) return;
             if (_debug)
             {
                 Parallel.For(0, _tileWidth, x =>
@@ -107,6 +134,8 @@ namespace PlanetCreator
                     });
                 });
             }
+
+            if (token.IsCancellationRequested) return;
             // Normalize noise to 0....1
             if (!_debug)
                 Normalize(_faces.Values.ToList());
@@ -117,6 +146,7 @@ namespace PlanetCreator
             // Apply an S-Curve for flatter plains and mountain tops
             foreach (var kv in _faces)
             {
+                if (token.IsCancellationRequested) return;
                 var face = kv.Key;
                 var tile = kv.Value;
                 if (_debug && face != _debugFace) continue;
@@ -138,6 +168,7 @@ namespace PlanetCreator
             // Generate lakes:
             foreach (var kv in _faces)
             {
+                if (token.IsCancellationRequested) return;
                 var face = kv.Key;
                 var tile = kv.Value;
                 if (_debug && face != _debugFace) continue;
@@ -154,32 +185,49 @@ namespace PlanetCreator
                 });
             }
 
+            ProgressChanged?.Invoke(this, new ProgressEventArgs(5));
+
             // Apply erosion
             // Place a water droplet on each pixel. Let droplet move 'down' (determined by gradient).
             // When droplet moves, it will take 1/65535 of height with it. When it reaches the lowest point, add 1/65536 to terrain height.
-            bool erode = true;
-            if (erode)
+            if (EnableErosion)
             {
-                int iterations = 1000000;
-                var rnd = new Random(0);
+                int iterations = ErosionIterations;
+                if (_debug)
+                {
+                    // 1 instead of 6 faces -> 1/6
+                    // 1/16 of area of normal face
+                    iterations /= (6*16);
+                    if (iterations == 0) iterations = 1;
+                }
+                var rnd = new Random(Seed);
                 int progress = 0;
                 Task.Run(async () =>
                 {
-                    while (progress < iterations-1)
+                    while (progress < iterations - 1)
                     {
+                        if (token.IsCancellationRequested) return;
                         await Task.Delay(1000);
-                        Debug.WriteLine("Progress: " + (progress * 100.0 / iterations) + "%");
+                        ProgressChanged?.Invoke(this, new ProgressEventArgs(
+                           (int)(5 + progress * 90.0 / iterations)));
                     }
                 });
-                Parallel.For(0, iterations, new ParallelOptions { MaxDegreeOfParallelism = 32 }, pit =>
+                var processors = Environment.ProcessorCount;
+                if (processors < 4) processors = 4;
+                try
                 {
-                    Erode(rnd, pit);
-                    Interlocked.Increment(ref progress);
-                });
+                    Parallel.For(0, iterations, new ParallelOptions { MaxDegreeOfParallelism = processors * 2, CancellationToken = token }, pit =>
+                    {
+                        Erode(rnd, token);
+                        Interlocked.Increment(ref progress);
+                    });
+                }
+                catch { return; } // Cancelled
 
                 // Refresh lakes:
                 foreach (var kv in _faces)
                 {
+                    if (token.IsCancellationRequested) return;
                     var face = kv.Key;
                     var tile = kv.Value;
                     if (_debug && face != _debugFace) continue;
@@ -216,6 +264,7 @@ namespace PlanetCreator
                 // Create pictures
                 foreach (var kv in _faces)
                 {
+                    if (token.IsCancellationRequested) return;
                     var face = kv.Key;
                     var tile = kv.Value;
                     TileToImage(tile, face);
@@ -225,6 +274,7 @@ namespace PlanetCreator
             }
             else
             {
+                if (token.IsCancellationRequested) return;
                 WriteMaterialMap(_lakes[_debugFace], _debugFace);
                 TileToImage(_faces[_debugFace], _debugFace);
                 var image = new Image<Rgb48>(_tileWidth, _tileWidth);
@@ -241,10 +291,20 @@ namespace PlanetCreator
                 image.SaveAsPng("debug.png");
             }
 
-            MessageBox.Show("Done");
+            ProgressChanged?.Invoke(this, new ProgressEventArgs(100));
         }
 
-        void Erode(Random rnd, int iteration)
+        public bool EnableErosion { get; set; } = true;
+        public int ErosionMaxDropletLifeTime { get; set; } = 100;
+        public double ErosionInteria { get; set; } = 0.01;
+        public double ErosionSedimentCapacityFactor { get; set; } = 30;
+        public double ErosionDepositSpeed { get; set; } = 0.1;
+        public double ErosionErodeSpeed { get; set; } = 0.3;
+        public double ErosionDepositBrush { get; set; } = 3;
+        public double ErosionErodeBrush { get; set; } = 3;
+        public double Gravity { get; set; } = 10;
+        public double EvaporateSpeed { get; set; } = 0.01;
+        void Erode(Random rnd, CancellationToken token)
         {
             // Code based on Sebastian Lague
             // https://www.youtube.com/watch?v=eaXk97ujbPQ
@@ -254,19 +314,19 @@ namespace PlanetCreator
             // which is based on a blog entry Alexey Volynskov
             // http://ranmantaru.com/blog/2011/10/08/water-erosion-on-heightmap-terrain/
 
-            int maxDropletLifetime = 100;
-            double inertia = 0.01;
+            int maxDropletLifetime = ErosionMaxDropletLifeTime;
+            double inertia = ErosionInteria;
             double speed = 1;
             double water = 1;
             double sediment = 0;
-            double sedimentCapacityFactor = 30;
+            double sedimentCapacityFactor = ErosionSedimentCapacityFactor;
             double minSedimentCapacity = 0.5/65535; // Half a pixel value
-            double depositSpeed = 0.1;
-            double erodeSpeed = 0.3;
-            double erodeBrush = 3;
-            double depositBrush = 3;
-            double evaporateSpeed = 0.01;
-            double gravity = 10;
+            double depositSpeed = ErosionDepositSpeed;
+            double erodeSpeed = ErosionErodeSpeed;
+            double erodeBrush = ErosionErodeBrush;
+            double depositBrush = ErosionDepositBrush;
+            double evaporateSpeed = EvaporateSpeed;
+            double gravity = Gravity;
 
             // Make sure we have no water left at the end:
             // Modify this exponential curve to become 0 at the end:
@@ -307,6 +367,8 @@ namespace PlanetCreator
             #region Code based on Sebastian Lague
             for (int i = 0; i < maxDropletLifetime; ++i)
             {
+                if (token.IsCancellationRequested) return;
+
                 double waterModified = water - (evaporatePart * i / (maxDropletLifetime-1)); // Will be 0 at last iteration
 
                 // Calculate droplet's offset inside the cell (0,0) = at NW node, (1,1) = at SE node
@@ -423,6 +485,13 @@ namespace PlanetCreator
             #endregion
         }
 
+        public bool GenerateLakes { get; set; } = true;
+        public ushort LakeDepth { get; set; } = 5;
+
+        void FillWithWater()
+        {
+
+        }
         void ApplyBrush(double brushRadius, CubeMapPoint mapLocation, PointD exactLocation, double materialAmount)
         {
             List<CubeMapPoint> brushPoints = new();

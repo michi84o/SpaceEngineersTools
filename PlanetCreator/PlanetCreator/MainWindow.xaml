@@ -5,30 +5,199 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PlanetCreator"
         mc:Ignorable="d"
-        Title="Planet Creator" Height="450" Width="800">
+        Title="Planet Creator" Height="600" Width="800">
     <Window.DataContext>
         <local:MainWindowViewModel x:Name="ViewModel"/>
     </Window.DataContext>
+    <Window.Resources>
+        <ResourceDictionary>
+            <local:ImgVisPreviewConverter x:Key="PreviewVisConv"/>
+            <local:BooVisConverter x:Key="BoolVis"/>
+        </ResourceDictionary>
+    </Window.Resources>
     <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
-        <Menu
-            Grid.Row="0">
-            <MenuItem Header="Generate" Command="{Binding GenerateCommand}"/>
-        </Menu>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="250"/>
+            <ColumnDefinition/>
+        </Grid.ColumnDefinitions>
         <GroupBox
-            Grid.Row="1"
+            Header="Variables">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Button
+                    Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Margin="5"
+                    Content="Generate" Visibility="{Binding NotBusy, Converter={StaticResource BoolVis}}"
+                    Command="{Binding GenerateCommand}"/>
+                <Button
+                    Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Margin="5"
+                    Content="Cancel" Visibility="{Binding IsBusy, Converter={StaticResource BoolVis}}"
+                    Command="{Binding AbortCommand}"/>
+                <CheckBox
+                    Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="5"
+                    Content="Preview Mode" IsEnabled="{Binding NotBusy}"
+                    IsChecked="{Binding PreviewMode}"/>
+                <ProgressBar
+                    Grid.Row="1" Grid.Column="1" HorizontalAlignment="Right" Width="100" Margin="5"
+                    Minimum="0" Maximum="100" Value="{Binding Progress}"/>
+                <Border
+                    Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Margin="5"
+                    BorderBrush="Gray" BorderThickness="0,1,0,0"/>
+                <TextBlock
+                    Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Margin="5"
+                    Text="Procedural Generation" FontWeight="Bold" />
+                <TextBlock
+                    Grid.Row="4" Grid.Column="0" Margin="5"
+                    Text="Seed" />
+                <TextBox
+                    Grid.Row="4" Grid.Column="1" Margin="5"
+                    Text="{Binding Seed, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock
+                    Grid.Row="5" Grid.Column="0" Margin="5"
+                    Text="Noise Scale" />
+                <TextBox
+                    Grid.Row="5" Grid.Column="1" Margin="5"
+                    Text="{Binding NoiseScale, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock
+                    Grid.Row="5" Grid.Column="0" Margin="5"
+                    Text="Noise Scale" />
+                <TextBox
+                    Grid.Row="5" Grid.Column="1" Margin="5"
+                    Text="{Binding NoiseScale, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock
+                    Grid.Row="6" Grid.Column="0" Margin="5"
+                    Text="Octaves" />
+                <TextBox
+                    Grid.Row="6" Grid.Column="1" Margin="5"
+                    Text="{Binding Octaves, UpdateSourceTrigger=PropertyChanged}"/>
+                <Border
+                    Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="2" Margin="5"
+                    BorderBrush="Gray" BorderThickness="0,1,0,0"/>
+                <TextBlock
+                    Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="2" Margin="5"
+                    Text="Hydraulic Erosion" FontWeight="Bold" />
+                <CheckBox
+                    Grid.Row="8" Grid.Column="1" Margin="5" Content="Enable"
+                    IsChecked="{Binding EnableErosion}"/>
+                <TextBlock
+                    Grid.Row="9" Grid.Column="0" Margin="5"
+                    Text="Iterations" />
+                <TextBox
+                    Grid.Row="9" Grid.Column="1" Margin="5"
+                    Text="{Binding ErosionIterations, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock
+                    Grid.Row="10" Grid.Column="0" Margin="5"
+                    Text="Droplet Lifetime" />
+                <TextBox
+                    Grid.Row="10" Grid.Column="1" Margin="5"
+                    Text="{Binding ErosionMaxDropletLifeTime, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock
+                    Grid.Row="11" Grid.Column="0" Margin="5"
+                    Text="Intertia" />
+                <TextBox
+                    Grid.Row="11" Grid.Column="1" Margin="5"
+                    Text="{Binding ErosionInteria, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock
+                    Grid.Row="12" Grid.Column="0" Margin="5"
+                    Text="Sediment Cap. Factor" />
+                <TextBox
+                    Grid.Row="12" Grid.Column="1" Margin="5"
+                    Text="{Binding ErosionSedimentCapacityFactor, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock
+                    Grid.Row="13" Grid.Column="0" Margin="5"
+                    Text="Erode Speed" />
+                <TextBox
+                    Grid.Row="13" Grid.Column="1" Margin="5"
+                    Text="{Binding ErosionErodeSpeed, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock
+                    Grid.Row="14" Grid.Column="0" Margin="5"
+                    Text="Deposit Speed" />
+                <TextBox
+                    Grid.Row="14" Grid.Column="1" Margin="5"
+                    Text="{Binding ErosionDepositSpeed, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock
+                    Grid.Row="15" Grid.Column="0" Margin="5"
+                    Text="Erode Brush Radius" />
+                <TextBox
+                    Grid.Row="15" Grid.Column="1" Margin="5"
+                    Text="{Binding ErosionErodeBrush, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock
+                    Grid.Row="16" Grid.Column="0" Margin="5"
+                    Text="Deposit Brush Radius" />
+                <TextBox
+                    Grid.Row="16" Grid.Column="1" Margin="5"
+                    Text="{Binding ErosionDepositBrush, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock
+                    Grid.Row="17" Grid.Column="0" Margin="5"
+                    Text="Gravity" />
+                <TextBox
+                    Grid.Row="17" Grid.Column="1" Margin="5"
+                    Text="{Binding Gravity, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock
+                    Grid.Row="18" Grid.Column="0" Margin="5"
+                    Text="Evaporate Speed" />
+                <TextBox
+                    Grid.Row="18" Grid.Column="1" Margin="5"
+                    Text="{Binding EvaporateSpeed, UpdateSourceTrigger=PropertyChanged}"/>
+                <Border
+                    Grid.Row="19" Grid.Column="0" Grid.ColumnSpan="2" Margin="5"
+                    BorderBrush="Gray" BorderThickness="0,1,0,0"/>
+                <TextBlock
+                    Grid.Row="20" Grid.Column="0" Grid.ColumnSpan="2" Margin="5"
+                    Text="Lake Generation" FontWeight="Bold" />
+                <CheckBox
+                    Grid.Row="20" Grid.Column="1" Margin="5" Content="Enable"
+                    IsChecked="{Binding EnableErosion}"/>
+                <TextBlock
+                    Grid.Row="21" Grid.Column="0" Margin="5"
+                    Text="Lake Depth" />
+                <TextBox
+                    Grid.Row="21" Grid.Column="1" Margin="5"
+                    Text="{Binding LakeDepth, UpdateSourceTrigger=PropertyChanged}"/>
+            </Grid>
+        </GroupBox>
+        <GroupBox
+            Grid.Row="1" Grid.Column="1"
             Header="Map" Margin="3">
             <Border Margin="3" x:Name="BorderView" ClipToBounds="True" Background="Gray">
                 <Canvas x:Name="ImageView" Width="8192" Height="6144" Background="DarkGray">
-                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="0" Canvas.Top="0" Source="{Binding TileUp}" />
-                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="0" Canvas.Top="2048" Source="{Binding TileFront}"/>
-                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="2048" Canvas.Top="2048" Source="{Binding TileRight}" />
-                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="2048" Source="{Binding TileBack}"/>
-                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="6144" Canvas.Top="2048" Source="{Binding TileLeft}"/>
-                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="4096" Source="{Binding TileDown}"/>
+                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="0" Canvas.Top="0" Source="{Binding TileUp}" Visibility="{Binding PreviewMode, Converter={StaticResource PreviewVisConv}}" />
+                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="0" Canvas.Top="2048" Source="{Binding TileFront}" Visibility="{Binding PreviewMode, Converter={StaticResource PreviewVisConv}}"/>
+                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="2048" Canvas.Top="2048" Source="{Binding TileRight}" Visibility="{Binding PreviewMode, Converter={StaticResource PreviewVisConv}}" />
+                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="2048" Source="{Binding TileBack}" x:Name="ImgBack" />
+                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="6144" Canvas.Top="2048" Source="{Binding TileLeft}" Visibility="{Binding PreviewMode, Converter={StaticResource PreviewVisConv}}"/>
+                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="4096" Source="{Binding TileDown}" Visibility="{Binding PreviewMode, Converter={StaticResource PreviewVisConv}}"/>
+                    <Border
+                        Canvas.Top="512" Canvas.Left="512" Width="512" Height="512" BorderThickness="5" BorderBrush="Black"
+                        Visibility="{Binding PreviewMode, Converter={StaticResource BoolVis}}"/>
                 </Canvas>
             </Border>
         </GroupBox>

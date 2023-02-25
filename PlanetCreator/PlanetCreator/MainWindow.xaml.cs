@@ -35,6 +35,26 @@ namespace PlanetCreator
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             ViewModel.LoadPictures();
+            ViewModel.PropertyChanged += ViewModel_PropertyChanged;
+        }
+
+        private void ViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ViewModel.PreviewMode))
+            {
+                // Default:
+                //  Canvas.Left="4096" Canvas.Top="2048"
+                if (ViewModel.PreviewMode)
+                {
+                    Canvas.SetLeft(ImgBack, 0);
+                    Canvas.SetTop(ImgBack, 0);
+                }
+                else
+                {
+                    Canvas.SetLeft(ImgBack, 4096);
+                    Canvas.SetTop(ImgBack, 2048);
+                }
+            }
         }
 
         private Point _origin;
