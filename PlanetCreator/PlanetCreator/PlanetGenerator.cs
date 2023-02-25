@@ -22,21 +22,23 @@ namespace PlanetCreator
         }
         void Init()
         {
-            TileUp = new double[_tileWidth, _tileWidth];
-            TileDown = new double[_tileWidth, _tileWidth];
-            TileFront = new double[_tileWidth, _tileWidth];
-            TileRight = new double[_tileWidth, _tileWidth];
-            TileLeft = new double[_tileWidth, _tileWidth];
-            TileBack = new double[_tileWidth, _tileWidth];
-
             _faces = new()
             {
-                { CubeMapFace.Up, TileUp },
-                { CubeMapFace.Down, TileDown },
-                { CubeMapFace.Front, TileFront },
-                { CubeMapFace.Right, TileRight },
-                { CubeMapFace.Left, TileLeft },
-                { CubeMapFace.Back, TileBack },
+                { CubeMapFace.Up, new double[_tileWidth, _tileWidth] },
+                { CubeMapFace.Down, new double[_tileWidth, _tileWidth] },
+                { CubeMapFace.Front, new double[_tileWidth, _tileWidth] },
+                { CubeMapFace.Right, new double[_tileWidth, _tileWidth] },
+                { CubeMapFace.Left, new double[_tileWidth, _tileWidth] },
+                { CubeMapFace.Back, new double[_tileWidth, _tileWidth] },
+            };
+            _lakes = new()
+            {
+                { CubeMapFace.Up, new byte[_tileWidth, _tileWidth] },
+                { CubeMapFace.Down, new byte[_tileWidth, _tileWidth] },
+                { CubeMapFace.Front, new byte[_tileWidth, _tileWidth] },
+                { CubeMapFace.Right, new byte[_tileWidth, _tileWidth] },
+                { CubeMapFace.Left, new byte[_tileWidth, _tileWidth] },
+                { CubeMapFace.Back, new byte[_tileWidth, _tileWidth] },
             };
         }
 
@@ -47,17 +49,14 @@ namespace PlanetCreator
         */
 
         Dictionary<CubeMapFace, double[,]> _faces;
-        public double[,] TileUp { get; private set; }
-        public double[,] TileDown { get; private set; }
-        public double[,] TileFront { get; private set; }
-        public double[,] TileRight { get; private set; }
-        public double[,] TileLeft { get; private set; }
-        public double[,] TileBack { get; private set; }
+        Dictionary<CubeMapFace, byte[,]> _lakes;
+        double _lakeDepth = 30.0 / 65535;
 
         double[,] _debugTileR = new double[2048, 2048];
         double[,] _debugTileG = new double[2048, 2048];
         double[,] _debugTileB = new double[2048, 2048];
         bool _debug = false;
+        CubeMapFace _debugFace = CubeMapFace.Back;
 
         public void GeneratePlanet()
         {
@@ -73,15 +72,13 @@ namespace PlanetCreator
 
             };
             double sphereRadius = 1000;
-            double max = 0;
-            double min = 0;
 
             // Apply noise
             foreach (var kv in _faces)
             {
                 var face = kv.Key;
                 var tile = kv.Value;
-                if (_debug && face != CubeMapFace.Back) continue;
+                if (_debug && face != _debugFace) continue;
                 Parallel.For(0, _tileWidth, x =>
                 {
                     Parallel.For(0, _tileWidth, y =>
@@ -92,8 +89,6 @@ namespace PlanetCreator
                         {
                             value += nm.GetValue3D(point.X * sphereRadius, point.Y * sphereRadius, point.Z * sphereRadius);
                         }
-                        if (value < min) Interlocked.Exchange(ref min, value);
-                        if (value > max) Interlocked.Exchange(ref max, value);
                         tile[x, y] = value;
                     });
 
@@ -113,30 +108,48 @@ namespace PlanetCreator
                 });
             }
             // Normalize noise to 0....1
-            double offset = -1 * min;
-            double stretch = Math.Abs(max - min);
+            if (!_debug)
+                Normalize(_faces.Values.ToList());
+            else
+                Normalize(new List<double[,]> { _faces[_debugFace] });
 
+            // TODO: Tweak these:
+            // Apply an S-Curve for flatter plains and mountain tops
             foreach (var kv in _faces)
             {
                 var face = kv.Key;
                 var tile = kv.Value;
+                if (_debug && face != _debugFace) continue;
                 Parallel.For(0, _tileWidth, x =>
                 {
                     Parallel.For(0, _tileWidth, y =>
                     {
                         double value = tile[x, y];
-                        value += offset;
-                        value /= stretch;
-
-                        // TODO: Tweak these:
-                        // Apply an S-Curve for flatter plains and mountain tops
-                        value = 0.5*Math.Sin(Math.PI*(value-0.5)) + 0.5;
+                        value = 0.5 * Math.Sin(Math.PI * (value - 0.5)) + 0.5;
                         // Use this line to modify further:
-                        value = Math.Pow(value, 3);
+                        value = Math.Pow(value, 2.5); // Lower=More mountains, Higher: more flat plains
                         if (value < 0) value = 0;
                         if (value > 1) value = 1;
-
                         tile[x, y] = value;
+                    });
+                });
+            }
+
+            // Generate lakes:
+            foreach (var kv in _faces)
+            {
+                var face = kv.Key;
+                var tile = kv.Value;
+                if (_debug && face != _debugFace) continue;
+                Parallel.For(0, _tileWidth, x =>
+                {
+                    Parallel.For(0, _tileWidth, y =>
+                    {
+                        double value = tile[x, y];
+                        if (value <= _lakeDepth)
+                        {
+                            _lakes[face][x, y] = 82; // 82 Red Channel = Lake
+                        }
                     });
                 });
             }
@@ -158,50 +171,36 @@ namespace PlanetCreator
                         Debug.WriteLine("Progress: " + (progress * 100.0 / iterations) + "%");
                     }
                 });
-                Parallel.For(0, iterations, new ParallelOptions { MaxDegreeOfParallelism = 16 }, pit =>
+                Parallel.For(0, iterations, new ParallelOptions { MaxDegreeOfParallelism = 32 }, pit =>
                 {
                     Erode(rnd, pit);
                     Interlocked.Increment(ref progress);
                 });
 
-                //// Normalize to 0....1
-                min = 0;
-                max = 0;
+                // Refresh lakes:
                 foreach (var kv in _faces)
                 {
                     var face = kv.Key;
                     var tile = kv.Value;
+                    if (_debug && face != _debugFace) continue;
                     Parallel.For(0, _tileWidth, x =>
                     {
                         Parallel.For(0, _tileWidth, y =>
                         {
                             double value = tile[x, y];
-                            if (value < min) Interlocked.Exchange(ref min, value);
-                            if (value > max) Interlocked.Exchange(ref max, value);
+                            if (value <= _lakeDepth)
+                            {
+                                _lakes[face][x, y] = 82; // 82 Red Channel = Lake
+                            }
                         });
                     });
                 }
 
-                Normalize(_faces.Values.ToList());
-
-                //offset = -1 * min;
-                //stretch = Math.Abs(max - min);
-                //foreach (var kv in _faces)
-                //{
-                //    var face = kv.Key;
-                //    var tile = kv.Value;
-                //    Parallel.For(0, _tileWidth, x =>
-                //    {
-                //        Parallel.For(0, _tileWidth, y =>
-                //        {
-                //            double value = tile[x, y];
-                //            value += offset;
-                //            value /= stretch;
-                //            tile[x, y] = value;
-                //        });
-                //    });
-                //}
-
+                //// Normalize noise to 0....1
+                //if (!_debug)
+                //    Normalize(_faces.Values.ToList());
+                //else
+                //    Normalize(new List<double[,]> { _faces[_debugFace] });
             }
 
             // WIP, TODO
@@ -220,11 +219,14 @@ namespace PlanetCreator
                     var face = kv.Key;
                     var tile = kv.Value;
                     TileToImage(tile, face);
+
+                    WriteMaterialMap(_lakes[face], face);
                 }
             }
             else
             {
-                TileToImage(_faces[CubeMapFace.Back], CubeMapFace.Back);
+                WriteMaterialMap(_lakes[_debugFace], _debugFace);
+                TileToImage(_faces[_debugFace], _debugFace);
                 var image = new Image<Rgb48>(_tileWidth, _tileWidth);
                 Normalize(new List<double[,]> { _debugTileR });
                 Normalize(new List<double[,]> { _debugTileG });
@@ -252,18 +254,19 @@ namespace PlanetCreator
             // which is based on a blog entry Alexey Volynskov
             // http://ranmantaru.com/blog/2011/10/08/water-erosion-on-heightmap-terrain/
 
-            int maxDropletLifetime = 40;
-            double inertia = 0.005;
+            int maxDropletLifetime = 100;
+            double inertia = 0.01;
             double speed = 1;
             double water = 1;
             double sediment = 0;
-            double sedimentCapacityFactor = 6;
+            double sedimentCapacityFactor = 30;
             double minSedimentCapacity = 0.5/65535; // Half a pixel value
-            double depositSpeed = 0.3;
+            double depositSpeed = 0.1;
             double erodeSpeed = 0.3;
-            double brushRadius = 3;
+            double erodeBrush = 3;
+            double depositBrush = 3;
             double evaporateSpeed = 0.01;
-            double gravity = 4;
+            double gravity = 10;
 
             // Make sure we have no water left at the end:
             // Modify this exponential curve to become 0 at the end:
@@ -293,9 +296,11 @@ namespace PlanetCreator
                 {
                     //pos.X = 333;
                     //pos.Y = 458;
-                    pos.X = rnd.NextDouble() * 500;
-                    pos.Y = rnd.NextDouble() * 500;
-                    face = CubeMapFace.Back;
+                    pos.X = rnd.NextDouble() * 512 + 512;
+                    pos.Y = rnd.NextDouble() * 512 + 512;
+                    //pos.X = rnd.NextDouble() * 2047;
+                    //pos.Y = rnd.NextDouble() * 2047;
+                    face = _debugFace;
                 }
             }
 
@@ -325,11 +330,6 @@ namespace PlanetCreator
                 var posI = pos.ToIntegerPoint();
                 var posOldI = posOld.ToIntegerPoint();
 
-                if (_debug)
-                {
-                    _debugTileG[posOldI.X, posOldI.Y] = waterModified;
-                }
-
                 if (posI.X >= _tileWidth || posI.X < 0 || posI.Y >= _tileWidth || posI.Y < 0)
                 {
                     // We left the tile! Check in which tile we are now:
@@ -347,8 +347,8 @@ namespace PlanetCreator
                             Debugger.Break();
                         }
                         face = newPosPoint.Face;
-                        pos.X = newPosPoint.PosX;
-                        pos.Y = newPosPoint.PosY;
+                        pos.X = newPosPoint.PosX + newPosPoint.OffsetX;
+                        pos.Y = newPosPoint.PosY + newPosPoint.OffsetY;
                         //Debug.WriteLine("Pos {0};{1}", pos.X, pos.Y);
                         dir.X = newPosPoint.VelocityX;
                         dir.Y = newPosPoint.VelocityY;
@@ -357,6 +357,12 @@ namespace PlanetCreator
                     }
                 }
 
+                posI = pos.ToIntegerPoint();
+                if (_lakes[face][posI.X, posI.Y] == 82)
+                {
+                    // Lakes swallow everything
+                    break;
+                }
 
                 // Find the droplet's new height and calculate the deltaHeight
                 double newHeight = CalculateHeightAndGradient(pos, face).Height;
@@ -365,6 +371,16 @@ namespace PlanetCreator
                 // Calculate the droplet's sediment capacity (higher when moving fast down a slope and contains lots of water)
                 double sedimentCapacity = Math.Max(-deltaHeight * speed * waterModified * sedimentCapacityFactor, minSedimentCapacity);
 
+
+                if (_debug)
+                {
+                    _debugTileG[posOldI.X, posOldI.Y] = waterModified;
+                    //var sedimentFill = sediment / sedimentCapacity;
+                    //if (sedimentFill > 1) sedimentFill = 1;
+                    //_debugTileG[posOldI.X, posOldI.Y + 1] = sedimentFill;
+                }
+
+
                 // If carrying more sediment than capacity, or if flowing uphill:
                 var oldPoint = new CubeMapPoint(_faces, posOldI.X, posOldI.Y, faceOld);
                 if (sediment > sedimentCapacity || deltaHeight > 0)
@@ -372,7 +388,7 @@ namespace PlanetCreator
                     // If moving uphill (deltaHeight > 0) try fill up to the current height, otherwise deposit a fraction of the excess sediment
                     double amountToDeposit = (deltaHeight > 0) ? Math.Min(deltaHeight, sediment) : (sediment - sedimentCapacity) * depositSpeed;
 
-                    ApplyBrush(brushRadius, oldPoint, posOld, amountToDeposit);
+                    ApplyBrush(depositBrush, oldPoint, posOld, amountToDeposit);
                     sediment -= amountToDeposit;
                 }
                 else
@@ -381,7 +397,7 @@ namespace PlanetCreator
                     // Clamp the erosion to the change in height so that it doesn't dig a hole in the terrain behind the droplet
                     double amountToErode = Math.Min((sedimentCapacity - sediment) * erodeSpeed, -deltaHeight);
 
-                    ApplyBrush(brushRadius, oldPoint, posOld, -amountToErode);
+                    ApplyBrush(erodeBrush, oldPoint, posOld, -amountToErode);
                     sediment += amountToErode;
                 }
                 // Update delta
@@ -441,12 +457,18 @@ namespace PlanetCreator
                     }
                     brushPoints.Add(pt);
                     brushWeights.Add(brushWeight);
+                    if (materialAmount > 0 && _lakes[pt.Face][pt.PosX, pt.PosY] == 82)
+                    {
+                        // Don't deposit stuff near lake!
+                        return;
+                    }
                 }
             }
             for (int ii = 0; ii < brushWeights.Count; ++ii)
             {
                 double brushpart = materialAmount * brushWeights[ii] / brushWeightSum;
                 brushPoints[ii].Value += brushpart;
+
                 if (_debug)
                 {
                     if (brushpart > 0)
@@ -471,8 +493,6 @@ namespace PlanetCreator
                     foreach (var image in images)
                     {
                         var value = image[x, y];
-                        if (value < 0) value = 0;
-                        else if (value > 1) value = 1;
                         if (value > max)
                         {
                             lock (images)
@@ -926,19 +946,40 @@ namespace PlanetCreator
         }
         void TileToImage(double[,] tile, string fileName)
         {
+            // Using full spectrum is too exteme. Flatten area:
+            double minVal = 0.3;
+            double maxVal = 0.9;
+            double lakeLevel = (maxVal - minVal) * _lakeDepth + minVal;
+
             var image = new Image<L16>(_tileWidth, _tileWidth);
             Parallel.For(0, _tileWidth, x =>
             {
                 Parallel.For(0, _tileWidth, y =>
                 {
-                    // Using full spectrum is too exteme
-                    // Smooth v
-                    //var v = 0.78 * tile[x, y] + 0.2; // Values between 0.2 and 0.98
-                    var v = 0.6 * tile[x, y] + 0.3; // Values between 0.3 and 0.9
+                    var v = (maxVal-minVal) * tile[x, y] + minVal;
                     if (v > 1) v = 1;
                     else if (v < 0) v = 0;
+                    if (v < lakeLevel) v = lakeLevel;
                     ushort value = (ushort)(v * 65535);
                     image[x, y] = new L16(value);
+                });
+            });
+            image.SaveAsPng(fileName);
+        }
+
+        void WriteMaterialMap(byte[,] red, CubeMapFace face)
+        {
+            WriteMaterialMap(red, face.ToString().ToLower() + "_mat.png");
+        }
+
+        void WriteMaterialMap(byte[,] red, string fileName)
+        {
+            var image = new Image<Rgb24>(_tileWidth, _tileWidth);
+            Parallel.For(0, _tileWidth, x =>
+            {
+                Parallel.For(0, _tileWidth, y =>
+                {
+                    image[x, y] = new Rgb24(red[x,y], 0,0);
                 });
             });
             image.SaveAsPng(fileName);
