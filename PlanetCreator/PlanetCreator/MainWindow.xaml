@@ -175,7 +175,7 @@
                     Text="Lake Generation" FontWeight="Bold" />
                 <CheckBox
                     Grid.Row="20" Grid.Column="1" Margin="5" Content="Enable"
-                    IsChecked="{Binding EnableErosion}"/>
+                    IsChecked="{Binding EnableLakeGeneration}"/>
                 <TextBlock
                     Grid.Row="21" Grid.Column="0" Margin="5"
                     Text="Lake Depth" />
