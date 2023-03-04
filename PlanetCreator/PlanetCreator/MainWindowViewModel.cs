@@ -169,11 +169,17 @@ namespace PlanetCreator
             get => _enableLakeGeneration;
             set => SetProp(ref _enableLakeGeneration, value);
         }
-        ushort _lakeDepth = 5;
+        ushort _lakeDepth = 10;
         public ushort LakeDepth
         {
             get => _lakeDepth;
             set => SetProp(ref _lakeDepth, value);
+        }
+        ushort _lakesPerTile = 30;
+        public ushort LakesPerTile
+        {
+            get => _lakesPerTile;
+            set => SetProp(ref _lakesPerTile, value);
         }
 
         public ICommand GenerateCommand => new RelayCommand(async o =>
@@ -213,6 +219,7 @@ namespace PlanetCreator
             generator.EvaporateSpeed = EvaporateSpeed;
             generator.GenerateLakes = EnableLakeGeneration;
             generator.LakeDepth = LakeDepth;
+            generator.LakesPerTile = LakesPerTile;
             Progress = 1;
             generator.ProgressChanged += Generator_ProgressChanged;
             IsBusy = true;

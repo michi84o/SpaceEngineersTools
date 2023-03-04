@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -166,26 +167,6 @@ namespace PlanetCreator
                 });
             }
 
-            //// Generate lakes:
-            //foreach (var kv in _faces)
-            //{
-            //    if (token.IsCancellationRequested) return;
-            //    var face = kv.Key;
-            //    var tile = kv.Value;
-            //    if (_debug && face != _debugFace) continue;
-            //    Parallel.For(0, _tileWidth, x =>
-            //    {
-            //        Parallel.For(0, _tileWidth, y =>
-            //        {
-            //            double value = tile[x, y];
-            //            if (value <= _lakeDepth)
-            //            {
-            //                _lakes[face][x, y] = 82; // 82 Red Channel = Lake
-            //            }
-            //        });
-            //    });
-            //}
-
             ProgressChanged?.Invoke(this, new ProgressEventArgs(5));
 
             // Apply erosion
@@ -225,26 +206,13 @@ namespace PlanetCreator
                 }
                 catch { return; } // Cancelled
 
-                //// Refresh lakes:
-                //foreach (var kv in _faces)
-                //{
-                //    if (token.IsCancellationRequested) return;
-                //    var face = kv.Key;
-                //    var tile = kv.Value;
-                //    if (_debug && face != _debugFace) continue;
-                //    Parallel.For(0, _tileWidth, x =>
-                //    {
-                //        Parallel.For(0, _tileWidth, y =>
-                //        {
-                //            double value = tile[x, y];
-                //            if (value <= _lakeDepth)
-                //            {
-                //                _lakes[face][x, y] = 82; // 82 Red Channel = Lake
-                //            }
-                //        });
-                //    });
-                //}
             }
+
+            // Normalize noise to 0....1
+            if (!_debug)
+                Normalize(_faces.Values.ToList());
+            else
+                Normalize(new List<double[,]> { _faces[_debugFace] });
 
             if (GenerateLakes)
             {
@@ -275,13 +243,15 @@ namespace PlanetCreator
                     var tile = kv.Value;
                     TileToImage(tile, face);
 
-                    WriteMaterialMap(_lakes[face], face);
+                    if (GenerateLakes)
+                        WriteMaterialMap(_lakes[face], face);
                 }
             }
             else
             {
                 if (token.IsCancellationRequested) return;
-                WriteMaterialMap(_lakes[_debugFace], _debugFace);
+                if (GenerateLakes)
+                    WriteMaterialMap(_lakes[_debugFace], _debugFace);
                 TileToImage(_faces[_debugFace], _debugFace);
                 var image = new Image<Rgb48>(_tileWidth, _tileWidth);
                 Normalize(new List<double[,]> { _debugTileR });
@@ -483,234 +453,278 @@ namespace PlanetCreator
 
         public bool GenerateLakes { get; set; } = true;
         public ushort LakeDepth { get; set; } = 5;
-        public ushort LakesPerTile { get; set; } = 20;
+        public ushort LakesPerTile { get; set; } = 40;
 
-        void MakeLakes(CancellationToken token)
-        {
-            // Strategy: Drop water on tiles and see where they end up. No inertia.
-            int pixelsPerTile = 200000;
-            int totalTilePixels = _tileWidth * _tileWidth;
-            int pixelGap = totalTilePixels / pixelsPerTile;
-            int pixelsPerRow = _tileWidth / pixelGap;
-            int lostPixels = _tileWidth - (pixelsPerRow * pixelGap);
-            int offset = lostPixels / 2;
+        #region Old attempt, was too naive
+        //void MakeLakes(CancellationToken token)
+        //{
+        //    // Target: About 100.000 pixels are lake pixels
 
-            Dictionary<CubeMapFace, double[,]> waterSpots = new Dictionary<CubeMapFace, double[,]>();
-            Dictionary<CubeMapFace, double[,]> waterSpots2 = new Dictionary<CubeMapFace, double[,]>();
-            var faceValues = _faces.Keys.ToList();
-            if (_debug) { faceValues = new List<CubeMapFace> { CubeMapFace.Back }; }
-            foreach (var face in faceValues)
-            {
-                waterSpots[face] = new double[_tileWidth, _tileWidth];
-                waterSpots2[face] = new double[_tileWidth, _tileWidth];
-            }
+        //    // Strategy: Drop water on tiles and see where they end up. No inertia.
+        //    int pixelsPerTile = 200000;
+        //    int totalTilePixels = _tileWidth * _tileWidth;
+        //    int pixelGap = totalTilePixels / pixelsPerTile;
+        //    int pixelsPerRow = _tileWidth / pixelGap;
+        //    int lostPixels = _tileWidth - (pixelsPerRow * pixelGap);
+        //    int offset = lostPixels / 2;
 
-            Parallel.For(0, faceValues.Count, faceIndex =>
-            {
-                var face = faceValues[faceIndex];
-                Parallel.For(0, 1 + _tileWidth / pixelGap, xred =>
-                {
-                    Parallel.For(0, 1 + _tileWidth / pixelGap, yred =>
-                    {
-                        int x = offset + xred * pixelGap;
-                        int y = offset + yred * pixelGap;
+        //    Dictionary<CubeMapFace, double[,]> waterSpots = new Dictionary<CubeMapFace, double[,]>();
+        //    Dictionary<CubeMapFace, double[,]> waterSpots2 = new Dictionary<CubeMapFace, double[,]>();
+        //    var faceValues = _faces.Keys.ToList();
+        //    if (_debug) { faceValues = new List<CubeMapFace> { CubeMapFace.Back }; }
+        //    foreach (var face in faceValues)
+        //    {
+        //        waterSpots[face] = new double[_tileWidth, _tileWidth];
+        //        waterSpots2[face] = new double[_tileWidth, _tileWidth];
+        //    }
 
-                        var currentFace = face;
-                        PointD pos = new PointD { X = x, Y = y };
-                        PointD posOld = pos;
-                        CubeMapPoint oldPoint = null;
-                        HeightAndGradient heightAndGradient = CalculateHeightAndGradient(pos, currentFace);
-                        int iteration = 0;
-                        bool floored = false;
-                        while (iteration++ < _tileWidth / 2 && !token.IsCancellationRequested) // Limit movement to half map
-                        {
-                            var dir = -heightAndGradient.Gradient;
-                            dir = dir.Normalize();
-                            PointD cellOffset = pos.IntegerOffset();
+        //    Parallel.For(0, faceValues.Count, faceIndex =>
+        //    {
+        //        var face = faceValues[faceIndex];
+        //        Parallel.For(0, 1 + _tileWidth / pixelGap, xred =>
+        //        {
+        //            Parallel.For(0, 1 + _tileWidth / pixelGap, yred =>
+        //            {
+        //                int x = offset + xred * pixelGap;
+        //                int y = offset + yred * pixelGap;
 
-                            HeightAndGradient lastHeight = heightAndGradient;
-                            posOld = pos;
-                            var posOldI = posOld.ToIntegerPoint();
-                            oldPoint = new CubeMapPoint(_faces, posOldI.X, posOldI.Y, currentFace) { VelocityX = dir.X, VelocityY = dir.Y, OffsetX = cellOffset.X, OffsetY = cellOffset.Y };
+        //                var currentFace = face;
+        //                PointD pos = new PointD { X = x, Y = y };
+        //                PointD posOld = pos;
+        //                CubeMapPoint oldPoint = null;
+        //                HeightAndGradient heightAndGradient = CalculateHeightAndGradient(pos, currentFace);
+        //                int iteration = 0;
+        //                bool floored = false;
+        //                while (iteration++ < _tileWidth / 2 && !token.IsCancellationRequested) // Limit movement to half map
+        //                {
+        //                    var dir = -heightAndGradient.Gradient;
+        //                    dir = dir.Normalize();
+        //                    PointD cellOffset = pos.IntegerOffset();
 
-                            // Update position
-                            pos += dir;
+        //                    HeightAndGradient lastHeight = heightAndGradient;
+        //                    posOld = pos;
+        //                    var posOldI = posOld.ToIntegerPoint();
+        //                    oldPoint = new CubeMapPoint(_faces, posOldI.X, posOldI.Y, currentFace) { VelocityX = dir.X, VelocityY = dir.Y, OffsetX = cellOffset.X, OffsetY = cellOffset.Y };
 
-                            #region Out of bounds handling
-                            var posI = pos.ToIntegerPoint();
-                            if (posI.X >= _tileWidth || posI.X < 0 || posI.Y >= _tileWidth || posI.Y < 0)
-                            {
-                                // We left the tile! Check in which tile we are now:
-                                var newPosPoint = CubeMapPoint.GetPointRelativeTo(
-                                    oldPoint,
-                                    posI.X - posOldI.X,
-                                    posI.Y - posOldI.Y,
-                                    _faces);
-                                // Update face, position, speed and offset:
-                                if (newPosPoint.Face != currentFace)
-                                {
-                                    if (newPosPoint.PosX >= _tileWidth || newPosPoint.PosX < 0 || newPosPoint.PosY >= _tileWidth || newPosPoint.PosY < 0)
-                                    {
-                                        Debugger.Break();
-                                        return;
-                                    }
-                                    currentFace = newPosPoint.Face;
-                                    pos.X = newPosPoint.PosX + newPosPoint.OffsetX;
-                                    pos.Y = newPosPoint.PosY + newPosPoint.OffsetY;
+        //                    // Update position
+        //                    pos += dir;
 
-                                }
-                            }
-                            #endregion
+        //                    #region Out of bounds handling
+        //                    var posI = pos.ToIntegerPoint();
+        //                    if (posI.X >= _tileWidth || posI.X < 0 || posI.Y >= _tileWidth || posI.Y < 0)
+        //                    {
+        //                        // We left the tile! Check in which tile we are now:
+        //                        var newPosPoint = CubeMapPoint.GetPointRelativeTo(
+        //                            oldPoint,
+        //                            posI.X - posOldI.X,
+        //                            posI.Y - posOldI.Y,
+        //                            _faces);
+        //                        // Update face, position, speed and offset:
+        //                        if (newPosPoint.Face != currentFace)
+        //                        {
+        //                            if (newPosPoint.PosX >= _tileWidth || newPosPoint.PosX < 0 || newPosPoint.PosY >= _tileWidth || newPosPoint.PosY < 0)
+        //                            {
+        //                                Debugger.Break();
+        //                                return;
+        //                            }
+        //                            currentFace = newPosPoint.Face;
+        //                            pos.X = newPosPoint.PosX + newPosPoint.OffsetX;
+        //                            pos.Y = newPosPoint.PosY + newPosPoint.OffsetY;
 
-                            if (_debug)
-                            {
-                                var ipos = pos.ToIntegerPoint();
-                                _debugTileR[ipos.X, ipos.Y] += 2;
-                                if (_debugTileR[ipos.X, ipos.Y] > 50) _debugTileR[ipos.X, ipos.Y] = 50;
-                            }
-                            heightAndGradient = CalculateHeightAndGradient(pos, currentFace);
-                            if (heightAndGradient.Height >= lastHeight.Height)
-                            {
-                                floored = true;
-                                break;
-                            }
+        //                        }
+        //                    }
+        //                    #endregion
 
-                        } // while
-                        if (!floored || oldPoint == null)
-                        {
-                            return;
-                        }
-                        if (_debug && oldPoint.Face != _debugFace)
-                        {
-                            return;
-                        }
-                        lock (waterSpots[oldPoint.Face])
-                        {
-                            waterSpots[oldPoint.Face][oldPoint.PosX, oldPoint.PosY] += 1;
-                            _debugTileG[oldPoint.PosX, oldPoint.PosY] = 255;
-                        }
-                    });
-                });
-            });
+        //                    if (_debug)
+        //                    {
+        //                        var ipos = pos.ToIntegerPoint();
+        //                        _debugTileR[ipos.X, ipos.Y] += 2;
+        //                        if (_debugTileR[ipos.X, ipos.Y] > 50) _debugTileR[ipos.X, ipos.Y] = 50;
+        //                    }
+        //                    heightAndGradient = CalculateHeightAndGradient(pos, currentFace);
+        //                    if (heightAndGradient.Height >= lastHeight.Height)
+        //                    {
+        //                        floored = true;
+        //                        break;
+        //                    }
 
-            // Apply a folding matrix to determine maxima
-            const int matrixSize = 9;
-            Parallel.For(0, faceValues.Count, faceIndex =>
-            {
-                var face = faceValues[faceIndex];
-                Parallel.For(0, _tileWidth, x =>
-                {
-                    Parallel.For(0, _tileWidth, y =>
-                    {
-                        var point = new CubeMapPoint(waterSpots, x,y, face);
-                        double sum = 0;
-                        for (int x2 = x - matrixSize / 2; x2 <= x + matrixSize / 2; ++x2)
-                        {
-                            for (int y2 = y - matrixSize / 2; y2 <= y + matrixSize / 2; ++y2)
-                            {
-                                var dp = CubeMapPoint.GetPointRelativeTo(point, x2-x, y2-y, waterSpots);
-                                if ((!_debug || dp.Face == face) && dp.Value > 0)
-                                {
-                                    PointD d;
-                                    d.X = x - x2;
-                                    d.Y = y - y2;
-                                    var distance = d.Length;
-                                    sum += dp.Value * (1/(distance+0.5)) ;
-                                }
-                            }
-                        }
-                        waterSpots2[face][x, y] = sum;
-                        _debugTileB[x,y] = sum;
-                    });
-                });
-            });
-            // We end up having lots of blue squares in the debug image and waterSpots2
+        //                } // while
+        //                if (!floored || oldPoint == null)
+        //                {
+        //                    return;
+        //                }
+        //                if (_debug && oldPoint.Face != _debugFace)
+        //                {
+        //                    return;
+        //                }
+        //                lock (waterSpots[oldPoint.Face])
+        //                {
+        //                    waterSpots[oldPoint.Face][oldPoint.PosX, oldPoint.PosY] += 1;
+        //                    _debugTileG[oldPoint.PosX, oldPoint.PosY] = 255;
+        //                }
+        //            });
+        //        });
+        //    });
 
-            //// Recycle waterspots list
-            //Parallel.For(0, faceValues.Count, faceIndex =>
-            //{
-            //    var face = faceValues[faceIndex];
-            //    Parallel.For(0, _tileWidth, x =>
-            //    {
-            //        Parallel.For(0, _tileWidth, y =>
-            //        {
-            //            waterSpots[face][x, y] = 0;
-            //        });
-            //    });
-            //});
+        //// Apply a folding matrix to determine maxima
+        //const int matrixSize = 9;
+        //Parallel.For(0, faceValues.Count, faceIndex =>
+        //{
+        //    var face = faceValues[faceIndex];
+        //    Parallel.For(0, _tileWidth, x =>
+        //    {
+        //        Parallel.For(0, _tileWidth, y =>
+        //        {
+        //            var point = new CubeMapPoint(waterSpots, x,y, face);
+        //            double sum = 0;
+        //            for (int x2 = x - matrixSize / 2; x2 <= x + matrixSize / 2; ++x2)
+        //            {
+        //                for (int y2 = y - matrixSize / 2; y2 <= y + matrixSize / 2; ++y2)
+        //                {
+        //                    var dp = CubeMapPoint.GetPointRelativeTo(point, x2-x, y2-y, waterSpots);
+        //                    if ((!_debug || dp.Face == face) && dp.Value > 0)
+        //                    {
+        //                        PointD d;
+        //                        d.X = x - x2;
+        //                        d.Y = y - y2;
+        //                        var distance = d.Length;
+        //                        sum += dp.Value * (1/(distance+0.5)) ;
+        //                    }
+        //                }
+        //            }
+        //            waterSpots2[face][x, y] = sum;
+        //            _debugTileB[x,y] = sum;
+        //        });
+        //    });
+        //});
+        //// We end up having lots of blue squares in the debug image and waterSpots2
 
-            Dictionary<CubeMapFace, List<HighScore>> highscores = new Dictionary<CubeMapFace, List<HighScore>>();
-            foreach (var face in faceValues)
-            {
-                highscores[face] = new List<HighScore>();
-            }
+        //Dictionary<CubeMapFace, List<HighScore>> highscores = new Dictionary<CubeMapFace, List<HighScore>>();
+        //foreach (var face in faceValues)
+        //{
+        //    highscores[face] = new List<HighScore>();
+        //}
 
-            // We end up having lots of 9x9 blue squares in the debug image
-            // Reduce squares to actual points
-            // Brute Force Strategy:
-            // - Check all points and put them in a managed high score list
-            // - Avoid multiple scores within same area by checking distance
-            const double safetyDistance = matrixSize * 1.41 + 5; // Diagonal length of 9x9 box + 5 pixel
-            Parallel.For(0, faceValues.Count, faceIndex =>
-            {
-                var face = faceValues[faceIndex];
-                var highscoreList = highscores[face];
-                var waterSpotList = waterSpots2[face];
-                double highScoreMin = 0;
-                int highScoreCount = 0;
-                //double highScoreMax = 0;
-                Parallel.For(0, _tileWidth, x =>
-                {
-                    Parallel.For(0, _tileWidth, y =>
-                    {
-                        var value = waterSpotList[x, y];
-                        if (value == 0) return;
-                        if (value > highScoreMin || highScoreCount < LakesPerTile)
-                        {
-                            lock (highscoreList)
-                            {
-                                if (value > highScoreMin || highScoreCount < LakesPerTile)
-                                {
-                                    var score = new HighScore(value, x, y);
-                                    var neighbors = highscoreList.Where(s => s.Position.IsWithinRadius(score.Position, safetyDistance)).ToList();
-                                    if (neighbors.Any(s => s.Score > value)) return;
-                                    foreach (var neighbor in neighbors)
-                                        highscoreList.Remove(neighbor);
-                                    highscoreList.Add(score);
+        //// We end up having lots of 9x9 blue squares in the debug image
+        //// Reduce squares to actual points
+        //// Brute Force Strategy:
+        //// - Check all points and put them in a managed high score list
+        //// - Avoid multiple scores within same area by checking distance
+        //const double safetyDistance = matrixSize * 1.41 + 5; // Diagonal length of 9x9 box + 5 pixel
+        //Parallel.For(0, faceValues.Count, faceIndex =>
+        //{
+        //    var face = faceValues[faceIndex];
+        //    var highscoreList = highscores[face];
+        //    var waterSpotList = waterSpots2[face];
+        //    double highScoreMin = 0;
+        //    int highScoreCount = 0;
+        //    //double highScoreMax = 0;
+        //    Parallel.For(0, _tileWidth, x =>
+        //    {
+        //        Parallel.For(0, _tileWidth, y =>
+        //        {
+        //            var value = waterSpotList[x, y];
+        //            if (value == 0) return;
+        //            if (value > highScoreMin || highScoreCount < LakesPerTile)
+        //            {
+        //                lock (highscoreList)
+        //                {
+        //                    if (value > highScoreMin || highScoreCount < LakesPerTile)
+        //                    {
+        //                        var score = new HighScore(value, x, y);
+        //                        var neighbors = highscoreList.Where(s => s.Position.IsWithinRadius(score.Position, safetyDistance)).ToList();
+        //                        if (neighbors.Any(s => s.Score > value)) return;
+        //                        foreach (var neighbor in neighbors)
+        //                            highscoreList.Remove(neighbor);
+        //                        highscoreList.Add(score);
 
-                                    highscoreList.Sort((a,b) => b.Score.CompareTo(a.Score));
-                                    while (highscoreList.Count > LakesPerTile)
-                                        highscoreList.RemoveAt(highscoreList.Count - 1);
+        //                        highscoreList.Sort((a,b) => b.Score.CompareTo(a.Score));
+        //                        while (highscoreList.Count > LakesPerTile)
+        //                            highscoreList.RemoveAt(highscoreList.Count - 1);
 
-                                    //highScoreMax = highscoreList[0].Score;
-                                    highScoreMin = highscoreList[highscoreList.Count - 1].Score;
-                                    highScoreCount = highscoreList.Count;
-                                }
-                            }
-                        }
-                    });
-                });
-            });
+        //                        //highScoreMax = highscoreList[0].Score;
+        //                        highScoreMin = highscoreList[highscoreList.Count - 1].Score;
+        //                        highScoreCount = highscoreList.Count;
+        //                    }
+        //                }
+        //            }
+        //        });
+        //    });
+        //});
 
-            if (_debug)
-            {
-                foreach (var score in highscores[_debugFace])
-                {
-                    var x = score.Position.X;
-                    var y = score.Position.Y;
-                    for (int xx = x-2; xx<x+2; xx++)
-                    {
-                        for (int yy = y-2; yy<y+2; yy++)
-                        {
-                            if (xx > 0 && yy > 0 && xx < _tileWidth && yy < _tileWidth)
-                                _debugTileR[xx, yy] = 55;
-                        }
-                    }
-                    Debug.WriteLine("SCORE: " + score.Position.X + ";" + score.Position.Y);
-                }
-            }
+        //if (_debug)
+        //{
+        //    foreach (var score in highscores[_debugFace])
+        //    {
+        //        var x = score.Position.X;
+        //        var y = score.Position.Y;
+        //        for (int xx = x-2; xx<x+2; xx++)
+        //        {
+        //            for (int yy = y-2; yy<y+2; yy++)
+        //            {
+        //                if (xx > 0 && yy > 0 && xx < _tileWidth && yy < _tileWidth)
+        //                    _debugTileR[xx, yy] = 55;
+        //            }
+        //        }
+        //        Debug.WriteLine("SCORE: " + score.Position.X + ";" + score.Position.Y);
+        //    }
+        //}
 
-        }
+        //// Last step: Fill up the lakes
+        //// Warning! If lake depth is too high it will overflow and fill nearly the whole map
+        //// We need to determine the maximum sane size of a lake without overflowing
+
+        //Parallel.For(0, faceValues.Count, faceIndex =>
+        //{
+        //    var face = faceValues[faceIndex];
+        //    var highscoreList = highscores[face];
+        //    foreach (var score in highscoreList)
+        //    {
+        //        var point = new CubeMapPoint(_faces, score.Position.X, score.Position.Y, face);
+        //        var height = point.Value;
+        //        var stopHeigt = height + LakeDepth*1.0/65535;
+        //        FillLake(point, stopHeigt/*, (int)(score.Score * 50)*/);
+        //    }
+        //});
+
+        //}
+
+        // BAD CODE: Fills whole map
+        //void FillLake(CubeMapPoint point, double stopHeight)
+        //{
+        //    if (_debug && point.Face != _debugFace) return;
+        //    //if (fillLimit < 100000) fillLimit = 100000;
+
+        //    // Recursive call leads to access violation, probably stack overflow.
+        //    // Use non-recursive algorithm
+        //    Queue<CubeMapPoint> queue = new Queue<CubeMapPoint>();
+        //    queue.Enqueue(point);
+        //    while (queue.Count > 0)
+        //    {
+        //        point = queue.Dequeue();
+        //        if (_debug && _debugFace != point.Face)
+        //        {
+        //            continue;
+        //        }
+        //        var matMap = _lakes[point.Face];
+        //        matMap[point.PosX, point.PosY] = 82;
+        //        point.Value = stopHeight;
+        //        //Debug.WriteLine("{0},{1}", point.PosX, point.PosY);
+
+        //        //if (--fillLimit <= 0) break;
+
+        //        var np = CubeMapPoint.GetPointRelativeTo(point, -1, 0, _faces);
+        //        if (np.Value < stopHeight) queue.Enqueue(np);
+        //        np = CubeMapPoint.GetPointRelativeTo(point, 0, -1, _faces);
+        //        if (np.Value < stopHeight) queue.Enqueue(np);
+        //        np = CubeMapPoint.GetPointRelativeTo(point, 1, 0, _faces);
+        //        if (np.Value < stopHeight) queue.Enqueue(np);
+        //        np = CubeMapPoint.GetPointRelativeTo(point, 0, 1, _faces);
+        //        if (np.Value < stopHeight) queue.Enqueue(np);
+        //    }
+        //}
+        #region
+
         void ApplyBrush(double brushRadius, CubeMapPoint mapLocation, PointD exactLocation, double materialAmount)
         {
             List<CubeMapPoint> brushPoints = new();
