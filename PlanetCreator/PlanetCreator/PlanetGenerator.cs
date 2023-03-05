@@ -60,15 +60,15 @@ namespace PlanetCreator
                 { CubeMapFace.Left, new byte[_tileWidth, _tileWidth] },
                 { CubeMapFace.Back, new byte[_tileWidth, _tileWidth] },
             };
-            _quadrants = new()
-            {
-                { CubeMapFace.Up, new List<object> { new object(), new object(), new object(), new object(), } },
-                { CubeMapFace.Down, new List<object> { new object(), new object(), new object(), new object(), } },
-                { CubeMapFace.Front, new List<object> { new object(), new object(), new object(), new object(), } },
-                { CubeMapFace.Right, new List<object> { new object(), new object(), new object(), new object(), } },
-                { CubeMapFace.Left, new List<object> { new object(), new object(), new object(), new object(), } },
-                { CubeMapFace.Back, new List<object> { new object(), new object(), new object(), new object(), } }
-            };
+            //_quadrants = new()
+            //{
+            //    { CubeMapFace.Up, new List<object> { new object(), new object(), new object(), new object(), } },
+            //    { CubeMapFace.Down, new List<object> { new object(), new object(), new object(), new object(), } },
+            //    { CubeMapFace.Front, new List<object> { new object(), new object(), new object(), new object(), } },
+            //    { CubeMapFace.Right, new List<object> { new object(), new object(), new object(), new object(), } },
+            //    { CubeMapFace.Left, new List<object> { new object(), new object(), new object(), new object(), } },
+            //    { CubeMapFace.Back, new List<object> { new object(), new object(), new object(), new object(), } }
+            //};
         }
 
         /* Cube Map: Folds into a cube
@@ -79,7 +79,7 @@ namespace PlanetCreator
 
         Dictionary<CubeMapFace, double[,]> _faces;
         Dictionary<CubeMapFace, byte[,]> _lakes;
-        Dictionary<CubeMapFace, List<object>> _quadrants; // Use for multitasking water fill
+        //Dictionary<CubeMapFace, List<object>> _quadrants; // Use for multitasking water fill
         double _lakeDepth = 30.0 / 65535;
 
         double[,] _debugTileR = new double[2048, 2048];
@@ -460,27 +460,104 @@ namespace PlanetCreator
         }
 
         public bool GenerateLakes { get; set; } = true;
-        public ushort LakeDepth { get; set; } = 5;
         public ushort LakesPerTile { get; set; } = 40;
+        public double LakeVolumeMultiplier { get; set; } = 1.0;
+
+        public IDebugImage DebugImage;
+
+        void CheckFillLake(CubeMapPoint point, double stopHeight, double maxVolume, int maxFilledPixels, CancellationToken token, out int filledPixelCount, out HashSet<CubeMapPointLight> filledPoints , out double filledVolume)
+        {
+            filledPixelCount = 0;
+            filledPoints = new();
+            filledVolume = 0;
+            if (_debug && point.Face != _debugFace) return;
+            if (point.Value >= stopHeight) return;
+            var pointLight = new CubeMapPointLight { Face = point.Face, X = point.PosX, Y = point.PosY };
+            //var faceValues = _faces.Keys.ToList();
+            //if (_debug) faceValues = new List<CubeMapFace> { _debugFace };
+            //foreach ( var faceValue in faceValues ) filledPixels[faceValue] = new bool[_tileWidth, _tileWidth];
+            Queue<CubeMapPointLight> queue = new Queue<CubeMapPointLight>();
+
+            // Use this to prevent thousands of duplicates beeing added to the queue
+            HashSet<CubeMapPointLight> queuedPoints = new();
+
+            queue.Enqueue(pointLight);
+            while (queue.Count > 0)
+            {
+                if (token.IsCancellationRequested)
+                {
+                    return;
+                }
+                var pt = queue.Dequeue();
+                if (_debug && _debugFace != pt.Face) continue;
+                if (!filledPoints.Contains(pt))
+                {
+                    ++filledPixelCount;
+                    filledPoints.Add(pt);
+                    filledVolume += (stopHeight - CubeMapPointLight.GetValue(pt, _faces));
+                    if (filledVolume > maxVolume || filledPixelCount > maxFilledPixels) return;
+                }
+                if (_debug &&
+                    (pt.X < 1 || pt.X > _tileWidth - 2 ||
+                     pt.Y < 1 || pt.Y > _tileWidth - 2)) continue;
+
+                var np = CubeMapPointLight.GetPointRelativeTo(pt,-1, 0);
+                if (!queuedPoints.Contains(np) && !filledPoints.Contains(np) && CubeMapPointLight.GetValue(np, _faces) < stopHeight)
+                {
+                    queue.Enqueue(np);
+                    queuedPoints.Add(np);
+                }
+                np = CubeMapPointLight.GetPointRelativeTo(pt, 0, -1);
+                if (!queuedPoints.Contains(np) && !filledPoints.Contains(np) && CubeMapPointLight.GetValue(np, _faces) < stopHeight)
+                {
+                    queue.Enqueue(np);
+                    queuedPoints.Add(np);
+                }
+                np = CubeMapPointLight.GetPointRelativeTo(pt, 1, 0);
+                if (!queuedPoints.Contains(np) && !filledPoints.Contains(np) && CubeMapPointLight.GetValue(np, _faces) < stopHeight)
+                {
+                    queue.Enqueue(np);
+                    queuedPoints.Add(np);
+                }
+                np = CubeMapPointLight.GetPointRelativeTo(pt, 0, 1);
+                if (!queuedPoints.Contains(np) && !filledPoints.Contains(np) && CubeMapPointLight.GetValue(np, _faces) < stopHeight)
+                {
+                    queue.Enqueue(np);
+                    queuedPoints.Add(np);
+                }
+            }
+        }
 
         void MakeLakes(CancellationToken token)
         {
-            var processors = Environment.ProcessorCount;
-            if (processors < 4) processors = 4;
-            // Target: About 100.000 pixels are lake pixels
+
             // Strategy: Drop water on tiles and see where they end up. No inertia.
-            // Each droplet carries a certain amount of water and spills it at its final destination
+            int pixelsPerTile = 200000;
+            int totalTilePixels = _tileWidth * _tileWidth;
+            int pixelGap = totalTilePixels / pixelsPerTile;
+            int pixelsPerRow = _tileWidth / pixelGap;
+            int lostPixels = _tileWidth - (pixelsPerRow * pixelGap);
+            int offset = lostPixels / 2;
+
+            Dictionary<CubeMapFace, double[,]> waterSpots = new Dictionary<CubeMapFace, double[,]>();
+            Dictionary<CubeMapFace, double[,]> waterSpots2 = new Dictionary<CubeMapFace, double[,]>();
             var faceValues = _faces.Keys.ToList();
-            if (_debug) { faceValues = new List<CubeMapFace> { _debugFace }; }
-            Parallel.For(0, faceValues.Count, new ParallelOptions { MaxDegreeOfParallelism = processors * 2, CancellationToken = token }, faceIndex =>
+            if (_debug) { faceValues = new List<CubeMapFace> { CubeMapFace.Back }; }
+            foreach (var face in faceValues)
+            {
+                waterSpots[face] = new double[_tileWidth, _tileWidth];
+                waterSpots2[face] = new double[_tileWidth, _tileWidth];
+            }
+
+            Parallel.For(0, faceValues.Count, faceIndex =>
             {
                 var face = faceValues[faceIndex];
-                Parallel.For(0, _tileWidth, new ParallelOptions { MaxDegreeOfParallelism = processors, CancellationToken = token }, x =>
+                Parallel.For(0, 1 + _tileWidth / pixelGap, xred =>
                 {
-                    Parallel.For(0, _tileWidth, new ParallelOptions { MaxDegreeOfParallelism = processors, CancellationToken = token }, y =>
+                    Parallel.For(0, 1 + _tileWidth / pixelGap, yred =>
                     {
-                        if (x % WaterModulo != 0) return;
-                        if (y % WaterModulo != 0) return;
+                        int x = offset + xred * pixelGap;
+                        int y = offset + yred * pixelGap;
 
                         var currentFace = face;
                         PointD pos = new PointD { X = x, Y = y };
@@ -549,388 +626,204 @@ namespace PlanetCreator
                         {
                             return;
                         }
-                        ApplyWater(oldPoint, token);
+                        lock (waterSpots[oldPoint.Face])
+                        {
+                            waterSpots[oldPoint.Face][oldPoint.PosX, oldPoint.PosY] += 1;
+                            _debugTileG[oldPoint.PosX, oldPoint.PosY] = 255;
+                        }
                     });
                 });
             });
-        }
 
-        public IDebugImage DebugImage;
-
-
-        public int WaterModulo = 16;
-        public int WaterUnitsPerDroplet = 200;
-        void ApplyWater(CubeMapPoint point, CancellationToken token)
-        {
-            _debugTileG[point.PosX, point.PosY] = 255;
-            double waterUnitVolume = 1.0 / 65535; // 1 unit increases height map value by 1
-
-            // We determine the pixels that need to be elevated to contain the volume of water
-            // Output parameters:
-            List<CubeMapPoint> requiredPoints = new();
-            double requiredHeight = 0;
-            // Input parameters:
-            double overallVolume = waterUnitVolume * WaterUnitsPerDroplet;
-
-            lock (_lakes) // Don't add water while adding water
+            // Apply a folding matrix to determine maxima
+            const int matrixSize = 9;
+            Parallel.For(0, faceValues.Count, faceIndex =>
             {
-                double stopHeight = point.Value + waterUnitVolume;
-                double lastStopHeight = stopHeight;
-                CheckFillLake(point, stopHeight, overallVolume, out var lastFilledPixelCount, out var lastFilledPixels, out var lastFilledVolume);
-                if (lastFilledPixelCount == 0)
-                    return; // Not possible to fill stuff here
-                if (lastFilledVolume > overallVolume) return; // Probably non-fillable flat area
-
-                while (true)
+                var face = faceValues[faceIndex];
+                Parallel.For(0, _tileWidth, x =>
                 {
-                    if (token.IsCancellationRequested) return;
-                    CheckFillLake(point, stopHeight, overallVolume, out var filledPixelCount, out var filledPixels, out var filledVolume);
-                    if (filledPixelCount > 0 && filledVolume < overallVolume)
+                    Parallel.For(0, _tileWidth, y =>
                     {
-                        lastStopHeight = stopHeight;
-                        lastFilledPixelCount = filledPixelCount;
-                        lastFilledPixels = filledPixels;
-                        lastFilledVolume = filledVolume;
-                        stopHeight += waterUnitVolume;
-                        continue;
-                    }
-                    break;
-                }
-
-                var processors = Environment.ProcessorCount;
-                if (processors < 4) processors = 4;
-                // Fill
-                var faceValues = _faces.Keys.ToList();
-                if (_debug) faceValues = new List<CubeMapFace> { _debugFace };
-                Parallel.For(0, faceValues.Count, new ParallelOptions { MaxDegreeOfParallelism = processors, CancellationToken = token }, faceIndex =>
-                {
-                    var face = faceValues[faceIndex];
-                    Parallel.For(0, _tileWidth, new ParallelOptions { MaxDegreeOfParallelism = processors, CancellationToken = token }, x =>
-                    {
-                        Parallel.For(0, _tileWidth, new ParallelOptions { MaxDegreeOfParallelism = processors, CancellationToken = token }, y =>
+                        var point = new CubeMapPoint(waterSpots, x, y, face);
+                        double sum = 0;
+                        for (int x2 = x - matrixSize / 2; x2 <= x + matrixSize / 2; ++x2)
                         {
-                            if (lastFilledPixels[face][x,y])
+                            for (int y2 = y - matrixSize / 2; y2 <= y + matrixSize / 2; ++y2)
                             {
-                                _faces[face][x, y] = lastStopHeight;
-                                _lakes[face][x, y] = 82;
-                                if (_debug)
+                                var dp = point.GetPointRelative(x2 - x, y2 - y);
+                                if ((!_debug || dp.Face == face) && dp.Value > 0)
                                 {
-                                    DebugImage.DebugDrawPixel(x, y, 128, 255, 0, 0);
+                                    PointD d;
+                                    d.X = x - x2;
+                                    d.Y = y - y2;
+                                    var distance = d.Length;
+                                    sum += dp.Value * (1 / (distance + 0.5));
                                 }
                             }
-                        });
+                        }
+                        waterSpots2[face][x, y] = sum;
+                        _debugTileB[x, y] = sum;
                     });
                 });
-            }
-        }
+            });
+            // We end up having lots of blue squares in the debug image and waterSpots2
 
-        void CheckFillLake(CubeMapPoint point, double stopHeight, double maxVolume, out int filledPixelCount, out Dictionary<CubeMapFace, bool[,]> filledPixels, out double filledVolume)
-        {
-            filledPixelCount = 0;
-            filledPixels = new();
-            filledVolume = 0;
-            if (_debug && point.Face != _debugFace) return;
-            if (point.Value >= stopHeight) return;
-            var faceValues = _faces.Keys.ToList();
-            if (_debug) faceValues = new List<CubeMapFace> { _debugFace };
-            foreach ( var faceValue in faceValues ) filledPixels[faceValue] = new bool[_tileWidth, _tileWidth];
-            Queue<CubeMapPoint> queue = new Queue<CubeMapPoint>();
-            queue.Enqueue(point.Clone());
-            while (queue.Count > 0)
+            Dictionary<CubeMapFace, List<HighScore>> highscores = new Dictionary<CubeMapFace, List<HighScore>>();
+            foreach (var face in faceValues)
             {
-                var pt = queue.Dequeue();
-                if (_debug && _debugFace != pt.Face) continue;
-                if (!filledPixels[pt.Face][pt.PosX, pt.PosY])
-                {
-                    ++filledPixelCount;
-                    filledPixels[pt.Face][pt.PosX, pt.PosY] = true;
-                    filledVolume += (stopHeight - pt.Value);
-                    if (filledVolume > maxVolume) return;
-                }
-                if (_debug &&
-                    (pt.PosX < 1 || pt.PosX > _tileWidth - 2 ||
-                     pt.PosY < 1 || pt.PosY > _tileWidth - 2)) continue;
-
-                var np = pt.GetPointRelative(-1, 0);
-                if (!filledPixels[np.Face][np.PosX, np.PosY] && np.Value < stopHeight) queue.Enqueue(np);
-                np = pt.GetPointRelative(0, -1);
-                if (!filledPixels[np.Face][np.PosX, np.PosY] && np.Value < stopHeight) queue.Enqueue(np);
-                np = pt.GetPointRelative(1, 0);
-                if (!filledPixels[np.Face][np.PosX, np.PosY] && np.Value < stopHeight) queue.Enqueue(np);
-                np = pt.GetPointRelative(0, 1);
-                if (!filledPixels[np.Face][np.PosX, np.PosY] && np.Value < stopHeight) queue.Enqueue(np);
+                highscores[face] = new List<HighScore>();
             }
+
+            // We end up having lots of 9x9 blue squares in the debug image
+            // Reduce squares to actual points
+            // Brute Force Strategy:
+            // - Check all points and put them in a managed high score list
+            // - Avoid multiple scores within same area by checking distance
+            const double safetyDistance = matrixSize * 1.41 + 5; // Diagonal length of 9x9 box + 5 pixel
+            double maxScore = 0;
+            Parallel.For(0, faceValues.Count, faceIndex =>
+            {
+                var face = faceValues[faceIndex];
+                var highscoreList = highscores[face];
+                var waterSpotList = waterSpots2[face];
+                double highScoreMin = 0;
+                int highScoreCount = 0;
+                //double highScoreMax = 0;
+                Parallel.For(0, _tileWidth, x =>
+                {
+                    Parallel.For(0, _tileWidth, y =>
+                    {
+                        var value = waterSpotList[x, y];
+                        if (value == 0) return;
+                        if (value > highScoreMin || highScoreCount < LakesPerTile)
+                        {
+                            lock (highscoreList)
+                            {
+                                if (value > highScoreMin || highScoreCount < LakesPerTile)
+                                {
+                                    var score = new HighScore(value, x, y);
+                                    var neighbors = highscoreList.Where(s => s.Position.IsWithinRadius(score.Position, safetyDistance)).ToList();
+                                    if (neighbors.Any(s => s.Score > value)) return;
+                                    foreach (var neighbor in neighbors)
+                                        highscoreList.Remove(neighbor);
+                                    highscoreList.Add(score);
+
+                                    highscoreList.Sort((a, b) => b.Score.CompareTo(a.Score));
+                                    while (highscoreList.Count > LakesPerTile)
+                                        highscoreList.RemoveAt(highscoreList.Count - 1);
+
+                                    if (highscoreList[0].Score > maxScore)
+                                        maxScore = highscoreList[0].Score;
+                                    highScoreMin = highscoreList[highscoreList.Count - 1].Score;
+                                    highScoreCount = highscoreList.Count;
+                                }
+                            }
+                        }
+                    });
+                });
+            });
+
+            if (_debug)
+            {
+                foreach (var score in highscores[_debugFace])
+                {
+                    var x = score.Position.X;
+                    var y = score.Position.Y;
+                    for (int xx = x - 2; xx < x + 2; xx++)
+                    {
+                        for (int yy = y - 2; yy < y + 2; yy++)
+                        {
+                            if (xx > 0 && yy > 0 && xx < _tileWidth && yy < _tileWidth)
+                                _debugTileR[xx, yy] = 55;
+                        }
+                    }
+                    // Somewhere between 70 and 30
+                    //Debug.WriteLine("SCORE: s=" + (int)score.Score + ", p=" + score.Position.X + ";" + score.Position.Y);
+                }
+            }
+
+            // Last step: Fill up the lakes
+            // Warning! If lake depth is too high it will overflow and fill nearly the whole map
+            // We need to determine the maximum sane size of a lake without overflowing
+            var processors = Environment.ProcessorCount;
+            if (processors < 4) processors = 4;
+            Parallel.For(0, faceValues.Count, new ParallelOptions { MaxDegreeOfParallelism = processors*2, CancellationToken = token }, faceIndex =>
+            {
+                var face = faceValues[faceIndex];
+                var highscoreList = highscores[face];
+                foreach (var score in highscoreList)
+                {
+                    // We want each lake to be up to 100.000 pixels with some tolerance.
+                    // Lake depth around 5 increments (1/65535) => volume = 1.5
+                    // Max scores around 70:
+                    var volume = score.Score * (1.5/maxScore) * LakeVolumeMultiplier;
+                    int maxFilledPixels = 120000;
+
+                    var point = new CubeMapPoint(_faces, score.Position.X, score.Position.Y, face);
+                    var height = point.Value;
+                    var stopHeight = height + 1.0 / 65535;
+
+                    double lastStopHeight = stopHeight;
+                    CheckFillLake(point, stopHeight, volume, maxFilledPixels, token, out var lastFilledPixelCount, out var lastFilledPoints, out var lastFilledVolume);
+                    if (lastFilledPixelCount == 0)
+                        continue; // Not possible to fill stuff here
+                    if (lastFilledVolume > volume || lastFilledPixelCount > maxFilledPixels) continue; // Probably non-fillable flat area
+
+                    int incCnt = 1;
+                    // Go with large increments of 5
+                    while (true)
+                    {
+                        if (token.IsCancellationRequested) return;
+                        CheckFillLake(point, stopHeight, volume, maxFilledPixels, token, out var filledPixelCount, out var filledPoints, out var filledVolume);
+                        if (filledPixelCount > 0 && filledVolume < volume && filledPixelCount < maxFilledPixels)
+                        {
+                            lastStopHeight = stopHeight;
+                            lastFilledPixelCount = filledPixelCount;
+                            lastFilledPoints = filledPoints;
+                            lastFilledVolume = filledVolume;
+                            stopHeight += 5.0/65535;
+                            // Debug.WriteLine("Iteration: " + (incCnt += 5) + ", filled pixels: " + filledPixelCount + ", volume: " + filledVolume + " (" + (100.0 * filledVolume / volume).ToString("0.0") + "%)" );
+                            continue;
+                        }
+                        break;
+                    }
+                    // Debug.WriteLine("Used increments: " + (int)((stopHeight - height) * 65535));
+                    // Repeat last but with 1 step increments
+                    stopHeight = lastStopHeight + 1.0/65535;
+                    while (true)
+                    {
+                        if (token.IsCancellationRequested) return;
+                        CheckFillLake(point, stopHeight, volume, maxFilledPixels, token, out var filledPixelCount, out var filledPixels, out var filledVolume);
+                        if (filledPixelCount > 0 && filledVolume < volume && filledPixelCount < maxFilledPixels)
+                        {
+                            lastStopHeight = stopHeight;
+                            lastFilledPixelCount = filledPixelCount;
+                            lastFilledPoints = filledPixels;
+                            lastFilledVolume = filledVolume;
+                            stopHeight += 1.0 / 65535;
+                            continue;
+                        }
+                        break;
+                    }
+                    //Debug.WriteLine("Used increments: " + (int)((stopHeight - height) * 65535));
+                    // Apply the lake
+                    lock (_faces)
+                    {
+                        foreach (var pt in lastFilledPoints)
+                        {
+
+                            if (_debug)
+                            {
+                                DebugImage.DebugDrawPixel(pt.X, pt.Y, 128, 255, 0, 0);
+                            }
+                            _faces[pt.Face][pt.X, pt.Y] = lastStopHeight;
+                            _lakes[pt.Face][pt.X, pt.Y] = 82;
+                        }
+                    }
+                }
+            });
+
         }
-
-
-        #region Old attempt, was too naive
-        //void MakeLakes(CancellationToken token)
-        //{
-
-        //    // Strategy: Drop water on tiles and see where they end up. No inertia.
-        //    int pixelsPerTile = 200000;
-        //    int totalTilePixels = _tileWidth * _tileWidth;
-        //    int pixelGap = totalTilePixels / pixelsPerTile;
-        //    int pixelsPerRow = _tileWidth / pixelGap;
-        //    int lostPixels = _tileWidth - (pixelsPerRow * pixelGap);
-        //    int offset = lostPixels / 2;
-
-        //    Dictionary<CubeMapFace, double[,]> waterSpots = new Dictionary<CubeMapFace, double[,]>();
-        //    Dictionary<CubeMapFace, double[,]> waterSpots2 = new Dictionary<CubeMapFace, double[,]>();
-        //    var faceValues = _faces.Keys.ToList();
-        //    if (_debug) { faceValues = new List<CubeMapFace> { CubeMapFace.Back }; }
-        //    foreach (var face in faceValues)
-        //    {
-        //        waterSpots[face] = new double[_tileWidth, _tileWidth];
-        //        waterSpots2[face] = new double[_tileWidth, _tileWidth];
-        //    }
-
-        //    Parallel.For(0, faceValues.Count, faceIndex =>
-        //    {
-        //        var face = faceValues[faceIndex];
-        //        Parallel.For(0, 1 + _tileWidth / pixelGap, xred =>
-        //        {
-        //            Parallel.For(0, 1 + _tileWidth / pixelGap, yred =>
-        //            {
-        //                int x = offset + xred * pixelGap;
-        //                int y = offset + yred * pixelGap;
-
-        //                var currentFace = face;
-        //                PointD pos = new PointD { X = x, Y = y };
-        //                PointD posOld = pos;
-        //                CubeMapPoint oldPoint = null;
-        //                HeightAndGradient heightAndGradient = CalculateHeightAndGradient(pos, currentFace);
-        //                int iteration = 0;
-        //                bool floored = false;
-        //                while (iteration++ < _tileWidth / 2 && !token.IsCancellationRequested) // Limit movement to half map
-        //                {
-        //                    var dir = -heightAndGradient.Gradient;
-        //                    dir = dir.Normalize();
-        //                    PointD cellOffset = pos.IntegerOffset();
-
-        //                    HeightAndGradient lastHeight = heightAndGradient;
-        //                    posOld = pos;
-        //                    var posOldI = posOld.ToIntegerPoint();
-        //                    oldPoint = new CubeMapPoint(_faces, posOldI.X, posOldI.Y, currentFace) { VelocityX = dir.X, VelocityY = dir.Y, OffsetX = cellOffset.X, OffsetY = cellOffset.Y };
-
-        //                    // Update position
-        //                    pos += dir;
-
-        //                    #region Out of bounds handling
-        //                    var posI = pos.ToIntegerPoint();
-        //                    if (posI.X >= _tileWidth || posI.X < 0 || posI.Y >= _tileWidth || posI.Y < 0)
-        //                    {
-        //                        // We left the tile! Check in which tile we are now:
-        //                        var newPosPoint = CubeMapPoint.GetPointRelativeTo(
-        //                            oldPoint,
-        //                            posI.X - posOldI.X,
-        //                            posI.Y - posOldI.Y,
-        //                            _faces);
-        //                        // Update face, position, speed and offset:
-        //                        if (newPosPoint.Face != currentFace)
-        //                        {
-        //                            if (newPosPoint.PosX >= _tileWidth || newPosPoint.PosX < 0 || newPosPoint.PosY >= _tileWidth || newPosPoint.PosY < 0)
-        //                            {
-        //                                Debugger.Break();
-        //                                return;
-        //                            }
-        //                            currentFace = newPosPoint.Face;
-        //                            pos.X = newPosPoint.PosX + newPosPoint.OffsetX;
-        //                            pos.Y = newPosPoint.PosY + newPosPoint.OffsetY;
-
-        //                        }
-        //                    }
-        //                    #endregion
-
-        //                    if (_debug)
-        //                    {
-        //                        var ipos = pos.ToIntegerPoint();
-        //                        _debugTileR[ipos.X, ipos.Y] += 2;
-        //                        if (_debugTileR[ipos.X, ipos.Y] > 50) _debugTileR[ipos.X, ipos.Y] = 50;
-        //                    }
-        //                    heightAndGradient = CalculateHeightAndGradient(pos, currentFace);
-        //                    if (heightAndGradient.Height >= lastHeight.Height)
-        //                    {
-        //                        floored = true;
-        //                        break;
-        //                    }
-
-        //                } // while
-        //                if (!floored || oldPoint == null)
-        //                {
-        //                    return;
-        //                }
-        //                if (_debug && oldPoint.Face != _debugFace)
-        //                {
-        //                    return;
-        //                }
-        //                lock (waterSpots[oldPoint.Face])
-        //                {
-        //                    waterSpots[oldPoint.Face][oldPoint.PosX, oldPoint.PosY] += 1;
-        //                    _debugTileG[oldPoint.PosX, oldPoint.PosY] = 255;
-        //                }
-        //            });
-        //        });
-        //    });
-
-        //// Apply a folding matrix to determine maxima
-        //const int matrixSize = 9;
-        //Parallel.For(0, faceValues.Count, faceIndex =>
-        //{
-        //    var face = faceValues[faceIndex];
-        //    Parallel.For(0, _tileWidth, x =>
-        //    {
-        //        Parallel.For(0, _tileWidth, y =>
-        //        {
-        //            var point = new CubeMapPoint(waterSpots, x,y, face);
-        //            double sum = 0;
-        //            for (int x2 = x - matrixSize / 2; x2 <= x + matrixSize / 2; ++x2)
-        //            {
-        //                for (int y2 = y - matrixSize / 2; y2 <= y + matrixSize / 2; ++y2)
-        //                {
-        //                    var dp = CubeMapPoint.GetPointRelativeTo(point, x2-x, y2-y, waterSpots);
-        //                    if ((!_debug || dp.Face == face) && dp.Value > 0)
-        //                    {
-        //                        PointD d;
-        //                        d.X = x - x2;
-        //                        d.Y = y - y2;
-        //                        var distance = d.Length;
-        //                        sum += dp.Value * (1/(distance+0.5)) ;
-        //                    }
-        //                }
-        //            }
-        //            waterSpots2[face][x, y] = sum;
-        //            _debugTileB[x,y] = sum;
-        //        });
-        //    });
-        //});
-        //// We end up having lots of blue squares in the debug image and waterSpots2
-
-        //Dictionary<CubeMapFace, List<HighScore>> highscores = new Dictionary<CubeMapFace, List<HighScore>>();
-        //foreach (var face in faceValues)
-        //{
-        //    highscores[face] = new List<HighScore>();
-        //}
-
-        //// We end up having lots of 9x9 blue squares in the debug image
-        //// Reduce squares to actual points
-        //// Brute Force Strategy:
-        //// - Check all points and put them in a managed high score list
-        //// - Avoid multiple scores within same area by checking distance
-        //const double safetyDistance = matrixSize * 1.41 + 5; // Diagonal length of 9x9 box + 5 pixel
-        //Parallel.For(0, faceValues.Count, faceIndex =>
-        //{
-        //    var face = faceValues[faceIndex];
-        //    var highscoreList = highscores[face];
-        //    var waterSpotList = waterSpots2[face];
-        //    double highScoreMin = 0;
-        //    int highScoreCount = 0;
-        //    //double highScoreMax = 0;
-        //    Parallel.For(0, _tileWidth, x =>
-        //    {
-        //        Parallel.For(0, _tileWidth, y =>
-        //        {
-        //            var value = waterSpotList[x, y];
-        //            if (value == 0) return;
-        //            if (value > highScoreMin || highScoreCount < LakesPerTile)
-        //            {
-        //                lock (highscoreList)
-        //                {
-        //                    if (value > highScoreMin || highScoreCount < LakesPerTile)
-        //                    {
-        //                        var score = new HighScore(value, x, y);
-        //                        var neighbors = highscoreList.Where(s => s.Position.IsWithinRadius(score.Position, safetyDistance)).ToList();
-        //                        if (neighbors.Any(s => s.Score > value)) return;
-        //                        foreach (var neighbor in neighbors)
-        //                            highscoreList.Remove(neighbor);
-        //                        highscoreList.Add(score);
-
-        //                        highscoreList.Sort((a,b) => b.Score.CompareTo(a.Score));
-        //                        while (highscoreList.Count > LakesPerTile)
-        //                            highscoreList.RemoveAt(highscoreList.Count - 1);
-
-        //                        //highScoreMax = highscoreList[0].Score;
-        //                        highScoreMin = highscoreList[highscoreList.Count - 1].Score;
-        //                        highScoreCount = highscoreList.Count;
-        //                    }
-        //                }
-        //            }
-        //        });
-        //    });
-        //});
-
-        //if (_debug)
-        //{
-        //    foreach (var score in highscores[_debugFace])
-        //    {
-        //        var x = score.Position.X;
-        //        var y = score.Position.Y;
-        //        for (int xx = x-2; xx<x+2; xx++)
-        //        {
-        //            for (int yy = y-2; yy<y+2; yy++)
-        //            {
-        //                if (xx > 0 && yy > 0 && xx < _tileWidth && yy < _tileWidth)
-        //                    _debugTileR[xx, yy] = 55;
-        //            }
-        //        }
-        //        Debug.WriteLine("SCORE: " + score.Position.X + ";" + score.Position.Y);
-        //    }
-        //}
-
-        //// Last step: Fill up the lakes
-        //// Warning! If lake depth is too high it will overflow and fill nearly the whole map
-        //// We need to determine the maximum sane size of a lake without overflowing
-
-        //Parallel.For(0, faceValues.Count, faceIndex =>
-        //{
-        //    var face = faceValues[faceIndex];
-        //    var highscoreList = highscores[face];
-        //    foreach (var score in highscoreList)
-        //    {
-        //        var point = new CubeMapPoint(_faces, score.Position.X, score.Position.Y, face);
-        //        var height = point.Value;
-        //        var stopHeigt = height + LakeDepth*1.0/65535;
-        //        FillLake(point, stopHeigt/*, (int)(score.Score * 50)*/);
-        //    }
-        //});
-
-        //}
-
-        // BAD CODE: Fills whole map
-        //void FillLake(CubeMapPoint point, double stopHeight)
-        //{
-        //    if (_debug && point.Face != _debugFace) return;
-        //    //if (fillLimit < 100000) fillLimit = 100000;
-
-        //    // Recursive call leads to access violation, probably stack overflow.
-        //    // Use non-recursive algorithm
-        //    Queue<CubeMapPoint> queue = new Queue<CubeMapPoint>();
-        //    queue.Enqueue(point);
-        //    while (queue.Count > 0)
-        //    {
-        //        point = queue.Dequeue();
-        //        if (_debug && _debugFace != point.Face)
-        //        {
-        //            continue;
-        //        }
-        //        var matMap = _lakes[point.Face];
-        //        matMap[point.PosX, point.PosY] = 82;
-        //        point.Value = stopHeight;
-        //        //Debug.WriteLine("{0},{1}", point.PosX, point.PosY);
-
-        //        //if (--fillLimit <= 0) break;
-
-        //        var np = CubeMapPoint.GetPointRelativeTo(point, -1, 0, _faces);
-        //        if (np.Value < stopHeight) queue.Enqueue(np);
-        //        np = CubeMapPoint.GetPointRelativeTo(point, 0, -1, _faces);
-        //        if (np.Value < stopHeight) queue.Enqueue(np);
-        //        np = CubeMapPoint.GetPointRelativeTo(point, 1, 0, _faces);
-        //        if (np.Value < stopHeight) queue.Enqueue(np);
-        //        np = CubeMapPoint.GetPointRelativeTo(point, 0, 1, _faces);
-        //        if (np.Value < stopHeight) queue.Enqueue(np);
-        //    }
-        //}
-        #endregion
 
         void ApplyBrush(double brushRadius, CubeMapPoint mapLocation, PointD exactLocation, double materialAmount)
         {
@@ -1069,17 +962,17 @@ namespace PlanetCreator
         //    return new HeightAndGradient() { Height = heightNW, Gradient = { X = gradientX, Y = gradientY } };
         //}
 
-        //class HighScore
-        //{
-        //    public double Score;
-        //    public PointI Position;
-        //    public HighScore(double score, int x, int y)
-        //    {
-        //        Score = score;
-        //        Position.X = x;
-        //        Position.Y = y;
-        //    }
-        //}
+        class HighScore
+        {
+            public double Score;
+            public PointI Position;
+            public HighScore(double score, int x, int y)
+            {
+                Score = score;
+                Position.X = x;
+                Position.Y = y;
+            }
+        }
 
         struct HeightAndGradient
         {

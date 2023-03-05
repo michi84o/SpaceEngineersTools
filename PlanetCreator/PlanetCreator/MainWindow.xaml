@@ -178,13 +178,13 @@
                     IsChecked="{Binding EnableLakeGeneration}"/>
                 <TextBlock
                     Grid.Row="21" Grid.Column="0" Margin="5"
-                    Text="Water Units / Droplet" />
+                    Text="Lakes per tile" />
                 <TextBox
                     Grid.Row="21" Grid.Column="1" Margin="5"
-                    Text="{Binding WaterUnitsPerDroplet, UpdateSourceTrigger=PropertyChanged}"/>
+                    Text="{Binding LakesPerTile, UpdateSourceTrigger=PropertyChanged}"/>
                 <TextBlock
                     Grid.Row="22" Grid.Column="0" Margin="5"
-                    Text="Water Modulo" />
+                    Text="Lake Vol. Multiplier" />
                 <TextBox
                     Grid.Row="22" Grid.Column="1" Margin="5"
                     Text="{Binding WaterModulo, UpdateSourceTrigger=PropertyChanged}"/>

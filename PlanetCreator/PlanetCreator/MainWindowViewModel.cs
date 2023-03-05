@@ -218,17 +218,17 @@ namespace PlanetCreator
             get => _enableLakeGeneration;
             set => SetProp(ref _enableLakeGeneration, value);
         }
-        ushort _waterUnitsPerDroplet = 200;
-        public ushort WaterUnitsPerDroplet
+        ushort _lakesPerTile = 40;
+        public ushort LakesPerTile
         {
-            get => _waterUnitsPerDroplet;
-            set => SetProp(ref _waterUnitsPerDroplet, value);
+            get => _lakesPerTile;
+            set => SetProp(ref _lakesPerTile, value);
         }
-        ushort _waterModulo = 16;
-        public ushort WaterModulo
+        double _lakeVolumeMultiplier = 1.0;
+        public double LakeVolumeMultiplier
         {
-            get => _waterModulo;
-            set => SetProp(ref _waterModulo, value);
+            get => _lakeVolumeMultiplier;
+            set => SetProp(ref _lakeVolumeMultiplier, value);
         }
 
         public ICommand GenerateCommand => new RelayCommand(async o =>
@@ -267,12 +267,19 @@ namespace PlanetCreator
             if (EvaporateSpeed < 0) EvaporateSpeed = 0;
             if (EvaporateSpeed > 1) EvaporateSpeed = 1;
             generator.EvaporateSpeed = EvaporateSpeed;
-            if (WaterUnitsPerDroplet < 1) WaterUnitsPerDroplet = 1;
-            generator.WaterUnitsPerDroplet = WaterUnitsPerDroplet;
-            if (WaterModulo < 1) WaterModulo = 1;
-            if (WaterModulo > 512) WaterModulo = 512;
+            generator.LakesPerTile = LakesPerTile;
+
             generator.GenerateLakes = EnableLakeGeneration;
-            generator.WaterModulo = WaterModulo;
+            if (LakeVolumeMultiplier <= 0)
+            {
+                generator.GenerateLakes = false;
+            }
+            if (LakeVolumeMultiplier > 100000)
+            {
+                LakeVolumeMultiplier = 100000;
+            }
+            generator.LakeVolumeMultiplier = LakeVolumeMultiplier;
+
             Progress = 1;
             generator.ProgressChanged += Generator_ProgressChanged;
             IsBusy = true;
