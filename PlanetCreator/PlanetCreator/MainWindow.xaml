@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PlanetCreator"
         mc:Ignorable="d"
-        Title="Planet Creator" Height="640" Width="800">
+        Title="Planet Creator" Height="720" Width="800">
     <Window.DataContext>
         <local:MainWindowViewModel x:Name="ViewModel"/>
     </Window.DataContext>
@@ -178,16 +178,16 @@
                     IsChecked="{Binding EnableLakeGeneration}"/>
                 <TextBlock
                     Grid.Row="21" Grid.Column="0" Margin="5"
-                    Text="Lake Depth" />
+                    Text="Water Units / Droplet" />
                 <TextBox
                     Grid.Row="21" Grid.Column="1" Margin="5"
-                    Text="{Binding LakeDepth, UpdateSourceTrigger=PropertyChanged}"/>
+                    Text="{Binding WaterUnitsPerDroplet, UpdateSourceTrigger=PropertyChanged}"/>
                 <TextBlock
                     Grid.Row="22" Grid.Column="0" Margin="5"
-                    Text="Lakes per Tile" />
+                    Text="Water Modulo" />
                 <TextBox
                     Grid.Row="22" Grid.Column="1" Margin="5"
-                    Text="{Binding LakesPerTile, UpdateSourceTrigger=PropertyChanged}"/>
+                    Text="{Binding WaterModulo, UpdateSourceTrigger=PropertyChanged}"/>
             </Grid>
         </GroupBox>
         <GroupBox
@@ -204,6 +204,7 @@
                     <Border
                         Canvas.Top="512" Canvas.Left="512" Width="512" Height="512" BorderThickness="5" BorderBrush="Black"
                         Visibility="{Binding PreviewMode, Converter={StaticResource BoolVis}}"/>
+                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="0" Canvas.Top="0" Source="{Binding DebugBitmap}" Visibility="{Binding PreviewMode, Converter={StaticResource BoolVis}}" />
                 </Canvas>
             </Border>
         </GroupBox>

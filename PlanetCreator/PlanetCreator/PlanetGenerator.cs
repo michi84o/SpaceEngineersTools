@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media.Media3D;
 
 namespace PlanetCreator
@@ -59,6 +60,15 @@ namespace PlanetCreator
                 { CubeMapFace.Left, new byte[_tileWidth, _tileWidth] },
                 { CubeMapFace.Back, new byte[_tileWidth, _tileWidth] },
             };
+            _quadrants = new()
+            {
+                { CubeMapFace.Up, new List<object> { new object(), new object(), new object(), new object(), } },
+                { CubeMapFace.Down, new List<object> { new object(), new object(), new object(), new object(), } },
+                { CubeMapFace.Front, new List<object> { new object(), new object(), new object(), new object(), } },
+                { CubeMapFace.Right, new List<object> { new object(), new object(), new object(), new object(), } },
+                { CubeMapFace.Left, new List<object> { new object(), new object(), new object(), new object(), } },
+                { CubeMapFace.Back, new List<object> { new object(), new object(), new object(), new object(), } }
+            };
         }
 
         /* Cube Map: Folds into a cube
@@ -69,6 +79,7 @@ namespace PlanetCreator
 
         Dictionary<CubeMapFace, double[,]> _faces;
         Dictionary<CubeMapFace, byte[,]> _lakes;
+        Dictionary<CubeMapFace, List<object>> _quadrants; // Use for multitasking water fill
         double _lakeDepth = 30.0 / 65535;
 
         double[,] _debugTileR = new double[2048, 2048];
@@ -214,20 +225,18 @@ namespace PlanetCreator
             else
                 Normalize(new List<double[,]> { _faces[_debugFace] });
 
+            ProgressChanged?.Invoke(this, new ProgressEventArgs(50));
+
             if (GenerateLakes)
             {
                 MakeLakes(token);
             }
 
-            //// Normalize noise to 0....1
-            //if (!_debug)
-            //    Normalize(_faces.Values.ToList());
-            //else
-            //    Normalize(new List<double[,]> { _faces[_debugFace] });
+            ProgressChanged?.Invoke(this, new ProgressEventArgs(90));
 
             // WIP, TODO
             // Planet features:
-            // A: Flat planes on equator.
+            // A: Flat planes close to equator.
             // B: Mountains around 45°
             // C: Flat poles
             // - Weighten noise based on location
@@ -370,8 +379,7 @@ namespace PlanetCreator
                     var newPosPoint = CubeMapPoint.GetPointRelativeTo(
                         new CubeMapPoint(_faces, posOldI.X, posOldI.Y, face) { VelocityX = dir.X, VelocityY = dir.Y, OffsetX = cellOffset.X, OffsetY = cellOffset.Y },
                             posI.X - posOldI.X,
-                            posI.Y - posOldI.Y,
-                            _faces);
+                            posI.Y - posOldI.Y);
                     // Update face, position, speed and offset:
                     if (newPosPoint.Face != face)
                     {
@@ -455,10 +463,209 @@ namespace PlanetCreator
         public ushort LakeDepth { get; set; } = 5;
         public ushort LakesPerTile { get; set; } = 40;
 
+        void MakeLakes(CancellationToken token)
+        {
+            var processors = Environment.ProcessorCount;
+            if (processors < 4) processors = 4;
+            // Target: About 100.000 pixels are lake pixels
+            // Strategy: Drop water on tiles and see where they end up. No inertia.
+            // Each droplet carries a certain amount of water and spills it at its final destination
+            var faceValues = _faces.Keys.ToList();
+            if (_debug) { faceValues = new List<CubeMapFace> { _debugFace }; }
+            Parallel.For(0, faceValues.Count, new ParallelOptions { MaxDegreeOfParallelism = processors * 2, CancellationToken = token }, faceIndex =>
+            {
+                var face = faceValues[faceIndex];
+                Parallel.For(0, _tileWidth, new ParallelOptions { MaxDegreeOfParallelism = processors, CancellationToken = token }, x =>
+                {
+                    Parallel.For(0, _tileWidth, new ParallelOptions { MaxDegreeOfParallelism = processors, CancellationToken = token }, y =>
+                    {
+                        if (x % WaterModulo != 0) return;
+                        if (y % WaterModulo != 0) return;
+
+                        var currentFace = face;
+                        PointD pos = new PointD { X = x, Y = y };
+                        PointD posOld = pos;
+                        CubeMapPoint oldPoint = null;
+                        HeightAndGradient heightAndGradient = CalculateHeightAndGradient(pos, currentFace);
+                        int iteration = 0;
+                        bool floored = false;
+                        while (iteration++ < _tileWidth / 2 && !token.IsCancellationRequested) // Limit movement to half map
+                        {
+                            var dir = -heightAndGradient.Gradient;
+                            dir = dir.Normalize();
+                            PointD cellOffset = pos.IntegerOffset();
+
+                            HeightAndGradient lastHeight = heightAndGradient;
+                            posOld = pos;
+                            var posOldI = posOld.ToIntegerPoint();
+                            oldPoint = new CubeMapPoint(_faces, posOldI.X, posOldI.Y, currentFace) { VelocityX = dir.X, VelocityY = dir.Y, OffsetX = cellOffset.X, OffsetY = cellOffset.Y };
+
+                            // Update position
+                            pos += dir;
+
+                            #region Out of bounds handling
+                            var posI = pos.ToIntegerPoint();
+                            if (posI.X >= _tileWidth || posI.X < 0 || posI.Y >= _tileWidth || posI.Y < 0)
+                            {
+                                // We left the tile! Check in which tile we are now:
+                                var newPosPoint = oldPoint.GetPointRelative(
+                                    posI.X - posOldI.X,
+                                    posI.Y - posOldI.Y);
+                                // Update face, position, speed and offset:
+                                if (newPosPoint.Face != currentFace)
+                                {
+                                    if (newPosPoint.PosX >= _tileWidth || newPosPoint.PosX < 0 || newPosPoint.PosY >= _tileWidth || newPosPoint.PosY < 0)
+                                    {
+                                        Debugger.Break();
+                                        return;
+                                    }
+                                    currentFace = newPosPoint.Face;
+                                    pos.X = newPosPoint.PosX + newPosPoint.OffsetX;
+                                    pos.Y = newPosPoint.PosY + newPosPoint.OffsetY;
+
+                                }
+                            }
+                            #endregion
+
+                            if (_debug)
+                            {
+                                var ipos = pos.ToIntegerPoint();
+                                _debugTileR[ipos.X, ipos.Y] += 2;
+                                if (_debugTileR[ipos.X, ipos.Y] > 50) _debugTileR[ipos.X, ipos.Y] = 50;
+                            }
+                            heightAndGradient = CalculateHeightAndGradient(pos, currentFace);
+                            if (heightAndGradient.Height >= lastHeight.Height)
+                            {
+                                floored = true;
+                                break;
+                            }
+
+                        } // while
+                        if (!floored || oldPoint == null)
+                        {
+                            return;
+                        }
+                        if (_debug && oldPoint.Face != _debugFace)
+                        {
+                            return;
+                        }
+                        ApplyWater(oldPoint, token);
+                    });
+                });
+            });
+        }
+
+        public IDebugImage DebugImage;
+
+
+        public int WaterModulo = 16;
+        public int WaterUnitsPerDroplet = 200;
+        void ApplyWater(CubeMapPoint point, CancellationToken token)
+        {
+            _debugTileG[point.PosX, point.PosY] = 255;
+            double waterUnitVolume = 1.0 / 65535; // 1 unit increases height map value by 1
+
+            // We determine the pixels that need to be elevated to contain the volume of water
+            // Output parameters:
+            List<CubeMapPoint> requiredPoints = new();
+            double requiredHeight = 0;
+            // Input parameters:
+            double overallVolume = waterUnitVolume * WaterUnitsPerDroplet;
+
+            lock (_lakes) // Don't add water while adding water
+            {
+                double stopHeight = point.Value + waterUnitVolume;
+                double lastStopHeight = stopHeight;
+                CheckFillLake(point, stopHeight, overallVolume, out var lastFilledPixelCount, out var lastFilledPixels, out var lastFilledVolume);
+                if (lastFilledPixelCount == 0)
+                    return; // Not possible to fill stuff here
+                if (lastFilledVolume > overallVolume) return; // Probably non-fillable flat area
+
+                while (true)
+                {
+                    if (token.IsCancellationRequested) return;
+                    CheckFillLake(point, stopHeight, overallVolume, out var filledPixelCount, out var filledPixels, out var filledVolume);
+                    if (filledPixelCount > 0 && filledVolume < overallVolume)
+                    {
+                        lastStopHeight = stopHeight;
+                        lastFilledPixelCount = filledPixelCount;
+                        lastFilledPixels = filledPixels;
+                        lastFilledVolume = filledVolume;
+                        stopHeight += waterUnitVolume;
+                        continue;
+                    }
+                    break;
+                }
+
+                var processors = Environment.ProcessorCount;
+                if (processors < 4) processors = 4;
+                // Fill
+                var faceValues = _faces.Keys.ToList();
+                if (_debug) faceValues = new List<CubeMapFace> { _debugFace };
+                Parallel.For(0, faceValues.Count, new ParallelOptions { MaxDegreeOfParallelism = processors, CancellationToken = token }, faceIndex =>
+                {
+                    var face = faceValues[faceIndex];
+                    Parallel.For(0, _tileWidth, new ParallelOptions { MaxDegreeOfParallelism = processors, CancellationToken = token }, x =>
+                    {
+                        Parallel.For(0, _tileWidth, new ParallelOptions { MaxDegreeOfParallelism = processors, CancellationToken = token }, y =>
+                        {
+                            if (lastFilledPixels[face][x,y])
+                            {
+                                _faces[face][x, y] = lastStopHeight;
+                                _lakes[face][x, y] = 82;
+                                if (_debug)
+                                {
+                                    DebugImage.DebugDrawPixel(x, y, 128, 255, 0, 0);
+                                }
+                            }
+                        });
+                    });
+                });
+            }
+        }
+
+        void CheckFillLake(CubeMapPoint point, double stopHeight, double maxVolume, out int filledPixelCount, out Dictionary<CubeMapFace, bool[,]> filledPixels, out double filledVolume)
+        {
+            filledPixelCount = 0;
+            filledPixels = new();
+            filledVolume = 0;
+            if (_debug && point.Face != _debugFace) return;
+            if (point.Value >= stopHeight) return;
+            var faceValues = _faces.Keys.ToList();
+            if (_debug) faceValues = new List<CubeMapFace> { _debugFace };
+            foreach ( var faceValue in faceValues ) filledPixels[faceValue] = new bool[_tileWidth, _tileWidth];
+            Queue<CubeMapPoint> queue = new Queue<CubeMapPoint>();
+            queue.Enqueue(point.Clone());
+            while (queue.Count > 0)
+            {
+                var pt = queue.Dequeue();
+                if (_debug && _debugFace != pt.Face) continue;
+                if (!filledPixels[pt.Face][pt.PosX, pt.PosY])
+                {
+                    ++filledPixelCount;
+                    filledPixels[pt.Face][pt.PosX, pt.PosY] = true;
+                    filledVolume += (stopHeight - pt.Value);
+                    if (filledVolume > maxVolume) return;
+                }
+                if (_debug &&
+                    (pt.PosX < 1 || pt.PosX > _tileWidth - 2 ||
+                     pt.PosY < 1 || pt.PosY > _tileWidth - 2)) continue;
+
+                var np = pt.GetPointRelative(-1, 0);
+                if (!filledPixels[np.Face][np.PosX, np.PosY] && np.Value < stopHeight) queue.Enqueue(np);
+                np = pt.GetPointRelative(0, -1);
+                if (!filledPixels[np.Face][np.PosX, np.PosY] && np.Value < stopHeight) queue.Enqueue(np);
+                np = pt.GetPointRelative(1, 0);
+                if (!filledPixels[np.Face][np.PosX, np.PosY] && np.Value < stopHeight) queue.Enqueue(np);
+                np = pt.GetPointRelative(0, 1);
+                if (!filledPixels[np.Face][np.PosX, np.PosY] && np.Value < stopHeight) queue.Enqueue(np);
+            }
+        }
+
+
         #region Old attempt, was too naive
         //void MakeLakes(CancellationToken token)
         //{
-        //    // Target: About 100.000 pixels are lake pixels
 
         //    // Strategy: Drop water on tiles and see where they end up. No inertia.
         //    int pixelsPerTile = 200000;
@@ -723,7 +930,7 @@ namespace PlanetCreator
         //        if (np.Value < stopHeight) queue.Enqueue(np);
         //    }
         //}
-        #region
+        #endregion
 
         void ApplyBrush(double brushRadius, CubeMapPoint mapLocation, PointD exactLocation, double materialAmount)
         {
@@ -736,7 +943,7 @@ namespace PlanetCreator
             {
                 for (int dy = -brushDelta; dy <= brushDelta; ++dy)
                 {
-                    var pt = CubeMapPoint.GetPointRelativeTo(mapLocation, dx, dy, _faces);
+                    var pt = CubeMapPoint.GetPointRelativeTo(mapLocation, dx, dy);
                     double brushWeight = 0;
                     // Split grid into 16 chunks, divide by 4 on each axis. Vector goes to center of subgrid
                     for (double subDx = -0.375; subDx <= 0.3751; subDx += 0.25)
@@ -829,16 +1036,18 @@ namespace PlanetCreator
             int coordX = (int)pos.X;
             int coordY = (int)pos.Y;
             // Calculate droplet's offset inside the cell (0,0) = at NW node, (1,1) = at SE node
+            // Remarks x and y are not coordinates, but offsets!
             double x = pos.X - coordX;
             double y = pos.Y - coordY;
 
             var point = new CubeMapPoint(_faces, coordX, coordY, face);
 
             // Calculate heights of the four nodes of the droplet's cell
-            double heightNW = CubeMapPoint.GetPointRelativeTo(point,-1,-1,_faces).Value;
-            double heightNE = CubeMapPoint.GetPointRelativeTo(point, 1, 0, _faces).Value;
-            double heightSW = CubeMapPoint.GetPointRelativeTo(point, -1, 1, _faces).Value;
-            double heightSE = CubeMapPoint.GetPointRelativeTo(point, 1, 1, _faces).Value;
+            // Remarks: The pos point is within the NW pixel, so the sky directions might be misleading here.
+            double heightNW = point.Value;
+            double heightNE = CubeMapPoint.GetPointRelativeTo(point, 1, 0).Value;
+            double heightSW = CubeMapPoint.GetPointRelativeTo(point, 0, 1).Value;
+            double heightSE = CubeMapPoint.GetPointRelativeTo(point, 1, 1).Value;
 
             // Calculate droplet's direction of flow with bilinear interpolation of height difference along the edges
             double gradientX = (heightNE - heightNW) * (1 - y) + (heightSE - heightSW) * y;
@@ -850,17 +1059,27 @@ namespace PlanetCreator
             return new HeightAndGradient() { Height = height, Gradient = { X = gradientX, Y = gradientY } };
         }
 
-        class HighScore
-        {
-            public double Score;
-            public PointI Position;
-            public HighScore(double score, int x, int y)
-            {
-                Score = score;
-                Position.X = x;
-                Position.Y = y;
-            }
-        }
+        //HeightAndGradient CalculateHeightAndGradient(CubeMapPoint point)
+        //{
+        //    double heightNW = point.Value;
+        //    double heightNE = CubeMapPoint.GetPointRelativeTo(point, 1, 0, _faces).Value;
+        //    double heightSW = CubeMapPoint.GetPointRelativeTo(point, 0, 1, _faces).Value;
+        //    double gradientX = (heightNE - heightNW);
+        //    double gradientY = (heightSW - heightNW);
+        //    return new HeightAndGradient() { Height = heightNW, Gradient = { X = gradientX, Y = gradientY } };
+        //}
+
+        //class HighScore
+        //{
+        //    public double Score;
+        //    public PointI Position;
+        //    public HighScore(double score, int x, int y)
+        //    {
+        //        Score = score;
+        //        Position.X = x;
+        //        Position.Y = y;
+        //    }
+        //}
 
         struct HeightAndGradient
         {

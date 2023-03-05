@@ -1,18 +1,25 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace PlanetCreator
 {
-    class MainWindowViewModel : PropChangeNotifier
+    interface IDebugImage
+    {
+        void DebugDrawPixel(int x, int y, byte a, byte r, byte g, byte b);
+    }
+
+    class MainWindowViewModel : PropChangeNotifier, IDebugImage
     {
         BitmapImage _tileUp;
         public BitmapImage TileUp
@@ -51,6 +58,48 @@ namespace PlanetCreator
         {
             get => _tileDown;
             set => SetProp(ref _tileDown, value);
+        }
+
+        public WriteableBitmap DebugBitmap { get; } = new WriteableBitmap(2048, 2048, 96, 96, PixelFormats.Bgra32, null);
+
+        public void DebugDrawPixel(int x, int y, byte a, byte r, byte g, byte b)
+        {
+            Application.Current.Dispatcher.BeginInvoke(() => _DebugDrawPixel(x, y, a, r, g, b));
+        }
+        void _DebugDrawPixel(int x, int y, byte a, byte r, byte g, byte b)
+        {
+            try
+            {
+                // Reserve the back buffer for updates.
+                DebugBitmap.Lock();
+
+                unsafe
+                {
+                    // Get a pointer to the back buffer.
+                    IntPtr pBackBuffer = DebugBitmap.BackBuffer;
+
+                    // Find the address of the pixel to draw.
+                    pBackBuffer += y * DebugBitmap.BackBufferStride;
+                    pBackBuffer += x * 4;
+
+                    // Compute the pixel's color.
+                    int color_data = b;    // B
+                    color_data |= g << 8;  // G
+                    color_data |= r << 16; // R
+                    color_data |= a << 24; // A
+
+                    // Assign the color data to the pixel.
+                    *((int*)pBackBuffer) = color_data;
+                }
+
+                // Specify the area of the bitmap that changed.
+                DebugBitmap.AddDirtyRect(new Int32Rect(x, y, 1, 1));
+            }
+            finally
+            {
+                // Release the back buffer and make it available for display.
+                DebugBitmap.Unlock();
+            }
         }
 
         int _progress;
@@ -169,17 +218,17 @@ namespace PlanetCreator
             get => _enableLakeGeneration;
             set => SetProp(ref _enableLakeGeneration, value);
         }
-        ushort _lakeDepth = 10;
-        public ushort LakeDepth
+        ushort _waterUnitsPerDroplet = 200;
+        public ushort WaterUnitsPerDroplet
         {
-            get => _lakeDepth;
-            set => SetProp(ref _lakeDepth, value);
+            get => _waterUnitsPerDroplet;
+            set => SetProp(ref _waterUnitsPerDroplet, value);
         }
-        ushort _lakesPerTile = 30;
-        public ushort LakesPerTile
+        ushort _waterModulo = 16;
+        public ushort WaterModulo
         {
-            get => _lakesPerTile;
-            set => SetProp(ref _lakesPerTile, value);
+            get => _waterModulo;
+            set => SetProp(ref _waterModulo, value);
         }
 
         public ICommand GenerateCommand => new RelayCommand(async o =>
@@ -187,6 +236,7 @@ namespace PlanetCreator
             TileUp = TileDown = TileRight = TileLeft = TileFront = TileBack = TileDown = null;
 
             var generator = new PlanetGenerator();
+            generator.DebugImage = this;
             generator.DebugMode = PreviewMode;
             generator.Seed = Seed;
             if (NoiseScale < 1 || NoiseScale > 65535) NoiseScale = 100;
@@ -217,9 +267,12 @@ namespace PlanetCreator
             if (EvaporateSpeed < 0) EvaporateSpeed = 0;
             if (EvaporateSpeed > 1) EvaporateSpeed = 1;
             generator.EvaporateSpeed = EvaporateSpeed;
+            if (WaterUnitsPerDroplet < 1) WaterUnitsPerDroplet = 1;
+            generator.WaterUnitsPerDroplet = WaterUnitsPerDroplet;
+            if (WaterModulo < 1) WaterModulo = 1;
+            if (WaterModulo > 512) WaterModulo = 512;
             generator.GenerateLakes = EnableLakeGeneration;
-            generator.LakeDepth = LakeDepth;
-            generator.LakesPerTile = LakesPerTile;
+            generator.WaterModulo = WaterModulo;
             Progress = 1;
             generator.ProgressChanged += Generator_ProgressChanged;
             IsBusy = true;

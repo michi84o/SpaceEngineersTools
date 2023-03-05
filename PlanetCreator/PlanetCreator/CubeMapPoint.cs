@@ -68,14 +68,14 @@ namespace PlanetCreator
             // Each gradient causes a force that drags the water droplet towards it
             // We can just sum the gradients up indepentently for each axis to get the final gradient vector
 
-            var g00 = (GetPointRelativeTo(this, -1, -1, _faces).Value - Value) / 1.414;
-            var g10 = GetPointRelativeTo(this, 0, -1, _faces).Value - Value;
-            var g20 = (GetPointRelativeTo(this, 1, -1, _faces).Value - Value) / 1.414;
-            var g01 = GetPointRelativeTo(this, -1, 0, _faces).Value - Value;
-            var g21 = GetPointRelativeTo(this, 1, 0, _faces).Value - Value;
-            var g02 = (GetPointRelativeTo(this, -1, 1, _faces).Value - Value) / 1.414;
-            var g12 = GetPointRelativeTo(this, 0, 1, _faces).Value - Value;
-            var g22 = (GetPointRelativeTo(this, 1, 1, _faces).Value - Value) / 1.414;
+            var g00 = (GetPointRelativeTo(this, -1, -1).Value - Value) / 1.414;
+            var g10 = GetPointRelativeTo(this, 0, -1).Value - Value;
+            var g20 = (GetPointRelativeTo(this, 1, -1).Value - Value) / 1.414;
+            var g01 = GetPointRelativeTo(this, -1, 0).Value - Value;
+            var g21 = GetPointRelativeTo(this, 1, 0).Value - Value;
+            var g02 = (GetPointRelativeTo(this, -1, 1).Value - Value) / 1.414;
+            var g12 = GetPointRelativeTo(this, 0, 1).Value - Value;
+            var g22 = (GetPointRelativeTo(this, 1, 1).Value - Value) / 1.414;
 
             gx = (g00 + g01 + g02) - (g20 + g21 + g22);
             gy = (g00 + g10 + g20) - (g02 + g12 + g22);
@@ -127,6 +127,17 @@ namespace PlanetCreator
             }
         }
 
+        [Obsolete("Use instance method")]
+        public static CubeMapPoint GetPointRelativeTo(CubeMapPoint origin, int dx, int dy)
+        {
+            return GetPointRelativeTo(origin, dx, dy, origin._faces);
+        }
+
+        public CubeMapPoint GetPointRelative(int dx, int dy)
+        {
+            return GetPointRelativeTo(this, dx, dy, _faces);
+        }
+
         /// <summary>
         /// Do not use dx or dy values greater than 2048!!!
         /// </summary>
@@ -134,7 +145,7 @@ namespace PlanetCreator
         /// <param name="dx"></param>
         /// <param name="dy"></param>
         /// <returns></returns>
-        public static CubeMapPoint GetPointRelativeTo(CubeMapPoint origin, int dx, int dy, Dictionary<CubeMapFace, double[,]> faces)
+        static CubeMapPoint GetPointRelativeTo(CubeMapPoint origin, int dx, int dy, Dictionary<CubeMapFace, double[,]> faces)
         {
             if (dx == 0 && dy == 0)
                 return origin;
@@ -160,7 +171,7 @@ namespace PlanetCreator
                                 VelocityX = origin.VelocityY,
                                 VelocityY = -1 * origin.VelocityX,
                                 OffsetX = origin.OffsetY,
-                                OffsetY = 1 - origin.OffsetX
+                                OffsetY = (origin.OffsetX > 0 ? 1 - origin.OffsetX : 0)
                             }, dy, 0, faces);
                     case CubeMapFace.Down:
                         // West of 'Down' is 'Right', rotated counterclockwise by 90°
@@ -172,7 +183,7 @@ namespace PlanetCreator
                             {
                                 VelocityX = -1 * origin.VelocityY,
                                 VelocityY = origin.VelocityX,
-                                OffsetX = 1 - origin.OffsetY,
+                                OffsetX = (origin.OffsetY > 0 ? 1 - origin.OffsetY : 0),
                                 OffsetY = origin.OffsetX,
                             }, -dy, 0, faces);
                     case CubeMapFace.Left:
@@ -211,7 +222,7 @@ namespace PlanetCreator
                             {
                                 VelocityX = -1 * origin.VelocityY,
                                 VelocityY = origin.VelocityX,
-                                OffsetX = 1 - origin.OffsetY,
+                                OffsetX = (origin.OffsetY > 0 ? 1 - origin.OffsetY : 0),
                                 OffsetY = origin.OffsetX
                             }, -dy, 0, faces);
                     case CubeMapFace.Down:
@@ -225,7 +236,7 @@ namespace PlanetCreator
                                 VelocityX = origin.VelocityY,
                                 VelocityY = -1 * origin.VelocityX,
                                 OffsetX = origin.OffsetY,
-                                OffsetY = 1 - origin.OffsetX
+                                OffsetY = (origin.OffsetX > 0 ? 1 - origin.OffsetX : 0)
                             }, dy, 0, faces);
                     case CubeMapFace.Left:
                         // East of 'Left' is 'Front'
@@ -266,8 +277,8 @@ namespace PlanetCreator
                         currentY = (-1 * currentY) - 1;
                         currentVelocityX = -1 * origin.VelocityX;
                         currentVelocityY = -1 * origin.VelocityY;
-                        currentOffsetX = 1 - origin.OffsetX;
-                        currentOffsetY = 1 - origin.OffsetY;
+                        currentOffsetX = (origin.OffsetX > 0 ? 1 - origin.OffsetX : 0);
+                        currentOffsetY = (origin.OffsetY > 0 ? 1 - origin.OffsetY : 0);
                         currentFace = CubeMapFace.Back;
                         break;
                     case CubeMapFace.Down:
@@ -282,7 +293,7 @@ namespace PlanetCreator
                         currentY = backup;
                         currentVelocityX = -1 * origin.VelocityY;
                         currentVelocityY = origin.VelocityX;
-                        currentOffsetX = 1 - origin.OffsetY;
+                        currentOffsetX = (origin.OffsetY > 0 ? 1 - origin.OffsetY : 0);
                         currentOffsetY = origin.OffsetX;
                         currentFace = CubeMapFace.Up;
                         break;
@@ -294,7 +305,7 @@ namespace PlanetCreator
                         currentVelocityX = origin.VelocityY;
                         currentVelocityY = -1 * origin.VelocityX;
                         currentOffsetX = origin.OffsetY;
-                        currentOffsetY = 1 - origin.OffsetX;
+                        currentOffsetY = (origin.OffsetX > 0 ? 1 - origin.OffsetX : 0);
                         currentFace = CubeMapFace.Up;
                         break;
                     case CubeMapFace.Front:
@@ -309,8 +320,8 @@ namespace PlanetCreator
                         currentY = (-1 * currentY) - 1;
                         currentVelocityX = -1 * origin.VelocityX;
                         currentVelocityY = -1 * origin.VelocityY;
-                        currentOffsetX = 1 - origin.OffsetX;
-                        currentOffsetY = 1 - origin.OffsetY;
+                        currentOffsetX = (origin.OffsetX > 0 ? 1 - origin.OffsetX : 0);
+                        currentOffsetY = (origin.OffsetY > 0 ? 1 - origin.OffsetY : 0);
                         currentFace = CubeMapFace.Up;
                         break;
                 }
@@ -330,8 +341,8 @@ namespace PlanetCreator
                         currentY = (2047 + 2048) - currentY;
                         currentVelocityX = currentVelocityX * -1;
                         currentVelocityY = currentVelocityY * -1;
-                        currentOffsetX = 1 - origin.OffsetX;
-                        currentOffsetY = 1 - origin.OffsetY;
+                        currentOffsetX = (origin.OffsetX > 0 ? 1 - origin.OffsetX : 0);
+                        currentOffsetY = (origin.OffsetY > 0 ? 1 - origin.OffsetY : 0);
                         currentFace = CubeMapFace.Front;
                         break;
                     case CubeMapFace.Left:
@@ -341,7 +352,7 @@ namespace PlanetCreator
                         currentY = backup;
                         currentVelocityX = -1 * origin.VelocityY;
                         currentVelocityY = origin.VelocityX;
-                        currentOffsetX = 1 - origin.OffsetY;
+                        currentOffsetX = (origin.OffsetY > 0 ? 1 - origin.OffsetY : 0);
                         currentOffsetY = origin.OffsetX;
                         currentFace = CubeMapFace.Down;
                         break;
@@ -353,7 +364,7 @@ namespace PlanetCreator
                         currentVelocityX = origin.VelocityY;
                         currentVelocityY = -1 * origin.VelocityX;
                         currentOffsetX = origin.OffsetY;
-                        currentOffsetY = 1 - origin.OffsetX;
+                        currentOffsetY = (origin.OffsetX > 0 ? 1 - origin.OffsetX : 0);
                         currentFace = CubeMapFace.Down;
                         break;
                     case CubeMapFace.Front:
@@ -363,8 +374,8 @@ namespace PlanetCreator
                         currentY = (2047 + 2048) - currentY;
                         currentVelocityX = -1 * origin.VelocityX;
                         currentVelocityY = -1 * origin.VelocityY;
-                        currentOffsetX = 1 - origin.OffsetX;
-                        currentOffsetY = 1 - origin.OffsetY;
+                        currentOffsetX = (origin.OffsetX > 0 ? 1 - origin.OffsetX : 0);
+                        currentOffsetY = (origin.OffsetY > 0 ? 1 - origin.OffsetY : 0);
                         currentFace = CubeMapFace.Down;
                         break;
                     case CubeMapFace.Back:
