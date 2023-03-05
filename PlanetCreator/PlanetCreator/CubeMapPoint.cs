@@ -22,7 +22,7 @@ namespace PlanetCreator
         {
             var x = origin.X + dx;
             var y = origin.Y + dy;
-            if (x > 0 && x < 2048 && y > 0 && y < 2048) return new CubeMapPointLight { X = x, Y = y, Face = origin.Face };
+            if (x >= 0 && x < 2048 && y >= 0 && y < 2048) return new CubeMapPointLight { X = x, Y = y, Face = origin.Face };
 
             int backup;
             // Move in X direction first:
@@ -246,12 +246,6 @@ namespace PlanetCreator
         public int PosX { get; set; }
         public int PosY { get; set; }
 
-        public PointD GetGradient()
-        {
-            CalcGradient(out var gx, out var gy);
-            return new PointD { X = gx, Y = gy };
-        }
-
         public double VelocityX;
         public double VelocityY;
         public double VelocityLength => Math.Sqrt(VelocityX * VelocityX + VelocityY * VelocityY);
@@ -273,34 +267,6 @@ namespace PlanetCreator
                 VelocityX = VelocityX,
                 VelocityY = VelocityY
             };
-        }
-
-        void CalcGradient(out double gx, out double gy)
-        {
-            // Gradient is steepness of terrain. Consider this matrix:
-            // | G00 G10 G20 |
-            // | G01 G11 G21 |
-            // | G02 G12 G22 |
-            //
-            // Our current position is G11.
-            // The gradient to each neighbor is: Gxx-G11/distance
-            // The points G10,G01,G21 and G12 have a distance of 1
-            // The other points are diagonal and have a distance of Sqrt(2) = 1.414 (Pythagoras)
-            //
-            // Each gradient causes a force that drags the water droplet towards it
-            // We can just sum the gradients up indepentently for each axis to get the final gradient vector
-
-            var g00 = (GetPointRelativeTo(this, -1, -1).Value - Value) / 1.414;
-            var g10 = GetPointRelativeTo(this, 0, -1).Value - Value;
-            var g20 = (GetPointRelativeTo(this, 1, -1).Value - Value) / 1.414;
-            var g01 = GetPointRelativeTo(this, -1, 0).Value - Value;
-            var g21 = GetPointRelativeTo(this, 1, 0).Value - Value;
-            var g02 = (GetPointRelativeTo(this, -1, 1).Value - Value) / 1.414;
-            var g12 = GetPointRelativeTo(this, 0, 1).Value - Value;
-            var g22 = (GetPointRelativeTo(this, 1, 1).Value - Value) / 1.414;
-
-            gx = (g00 + g01 + g02) - (g20 + g21 + g22);
-            gy = (g00 + g10 + g20) - (g02 + g12 + g22);
         }
 
         public static void CalculateDirection(double vx, double vy, out int dx, out int dy)
@@ -349,11 +315,11 @@ namespace PlanetCreator
             }
         }
 
-        [Obsolete("Use instance method")]
-        public static CubeMapPoint GetPointRelativeTo(CubeMapPoint origin, int dx, int dy)
-        {
-            return GetPointRelativeTo(origin, dx, dy, origin._faces);
-        }
+        //[Obsolete("Use instance method")]
+        //public static CubeMapPoint GetPointRelativeTo(CubeMapPoint origin, int dx, int dy)
+        //{
+        //    return GetPointRelativeTo(origin, dx, dy, origin._faces);
+        //}
 
         public CubeMapPoint GetPointRelative(int dx, int dy)
         {

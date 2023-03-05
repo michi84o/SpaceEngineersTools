@@ -40,7 +40,8 @@ namespace PlanetCreator
 
         private void ViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(ViewModel.PreviewMode))
+            if (e.PropertyName == nameof(ViewModel.PreviewMode) ||
+                e.PropertyName == nameof(ViewModel.ExtendedPreview))
             {
                 // Default:
                 //  Canvas.Left="4096" Canvas.Top="2048"
@@ -48,12 +49,27 @@ namespace PlanetCreator
                 {
                     Canvas.SetLeft(ImgBack, 0);
                     Canvas.SetTop(ImgBack, 0);
+                    Canvas.SetLeft(OvlBack, 0);
+                    Canvas.SetTop(OvlBack, 0);
                 }
                 else
                 {
                     Canvas.SetLeft(ImgBack, 4096);
                     Canvas.SetTop(ImgBack, 2048);
+                    Canvas.SetLeft(OvlBack, 4096);
+                    Canvas.SetTop(OvlBack, 2048);
                 }
+
+                if (ViewModel.ExtendedPreview || !ViewModel.PreviewMode)
+                {
+                    PreviewBorder.Visibility = Visibility.Collapsed;
+                }
+                else
+                {
+                    PreviewBorder.Visibility = Visibility.Visible;
+                }
+
+
             }
         }
 

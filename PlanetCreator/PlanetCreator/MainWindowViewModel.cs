@@ -1,4 +1,6 @@
-﻿using System;
+﻿using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.IO;
@@ -14,12 +16,13 @@ using System.Windows.Media.Imaging;
 
 namespace PlanetCreator
 {
-    interface IDebugImage
+    interface IDebugOverlay
     {
-        void DebugDrawPixel(int x, int y, byte a, byte r, byte g, byte b);
+        void DebugDrawPixel(CubeMapFace face, int x, int y, byte a, byte r, byte g, byte b);
+        void DebugClearPixels(CubeMapFace face);
     }
 
-    class MainWindowViewModel : PropChangeNotifier, IDebugImage
+    class MainWindowViewModel : PropChangeNotifier, IDebugOverlay
     {
         BitmapImage _tileUp;
         public BitmapImage TileUp
@@ -60,26 +63,107 @@ namespace PlanetCreator
             set => SetProp(ref _tileDown, value);
         }
 
-        public WriteableBitmap DebugBitmap { get; } = new WriteableBitmap(2048, 2048, 96, 96, PixelFormats.Bgra32, null);
+        public WriteableBitmap OverlayBitmapUp { get; } = new WriteableBitmap(2048, 2048, 96, 96, PixelFormats.Bgra32, null);
+        public WriteableBitmap OverlayBitmapFront { get; } = new WriteableBitmap(2048, 2048, 96, 96, PixelFormats.Bgra32, null);
+        public WriteableBitmap OverlayBitmapRight { get; } = new WriteableBitmap(2048, 2048, 96, 96, PixelFormats.Bgra32, null);
+        public WriteableBitmap OverlayBitmapBack { get; } = new WriteableBitmap(2048, 2048, 96, 96, PixelFormats.Bgra32, null);
+        public WriteableBitmap OverlayBitmapLeft { get; } = new WriteableBitmap(2048, 2048, 96, 96, PixelFormats.Bgra32, null);
+        public WriteableBitmap OverlayBitmapDown { get; } = new WriteableBitmap(2048, 2048, 96, 96, PixelFormats.Bgra32, null);
 
-        public void DebugDrawPixel(int x, int y, byte a, byte r, byte g, byte b)
+        WriteableBitmap GetOverlay(CubeMapFace face)
         {
-            Application.Current.Dispatcher.BeginInvoke(() => _DebugDrawPixel(x, y, a, r, g, b));
+            WriteableBitmap bitmap;
+            switch (face)
+            {
+                case CubeMapFace.Back:
+                    bitmap = OverlayBitmapBack;
+                    break;
+                case CubeMapFace.Left:
+                    bitmap = OverlayBitmapLeft;
+                    break;
+                case CubeMapFace.Right:
+                    bitmap = OverlayBitmapRight;
+                    break;
+                case CubeMapFace.Front:
+                    bitmap = OverlayBitmapFront;
+                    break;
+                case CubeMapFace.Up:
+                    bitmap = OverlayBitmapUp;
+                    break;
+                case CubeMapFace.Down:
+                    bitmap = OverlayBitmapDown;
+                    break;
+                default:
+                    return null;
+            }
+            return bitmap;
         }
-        void _DebugDrawPixel(int x, int y, byte a, byte r, byte g, byte b)
+
+        public void DebugDrawPixel(CubeMapFace face, int x, int y, byte a, byte r, byte g, byte b)
         {
+            Application.Current.Dispatcher.BeginInvoke(() => _DebugDrawPixel(face, x, y, a, r, g, b));
+        }
+
+        public void DebugClearPixels(CubeMapFace face)
+        {
+            Application.Current.Dispatcher.BeginInvoke(() => _DebugClearPixels(face));
+        }
+
+        void _DebugClearPixels(CubeMapFace face)
+        {
+            var bitmap = GetOverlay(face);
+            if (bitmap == null) return;
             try
             {
                 // Reserve the back buffer for updates.
-                DebugBitmap.Lock();
+                bitmap.Lock();
+
+                unsafe
+                {
+                    for (int x = 0; x < bitmap.Width; x++)
+                    {
+                        for (int y = 0; y < bitmap.Height; y++)
+                        {
+                            // Get a pointer to the back buffer.
+                            IntPtr pBackBuffer = bitmap.BackBuffer;
+
+                            // Find the address of the pixel to draw.
+                            pBackBuffer += y * bitmap.BackBufferStride;
+                            pBackBuffer += x * 4;
+
+                            // Compute the pixel's color.
+                            int color_data = 0;
+                            // Assign the color data to the pixel.
+                            *((int*)pBackBuffer) = color_data;
+                        }
+                    }
+                }
+
+                // Specify the area of the bitmap that changed.
+                bitmap.AddDirtyRect(new Int32Rect(0, 0, 2048, 2048));
+            }
+            finally
+            {
+                // Release the back buffer and make it available for display.
+                bitmap.Unlock();
+            }
+        }
+        void _DebugDrawPixel(CubeMapFace face, int x, int y, byte a, byte r, byte g, byte b)
+        {
+            var bitmap = GetOverlay(face);
+            if (bitmap == null) return;
+            try
+            {
+                // Reserve the back buffer for updates.
+                bitmap.Lock();
 
                 unsafe
                 {
                     // Get a pointer to the back buffer.
-                    IntPtr pBackBuffer = DebugBitmap.BackBuffer;
+                    IntPtr pBackBuffer = bitmap.BackBuffer;
 
                     // Find the address of the pixel to draw.
-                    pBackBuffer += y * DebugBitmap.BackBufferStride;
+                    pBackBuffer += y * bitmap.BackBufferStride;
                     pBackBuffer += x * 4;
 
                     // Compute the pixel's color.
@@ -93,12 +177,12 @@ namespace PlanetCreator
                 }
 
                 // Specify the area of the bitmap that changed.
-                DebugBitmap.AddDirtyRect(new Int32Rect(x, y, 1, 1));
+                bitmap.AddDirtyRect(new Int32Rect(x, y, 1, 1));
             }
             finally
             {
                 // Release the back buffer and make it available for display.
-                DebugBitmap.Unlock();
+                bitmap.Unlock();
             }
         }
 
@@ -113,7 +197,22 @@ namespace PlanetCreator
         public bool PreviewMode
         {
             get => _previewMode;
-            set => SetProp(ref _previewMode, value);
+            set
+            {
+                if (!SetProp(ref _previewMode, value)) return;
+                if (!value) ExtendedPreview = false;
+            }
+        }
+
+        bool _extendedPreview;
+        public bool ExtendedPreview
+        {
+            get => _extendedPreview;
+            set
+            {
+                if (!SetProp(ref _extendedPreview, value)) return;
+                PreviewMode = true;
+            }
         }
 
         bool _isBusy;
@@ -164,7 +263,7 @@ namespace PlanetCreator
             get => _erosionInteria;
             set => SetProp(ref _erosionInteria, value);
         }
-        double _erosionSedimentCapacityFactor = 30;
+        double _erosionSedimentCapacityFactor = 25;
         public double ErosionSedimentCapacityFactor
         {
             get => _erosionSedimentCapacityFactor;
@@ -230,14 +329,24 @@ namespace PlanetCreator
             get => _lakeVolumeMultiplier;
             set => SetProp(ref _lakeVolumeMultiplier, value);
         }
+        string _materialSource = "C:\\Steam\\steamapps\\common\\SpaceEngineers\\Content\\Data\\PlanetDataFiles\\EarthLike";
+        public string MaterialSource
+        {
+            get => _materialSource;
+            set => SetProp(ref _materialSource, value);
+        }
 
         public ICommand GenerateCommand => new RelayCommand(async o =>
         {
-            TileUp = TileDown = TileRight = TileLeft = TileFront = TileBack = TileDown = null;
+            var faceValues = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToArray();
+            foreach (var face in faceValues)
+                DebugClearPixels(face);
 
+            TileUp = TileDown = TileRight = TileLeft = TileFront = TileBack = TileDown = null;
             var generator = new PlanetGenerator();
-            generator.DebugImage = this;
+            generator.DebugOverlay = this;
             generator.DebugMode = PreviewMode;
+            generator.ExtendedDebugMode = ExtendedPreview;
             generator.Seed = Seed;
             if (NoiseScale < 1 || NoiseScale > 65535) NoiseScale = 100;
             generator.NoiseScale = NoiseScale;
@@ -284,21 +393,64 @@ namespace PlanetCreator
             generator.ProgressChanged += Generator_ProgressChanged;
             IsBusy = true;
             try { _tcs?.Cancel(); } catch { }
-            _tcs = new CancellationTokenSource();
+            var tcs = new CancellationTokenSource();
+            var token = tcs.Token;
+            _tcs = tcs;
             try
             {
                 await Task.Run(() =>
                 {
-                    generator.GeneratePlanet(_tcs.Token);
+                    generator.GeneratePlanet(token);
                 });
             }
+            catch { } // TaskCancelledException
             finally
             {
                 IsBusy = false;
                 generator.ProgressChanged -= Generator_ProgressChanged;
                 _tcs.Dispose();
             }
+            if (token.IsCancellationRequested) return;
+
             LoadPictures();
+
+            if (MaterialSource != null)
+            {
+                if (Directory.Exists(MaterialSource))
+                {
+                    foreach (var face in faceValues)
+                    {
+                        try
+                        {
+                            if (token.IsCancellationRequested) return;
+                            var file = face.ToString().ToLower()+"_mat.png";
+                            var path = System.IO.Path.Combine(MaterialSource, file);
+                            if (File.Exists(path) && File.Exists(file))
+                            {
+                                dynamic localImg = Image.Load(file);
+                                dynamic img = Image.Load(path);
+                                var image = new Image<Rgb24>(2048, 2048);
+                                if (img != null && localImg != null)
+                                {
+                                    Parallel.For(0, 2048, generator.POptions(token), x =>
+                                    {
+                                        for (int y = 0; y < 2048; ++y)
+                                        {
+                                            // Local image is lake only
+                                            var localImgVal = localImg[x, y];
+                                            var imgVal = img[x, y];
+                                            image[x, y] = new Rgb24((byte)localImgVal.R, (byte)imgVal.G, (byte)imgVal.B);
+                                        }
+                                    });
+                                    image.Save(face.ToString().ToLower() + "_mat2.png");
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+                }
+            }
+
             Progress = 0;
         }, o=> !IsBusy);
         CancellationTokenSource _tcs;
