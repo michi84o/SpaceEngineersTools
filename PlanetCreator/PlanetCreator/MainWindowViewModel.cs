@@ -423,7 +423,7 @@ namespace PlanetCreator
                         try
                         {
                             if (token.IsCancellationRequested) return;
-                            var file = face.ToString().ToLower()+"_mat.png";
+                            var file = face.ToString().ToLower()+"_lakes.png";
                             var path = System.IO.Path.Combine(MaterialSource, file);
                             if (File.Exists(path) && File.Exists(file))
                             {
@@ -442,7 +442,7 @@ namespace PlanetCreator
                                             image[x, y] = new Rgb24((byte)localImgVal.R, (byte)imgVal.G, (byte)imgVal.B);
                                         }
                                     });
-                                    image.Save(face.ToString().ToLower() + "_mat2.png");
+                                    image.Save(face.ToString().ToLower() + "_mat.png");
                                 }
                             }
                         }

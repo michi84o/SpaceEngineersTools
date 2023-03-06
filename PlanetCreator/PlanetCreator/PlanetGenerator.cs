@@ -11,6 +11,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input.Manipulations;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Media3D;
 
 namespace PlanetCreator
@@ -922,6 +924,71 @@ namespace PlanetCreator
             }
         }
 
+        void MakeSeemless(Dictionary<CubeMapFace, double[,]> faces)
+        {
+            // Fix cubemap edges if there are sudden jumps
+            List<Task> tasks = new List<Task>();
+
+            // Strategy: linear regression:
+            // Glitched terrain looks like this:
+            //       /
+            //      /
+            //    --  <- this should not be here
+            //   /
+            //  /
+            //x:123456
+            // To fix this, we ignore points at location 3+4
+            // Take 4 other points (1,2,5,6), calculate linear regression,
+            // then calculate points 3+4 from it.
+
+            // Front <-> Up
+            tasks.Add(Task.Run(() =>
+            {
+                for (int x = 0; x < _tileWidth; ++x)
+                {
+                    PointD[] points = new PointD[4];
+                    points[0] = new PointD { X = 1, Y = faces[CubeMapFace.Front][x, 2] };
+                    points[1] = new PointD { X = 2, Y = faces[CubeMapFace.Front][x, 1] };
+                                         // skip 3                                  0
+                                         // skip 4                               2047
+                    points[2] = new PointD { X = 5, Y = faces[CubeMapFace.Up][x, 2046] };
+                    points[3] = new PointD { X = 6, Y = faces[CubeMapFace.Up][x, 2045] };
+                    LinearRegression(points, out var slope, out var yIntercept);
+                    faces[CubeMapFace.Front][x, 0] = 3 * slope + yIntercept;
+                    faces[CubeMapFace.Up][x, 2047] = 4 * slope + yIntercept;
+                }
+            }));
+
+            // TODO, WIP Do all other edges
+
+            Task.WhenAll(tasks).GetAwaiter().GetResult();
+        }
+
+        void LinearRegression(PointD[] points, out double slope, out double yIntercept)
+        {
+            // Calculate the mean of x and y
+            double x_mean = 0;
+            double y_mean = 0;
+            for (int i = 0; i < points.Length; i++)
+            {
+                x_mean += points[i].X;
+                y_mean += points[i].Y;
+            }
+            x_mean /= points.Length;
+            y_mean /= points.Length;
+
+            // Calculate the slope and y-intercept of the regression line
+            double numerator = 0;
+            double denominator = 0;
+            for (int i = 0; i < points.Length; i++)
+            {
+                numerator += (points[i].X - x_mean) * (points[i].Y - y_mean);
+                denominator += (points[i].X - x_mean) * (points[i].X - x_mean);
+            }
+            slope = numerator / denominator;
+            yIntercept = y_mean - slope * x_mean;
+        }
+
         void Normalize(List<double[,]> images, CancellationToken token)
         {
             double max = images[0][0, 0];
@@ -1046,7 +1113,7 @@ namespace PlanetCreator
 
         void WriteMaterialMap(byte[,] red, CubeMapFace face)
         {
-            WriteMaterialMap(red, face.ToString().ToLower() + "_mat.png");
+            WriteMaterialMap(red, face.ToString().ToLower() + "_lakes.png");
         }
 
         void WriteMaterialMap(byte[,] red, string fileName)
