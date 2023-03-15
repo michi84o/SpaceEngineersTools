@@ -21,7 +21,7 @@
             <ColumnDefinition/>
         </Grid.ColumnDefinitions>
         <GroupBox
-            Header="Variables">
+            Header="Variables" Margin="3">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -241,5 +241,12 @@
                 </Canvas>
             </Border>
         </GroupBox>
+
+        <Button
+            Grid.Column="1"
+            VerticalAlignment="Top"
+            HorizontalAlignment="Right"
+            Command="{Binding EdgeFixCommand}"
+            Content="Edge Fix" Margin="0,0,12,0"/>
     </Grid>
 </Window>

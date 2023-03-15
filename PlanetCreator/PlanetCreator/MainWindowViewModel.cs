@@ -1,4 +1,5 @@
-﻿using SixLabors.ImageSharp;
+﻿using Microsoft.Win32;
+using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
@@ -427,6 +428,7 @@ namespace PlanetCreator
                             var path = System.IO.Path.Combine(MaterialSource, file);
                             if (File.Exists(path) && File.Exists(file))
                             {
+                                // TODO: dynamic is slow!
                                 dynamic localImg = Image.Load(file);
                                 dynamic img = Image.Load(path);
                                 var image = new Image<Rgb24>(2048, 2048);
@@ -500,6 +502,102 @@ namespace PlanetCreator
             }
             catch { return null; }
         }
+
+
+        public ICommand EdgeFixCommand => new RelayCommand(o =>
+        {
+            MessageBox.Show("This is test code to test edge fix code.\r\nWarning! It will override your files!\r\nClose the next dialog to abort.");
+            var dlg = new OpenFileDialog();
+            dlg.Filter = "PNG Files|*.png";
+            if (dlg.ShowDialog() != true) return;
+            var folder = System.IO.Path.GetDirectoryName(dlg.FileName);
+
+            // Check if all files exist:
+            string[] files = new[]
+            {
+                "back.png",
+                "down.png",
+                "front.png",
+                "left.png",
+                "right.png",
+                "up.png",
+            };
+            foreach (var file in files)
+            {
+                var fileName = Path.Combine(folder, file);
+                if (!File.Exists(fileName))
+                {
+                    MessageBox.Show(file + " is missing!", "Missing file", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            Dictionary<CubeMapFace, double[,]> images = new();
+            CubeMapFace[] faces = new[]
+            {
+                CubeMapFace.Back,
+                CubeMapFace.Down,
+                CubeMapFace.Front,
+                CubeMapFace.Left,
+                CubeMapFace.Right,
+                CubeMapFace.Up,
+            };
+            // Load images
+            for (int i = 0; i < files.Length; i++)
+            {
+                try
+                {
+                    var fileName = Path.Combine(folder, files[i]);
+                    var face = faces[i];
+                    var image = SixLabors.ImageSharp.Image.Load(fileName) as Image<L16>;
+                    double[,] imageData = new double[2048, 2048];
+                    for (int x = 0; x < 2048; ++x)
+                        for (int y = 0; y < 2048; ++y)
+                        {
+                            imageData[x, y] = image[x, y].PackedValue / 65535.0;
+                        }
+                    images[face] = imageData;
+                }
+                catch (Exception e)
+                {
+                    MessageBox.Show(e.Message, "Error loading files", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+            }
+            // Apply fix
+            try
+            {
+                EdgeFixer.MakeSeemless(images, CancellationToken.None);
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show(e.Message, "Error applying edge fix", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            // Save images
+            for (int i = 0; i < files.Length; i++)
+            {
+                try
+                {
+                    var fileName = Path.Combine(folder, files[i]);
+                    var face = faces[i];
+                    var image = new SixLabors.ImageSharp.Image<L16>(2048, 2048);
+                    var imageData = images[face];
+                    for (int x = 0; x < 2048; ++x)
+                        for (int y = 0; y < 2048; ++y)
+                        {
+                            var val = imageData[x, y] * 65535;
+                            if (val < 0) val = 0;
+                            if (val > 65535) val = 65535;
+                            image[x, y] = new L16 { PackedValue = (ushort)val };
+                        }
+                    image.Save(fileName);
+                }
+                catch (Exception e)
+                {
+                    MessageBox.Show(e.Message, "Error loading files", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+            }
+        });
 
     }
 }
