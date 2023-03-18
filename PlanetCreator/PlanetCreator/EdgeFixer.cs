@@ -46,19 +46,33 @@ namespace PlanetCreator
                 var face2 = pair[1];
                 tasks.Add(Task.Run(() =>
                 {
+                    // WIP
+                    // Problems:
+                    // - There are still jumps in terrain, especially at the edges of the cubemap where the distortions are the greatest
+                    // - Problems with pitched roof shapes when terrain maxing out at the edge between cubemaps
+                    //   - In that case we need another regression formula. Linear is not working.
+
                     for (int x = 0; x < TileWidth; ++x)
                     {
                         if (token.IsCancellationRequested) return;
-                        PointD[] points = new PointD[4];
-                        points[0] = new PointD { X = 1, Y = faces[face1][x, 2] };
-                        points[1] = new PointD { X = 2, Y = faces[face1][x, 1] };
-                        //                      skip 3                   x, 0
-                        //                      skip 4                   x, 2047
-                        points[2] = new PointD { X = 5, Y = faces[face2][x, 2046] };
-                        points[3] = new PointD { X = 6, Y = faces[face2][x, 2045] };
+                        PointD[] points = new PointD[6];
+                        points[0] = new PointD { X = 0, Y = faces[face1][x, 3] };
+                        points[1] = new PointD { X = 1, Y = faces[face1][x, 2] };    // 33% reg / 66% orig
+                        points[2] = new PointD { X = 2, Y = faces[face1][x, 1] };    // 66% reg / 33% orig
+                        //                      skip 3                   x, 0        // 100% reg / 0% orig
+                        //                      skip 4                   x, 2047     // 100% reg / 0% orig
+                        points[3] = new PointD { X = 5, Y = faces[face2][x, 2046] }; // 66% reg / 33% orig
+                        points[4] = new PointD { X = 6, Y = faces[face2][x, 2045] }; // 33% reg / 66% orig
+                        points[5] = new PointD { X = 7, Y = faces[face2][x, 2044] };
                         LinearRegression(points, out var slope, out var yIntercept);
+                        var _66 = 2.0 / 3.0;
+                        var _33 = 1.0 / 3.0;
+                        faces[face1][x, 2] = faces[face1][x, 2] * _66 + ((1 * slope + yIntercept) * _33);
+                        faces[face1][x, 1] = faces[face1][x, 1] * _33 + ((2 * slope + yIntercept) * _66);
                         faces[face1][x, 0] = 3 * slope + yIntercept;
                         faces[face2][x, 2047] = 4 * slope + yIntercept;
+                        faces[face2][x, 2046] = faces[face2][x, 2046] * _33 + ((5 * slope + yIntercept) * _66);
+                        faces[face2][x, 2045] = faces[face2][x, 2045] * _66 + ((6 * slope + yIntercept) * _33);
                     }
                 }));
             }
