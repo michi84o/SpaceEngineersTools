@@ -14,6 +14,55 @@ namespace PlanetCreator
     {
         public static int TileWidth = 2048;
 
+        class PointWrapper
+        {
+            public Func<double> GetValue;
+            public Action<double> SetValue;
+            public PointWrapper(Func<double> getValue, Action<double> setValue)
+            {
+                GetValue = getValue;
+                SetValue = setValue;
+            }
+        }
+
+        static void ApplyPolyRegression(List<PointWrapper> edgePoints)
+        {
+            PointD[] points = new PointD[6];
+            int nextIndex = 0;
+            for (int i = 0; i < 10; ++i)
+            {
+                if (i >= 3 && i <= 6) continue;
+                points[nextIndex++] = new PointD { X = i, Y = edgePoints[i].GetValue() };
+            }
+            PolynomialRegression(points, out var regFunc);
+            // 0 1 2 3 4 5 6 7 8 9
+            //       | | | |        <- these are skipped and reconstructed
+            for (int i = 4; i <= 6; ++i)
+                edgePoints[i].SetValue(regFunc(i));
+        }
+
+        static void ApplyBlend(List<PointWrapper> edgePoints)
+        {
+            double[] copy = new double[10];
+            for (int i = 0; i < 10; ++i)
+                copy[i] = edgePoints[i].GetValue();
+
+            for (int i = 2; i <= 7; ++i)
+                edgePoints[i].SetValue(
+                    (copy[i] * 0.5 +
+                    copy[i-1] * 0.25 + copy[i+1] * 0.25 +
+                    copy[i-2]*0.125 + copy[i+2]*0.125)/1.25);
+        }
+
+        static void ApplyEdgeFix(List<PointWrapper> edgePoints)
+        {
+            ApplyPolyRegression(edgePoints);
+            //ApplyBlend(edgePoints);
+            //ApplyBlend(edgePoints);
+            //ApplyBlend(edgePoints);
+            //ApplyBlend(edgePoints);
+        }
+
         public static void MakeSeemless(Dictionary<CubeMapFace, double[,]> faces, CancellationToken token)
         {
             if (token.IsCancellationRequested) return;
@@ -21,7 +70,7 @@ namespace PlanetCreator
             // Fix cubemap edges if there are sudden jumps
             List<Task> tasks = new List<Task>();
 
-            // Strategy: linear regression:
+            // Strategy: polynomial regression:
             // Glitched terrain looks like this:
             //       /
             //      /
@@ -30,10 +79,14 @@ namespace PlanetCreator
             //  /
             //x:123456
             // To fix this, we ignore points at location 3+4
-            // Take 4 other points (1,2,5,6), calculate linear regression,
+            // Take 4 other points (1,2,5,6), calculate polynomial regression,
             // then calculate points 3+4 from it.
 
-            // Idea: If fix is not enough maybe use average of regression and points 2+5
+            // Since this does not fix everything, we also apply some blending afterwards:
+            // Blend pixels:
+            // a b c ][ d e f
+            // Schema:  c = 0.5c + 0.25b + 0.25d
+            // Apply for b,c,d,e
 
             // Front <-> Up
             // Down <-> Back
@@ -41,49 +94,34 @@ namespace PlanetCreator
             CubeMapFace[][] verticals = new CubeMapFace[][]
             {
                 new[] { CubeMapFace.Front, CubeMapFace.Up },
-                //new[] { CubeMapFace.Down, CubeMapFace.Back },
+                new[] { CubeMapFace.Down, CubeMapFace.Back },
             };
-            Func<double, double> regFunc;
             foreach (var pair in verticals)
             {
                 var face1 = pair[0];
                 var face2 = pair[1];
                 tasks.Add(Task.Run(() =>
                 {
-                    // WIP
-                    // Problems:
-                    // - There are still jumps in terrain, especially at the edges of the cubemap where the distortions are the greatest
-                    // - Problems with pitched roof shapes when terrain maxing out at the edge between cubemaps
-                    //   - In that case we need another regression formula. Linear is not working.
-
-                    // TODO: Weird shapes probably comming from parallel access. Need to add locks.
-
                     for (int x = 0; x < TileWidth; ++x)
                     {
                         if (token.IsCancellationRequested) return;
-                        PointD[] points = new PointD[6];
-                        points[0] = new PointD { X = 0, Y = faces[face1][x, 3] };
-                        points[1] = new PointD { X = 1, Y = faces[face1][x, 2] };
-                        points[2] = new PointD { X = 2, Y = faces[face1][x, 1] };
-                        //                      skip 3                   x, 0
-                        //                      skip 4                   x, 2047
-                        points[3] = new PointD { X = 5, Y = faces[face2][x, 2046] };
-                        points[4] = new PointD { X = 6, Y = faces[face2][x, 2045] };
-                        points[5] = new PointD { X = 7, Y = faces[face2][x, 2044] };
-                        //Debug.WriteLine("");
-                        //Debug.WriteLine("3: " + faces[face1][x, 0]);
-                        //Debug.WriteLine("4: " + faces[face2][x, 2047]);
-                        PolynomialRegression(points, out regFunc);
-                        faces[face1][x, 0] = regFunc(3);
-                        faces[face2][x, 2047] = regFunc(4);
-                        //Debug.WriteLine("3: " + faces[face1][x, 0]);
-                        //Debug.WriteLine("4: " + faces[face2][x, 2047]);
+                        List<PointWrapper> edgePoints = new List<PointWrapper>
+                        {
+                            new PointWrapper(()=>faces[face1][x, 4], d => faces[face1][x, 4] = d),
+                            new PointWrapper(()=>faces[face1][x, 3], d => faces[face1][x, 3] = d),
+                            new PointWrapper(()=>faces[face1][x, 2], d => faces[face1][x, 2] = d),
+                            new PointWrapper(()=>faces[face1][x, 1], d => faces[face1][x, 1] = d),
+                            new PointWrapper(()=>faces[face1][x, 0], d => faces[face1][x, 0] = d),           // 4
+                            new PointWrapper(()=>faces[face2][x, 2047], d => faces[face2][x, 2047] = d),     // 5
+                            new PointWrapper(()=>faces[face2][x, 2046], d => faces[face2][x, 2046] = d),
+                            new PointWrapper(()=>faces[face2][x, 2045], d => faces[face2][x, 2045] = d),
+                            new PointWrapper(()=>faces[face2][x, 2044], d => faces[face2][x, 2044] = d),
+                            new PointWrapper(()=>faces[face2][x, 2043], d => faces[face2][x, 2043] = d),
+                        };
+                        ApplyEdgeFix(edgePoints);
                     }
                 }));
             }
-
-            Task.WhenAll(tasks).GetAwaiter().GetResult();
-            return;
 
             // Equator:
             CubeMapFace[][] equator = new CubeMapFace[][]
@@ -102,18 +140,20 @@ namespace PlanetCreator
                     for (int y = 0; y < TileWidth; ++y)
                     {
                         if (token.IsCancellationRequested) return;
-                        PointD[] points = new PointD[6];
-                        points[0] = new PointD { X = 0, Y = faces[face1][2044, y] };
-                        points[1] = new PointD { X = 1, Y = faces[face1][2045, y] };
-                        points[2] = new PointD { X = 2, Y = faces[face1][2046, y] };
-                        //                      skip 3                   2047, y
-                        //                      skip 4                   0, y
-                        points[3] = new PointD { X = 5, Y = faces[face2][1, y] };
-                        points[4] = new PointD { X = 6, Y = faces[face2][2, y] };
-                        points[5] = new PointD { X = 7, Y = faces[face2][3, y] };
-                        PolynomialRegression(points, out regFunc);
-                        faces[face1][2047, y] = regFunc(3);
-                        faces[face2][0, y] = regFunc(4);
+                        List<PointWrapper> edgePoints = new List<PointWrapper>
+                        {
+                            new PointWrapper(()=>faces[face1][2043, y], d => faces[face1][2043, y] = d),
+                            new PointWrapper(()=>faces[face1][2044, y], d => faces[face1][2044, y] = d),
+                            new PointWrapper(()=>faces[face1][2045, y], d => faces[face1][2045, y] = d),
+                            new PointWrapper(()=>faces[face1][2046, y], d => faces[face1][2046, y] = d),
+                            new PointWrapper(()=>faces[face1][2047, y], d => faces[face1][2047, y] = d),
+                            new PointWrapper(()=>faces[face2][0, y], d => faces[face2][0, y] = d),
+                            new PointWrapper(()=>faces[face2][1, y], d => faces[face2][1, y] = d),
+                            new PointWrapper(()=>faces[face2][2, y], d => faces[face2][2, y] = d),
+                            new PointWrapper(()=>faces[face2][3, y], d => faces[face2][3, y] = d),
+                            new PointWrapper(()=>faces[face2][4, y], d => faces[face2][4, y] = d),
+                        };
+                        ApplyEdgeFix(edgePoints);
                     }
                 }));
             }
@@ -124,16 +164,20 @@ namespace PlanetCreator
                 for (int x = 0; x < TileWidth; ++x)
                 {
                     if (token.IsCancellationRequested) return;
-                    PointD[] points = new PointD[4];
-                    points[0] = new PointD { X = 1, Y = faces[CubeMapFace.Front][x, 2045] };
-                    points[1] = new PointD { X = 2, Y = faces[CubeMapFace.Front][x, 2046] };
-                    //                      skip 3                               x, 2047
-                    //                      skip 4                              2047 - x, 2047
-                    points[2] = new PointD { X = 5, Y = faces[CubeMapFace.Down][2047 - x, 2046] };
-                    points[3] = new PointD { X = 6, Y = faces[CubeMapFace.Down][2047 - x, 2045] };
-                    LinearRegression(points, out var slope, out var yIntercept);
-                    faces[CubeMapFace.Front][x, 2047] = 3 * slope + yIntercept;
-                    faces[CubeMapFace.Down][2047 - x, 2047] = 4 * slope + yIntercept;
+                    List<PointWrapper> edgePoints = new List<PointWrapper>
+                    {
+                        new PointWrapper(()=>faces[CubeMapFace.Front][x, 2043], d => faces[CubeMapFace.Front][x, 2043] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Front][x, 2044], d => faces[CubeMapFace.Front][x, 2044] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Front][x, 2045], d => faces[CubeMapFace.Front][x, 2045] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Front][x, 2046], d => faces[CubeMapFace.Front][x, 2046] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Front][x, 2047], d => faces[CubeMapFace.Front][x, 2047] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][2047 - x, 2047], d => faces[CubeMapFace.Down][2047 - x, 2047] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][2047 - x, 2046], d => faces[CubeMapFace.Down][2047 - x, 2046] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][2047 - x, 2045], d => faces[CubeMapFace.Down][2047 - x, 2045] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][2047 - x, 2044], d => faces[CubeMapFace.Down][2047 - x, 2044] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][2047 - x, 2043], d => faces[CubeMapFace.Down][2047 - x, 2043] = d),
+                    };
+                    ApplyEdgeFix(edgePoints);
                 }
             }));
 
@@ -143,16 +187,20 @@ namespace PlanetCreator
                 for (int z = 0; z < TileWidth; ++z)
                 {
                     if (token.IsCancellationRequested) return;
-                    PointD[] points = new PointD[4];
-                    points[0] = new PointD { X = 1, Y = faces[CubeMapFace.Right][z, 2045] };
-                    points[1] = new PointD { X = 2, Y = faces[CubeMapFace.Right][z, 2046] };
-                    //                      skip 3                               z, 2047
-                    //                      skip 4                              0, 2047-z
-                    points[2] = new PointD { X = 5, Y = faces[CubeMapFace.Down][1, 2047-z] };
-                    points[3] = new PointD { X = 6, Y = faces[CubeMapFace.Down][2, 2047-z] };
-                    LinearRegression(points, out var slope, out var yIntercept);
-                    faces[CubeMapFace.Right][z, 2047] = 3 * slope + yIntercept;
-                    faces[CubeMapFace.Down][0, 2047-z] = 4 * slope + yIntercept;
+                    List<PointWrapper> edgePoints = new List<PointWrapper>
+                    {
+                        new PointWrapper(()=>faces[CubeMapFace.Right][z, 2043], d => faces[CubeMapFace.Right][z, 2043] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Right][z, 2044], d => faces[CubeMapFace.Right][z, 2044] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Right][z, 2045], d => faces[CubeMapFace.Right][z, 2045] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Right][z, 2046], d => faces[CubeMapFace.Right][z, 2046] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Right][z, 2047], d => faces[CubeMapFace.Right][z, 2047] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][0, 2047-z], d => faces[CubeMapFace.Down][0, 2047-z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][1, 2047-z], d => faces[CubeMapFace.Down][1, 2047-z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][2, 2047-z], d => faces[CubeMapFace.Down][2, 2047-z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][3, 2047-z], d => faces[CubeMapFace.Down][3, 2047-z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][4, 2047-z], d => faces[CubeMapFace.Down][4, 2047-z] = d),
+                    };
+                    ApplyEdgeFix(edgePoints);
                 }
             }));
 
@@ -162,16 +210,20 @@ namespace PlanetCreator
                 for (int z = 0; z < TileWidth; ++z)
                 {
                     if (token.IsCancellationRequested) return;
-                    PointD[] points = new PointD[4];
-                    points[0] = new PointD { X = 1, Y = faces[CubeMapFace.Left][z, 2045] };
-                    points[1] = new PointD { X = 2, Y = faces[CubeMapFace.Left][z, 2046] };
-                    //                      skip 3                              z,  2047
-                    //                      skip 4                              2047, z
-                    points[2] = new PointD { X = 5, Y = faces[CubeMapFace.Down][2046, z] };
-                    points[3] = new PointD { X = 6, Y = faces[CubeMapFace.Down][2045, z] };
-                    LinearRegression(points, out var slope, out var yIntercept);
-                    faces[CubeMapFace.Left][z, 2047] = 3 * slope + yIntercept;
-                    faces[CubeMapFace.Down][2047, z] = 4 * slope + yIntercept;
+                    List<PointWrapper> edgePoints = new List<PointWrapper>
+                    {
+                        new PointWrapper(()=>faces[CubeMapFace.Left][z, 2043], d => faces[CubeMapFace.Left][z, 2043] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Left][z, 2044], d => faces[CubeMapFace.Left][z, 2044] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Left][z, 2045], d => faces[CubeMapFace.Left][z, 2045] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Left][z, 2046], d => faces[CubeMapFace.Left][z, 2046] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Left][z, 2047], d => faces[CubeMapFace.Left][z, 2047] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][2047, z], d => faces[CubeMapFace.Down][2047, z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][2046, z], d => faces[CubeMapFace.Down][2046, z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][2045, z], d => faces[CubeMapFace.Down][2045, z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][2044, z], d => faces[CubeMapFace.Down][2044, z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][2043, z], d => faces[CubeMapFace.Down][2043, z] = d),
+                    };
+                    ApplyEdgeFix(edgePoints);
                 }
             }));
 
@@ -181,16 +233,20 @@ namespace PlanetCreator
                 for (int z = 0; z < TileWidth; ++z)
                 {
                     if (token.IsCancellationRequested) return;
-                    PointD[] points = new PointD[4];
-                    points[0] = new PointD { X = 1, Y = faces[CubeMapFace.Right][z, 2] };
-                    points[1] = new PointD { X = 2, Y = faces[CubeMapFace.Right][z, 1] };
-                    //                      skip 3                               z, 0
-                    //                      skip 4                            2047, 2047-z
-                    points[2] = new PointD { X = 5, Y = faces[CubeMapFace.Up][2046, 2047-z] };
-                    points[3] = new PointD { X = 6, Y = faces[CubeMapFace.Up][2045, 2047-z] };
-                    LinearRegression(points, out var slope, out var yIntercept);
-                    faces[CubeMapFace.Right][z, 0] = 3 * slope + yIntercept;
-                    faces[CubeMapFace.Up][2047, 2047-z] = 4 * slope + yIntercept;
+                    List<PointWrapper> edgePoints = new List<PointWrapper>
+                    {
+                        new PointWrapper(()=>faces[CubeMapFace.Right][z, 4], d => faces[CubeMapFace.Right][z, 4] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Right][z, 3], d => faces[CubeMapFace.Right][z, 3] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Right][z, 2], d => faces[CubeMapFace.Right][z, 2] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Right][z, 1], d => faces[CubeMapFace.Right][z, 1] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Right][z, 0], d => faces[CubeMapFace.Right][z, 0] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][2047, 2047-z] , d => faces[CubeMapFace.Up][2047, 2047-z]  = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][2046, 2047-z] , d => faces[CubeMapFace.Up][2046, 2047-z]  = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][2045, 2047-z] , d => faces[CubeMapFace.Up][2045, 2047-z]  = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][2044, 2047-z] , d => faces[CubeMapFace.Up][2044, 2047-z]  = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][2043, 2047-z] , d => faces[CubeMapFace.Up][2043, 2047-z]  = d),
+                    };
+                    ApplyEdgeFix(edgePoints);
                 }
             }));
 
@@ -200,16 +256,20 @@ namespace PlanetCreator
                 for (int z = 0; z < TileWidth; ++z)
                 {
                     if (token.IsCancellationRequested) return;
-                    PointD[] points = new PointD[4];
-                    points[0] = new PointD { X = 1, Y = faces[CubeMapFace.Back][z, 2] };
-                    points[1] = new PointD { X = 2, Y = faces[CubeMapFace.Back][z, 1] };
-                    //                      skip 3                              z, 0
-                    //                      skip 4                            2047-z, 0
-                    points[2] = new PointD { X = 5, Y = faces[CubeMapFace.Up][2047-z, 1] };
-                    points[3] = new PointD { X = 6, Y = faces[CubeMapFace.Up][2047-z, 2] };
-                    LinearRegression(points, out var slope, out var yIntercept);
-                    faces[CubeMapFace.Back][z, 0] = 3 * slope + yIntercept;
-                    faces[CubeMapFace.Up][2047-z, 0] = 4 * slope + yIntercept;
+                    List<PointWrapper> edgePoints = new List<PointWrapper>
+                    {
+                        new PointWrapper(()=>faces[CubeMapFace.Back][z, 4], d => faces[CubeMapFace.Back][z, 4] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Back][z, 3], d => faces[CubeMapFace.Back][z, 3] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Back][z, 2], d => faces[CubeMapFace.Back][z, 2] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Back][z, 1], d => faces[CubeMapFace.Back][z, 1] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Back][z, 0], d => faces[CubeMapFace.Back][z, 0] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][2047-z, 0] , d => faces[CubeMapFace.Up][2047-z, 0]  = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][2047-z, 1] , d => faces[CubeMapFace.Up][2047-z, 1]  = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][2047-z, 2] , d => faces[CubeMapFace.Up][2047-z, 2]  = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][2047-z, 3] , d => faces[CubeMapFace.Up][2047-z, 3]  = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][2047-z, 4] , d => faces[CubeMapFace.Up][2047-z, 4]  = d),
+                    };
+                    ApplyEdgeFix(edgePoints);
                 }
             }));
 
@@ -219,20 +279,31 @@ namespace PlanetCreator
                 for (int z = 0; z < TileWidth; ++z)
                 {
                     if (token.IsCancellationRequested) return;
-                    PointD[] points = new PointD[4];
-                    points[0] = new PointD { X = 1, Y = faces[CubeMapFace.Left][z, 2] };
-                    points[1] = new PointD { X = 2, Y = faces[CubeMapFace.Left][z, 1] };
-                    //                      skip 3                              z, 0
-                    //                      skip 4                            0, z
-                    points[2] = new PointD { X = 5, Y = faces[CubeMapFace.Up][1, z] };
-                    points[3] = new PointD { X = 6, Y = faces[CubeMapFace.Up][2, z] };
-                    LinearRegression(points, out var slope, out var yIntercept);
-                    faces[CubeMapFace.Left][z, 0] = 3 * slope + yIntercept;
-                    faces[CubeMapFace.Up][0, z] = 4 * slope + yIntercept;
+                    List<PointWrapper> edgePoints = new List<PointWrapper>
+                    {
+                        new PointWrapper(()=>faces[CubeMapFace.Left][z, 4], d => faces[CubeMapFace.Left][z, 4] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Left][z, 3], d => faces[CubeMapFace.Left][z, 3] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Left][z, 2], d => faces[CubeMapFace.Left][z, 2] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Left][z, 1], d => faces[CubeMapFace.Left][z, 1] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Left][z, 0], d => faces[CubeMapFace.Left][z, 0] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][0, z], d => faces[CubeMapFace.Up][0, z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][1, z], d => faces[CubeMapFace.Up][1, z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][2, z], d => faces[CubeMapFace.Up][2, z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][3, z], d => faces[CubeMapFace.Up][3, z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][4, z], d => faces[CubeMapFace.Up][4, z] = d),
+                    };
+                    ApplyEdgeFix(edgePoints);
                 }
             }));
 
             Task.WhenAll(tasks).GetAwaiter().GetResult();
+
+            // TODO: Maybe apply low pass filter matrix on edge pixels at the end:
+            //
+            //     0    .125     0
+            //    .125   .5    0.125
+            //     0    .125     0
+            //
         }
 
         // Special thanks to ChatGPT for these regression codes.
