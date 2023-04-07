@@ -1,5 +1,8 @@
-﻿using System;
+﻿using MathNet.Numerics.LinearAlgebra;
+using MathNet.Numerics.LinearRegression;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -38,8 +41,9 @@ namespace PlanetCreator
             CubeMapFace[][] verticals = new CubeMapFace[][]
             {
                 new[] { CubeMapFace.Front, CubeMapFace.Up },
-                new[] { CubeMapFace.Down, CubeMapFace.Back },
+                //new[] { CubeMapFace.Down, CubeMapFace.Back },
             };
+            Func<double, double> regFunc;
             foreach (var pair in verticals)
             {
                 var face1 = pair[0];
@@ -52,30 +56,34 @@ namespace PlanetCreator
                     // - Problems with pitched roof shapes when terrain maxing out at the edge between cubemaps
                     //   - In that case we need another regression formula. Linear is not working.
 
+                    // TODO: Weird shapes probably comming from parallel access. Need to add locks.
+
                     for (int x = 0; x < TileWidth; ++x)
                     {
                         if (token.IsCancellationRequested) return;
                         PointD[] points = new PointD[6];
                         points[0] = new PointD { X = 0, Y = faces[face1][x, 3] };
-                        points[1] = new PointD { X = 1, Y = faces[face1][x, 2] };    // 33% reg / 66% orig
-                        points[2] = new PointD { X = 2, Y = faces[face1][x, 1] };    // 66% reg / 33% orig
-                        //                      skip 3                   x, 0        // 100% reg / 0% orig
-                        //                      skip 4                   x, 2047     // 100% reg / 0% orig
-                        points[3] = new PointD { X = 5, Y = faces[face2][x, 2046] }; // 66% reg / 33% orig
-                        points[4] = new PointD { X = 6, Y = faces[face2][x, 2045] }; // 33% reg / 66% orig
+                        points[1] = new PointD { X = 1, Y = faces[face1][x, 2] };
+                        points[2] = new PointD { X = 2, Y = faces[face1][x, 1] };
+                        //                      skip 3                   x, 0
+                        //                      skip 4                   x, 2047
+                        points[3] = new PointD { X = 5, Y = faces[face2][x, 2046] };
+                        points[4] = new PointD { X = 6, Y = faces[face2][x, 2045] };
                         points[5] = new PointD { X = 7, Y = faces[face2][x, 2044] };
-                        LinearRegression(points, out var slope, out var yIntercept);
-                        var _66 = 2.0 / 3.0;
-                        var _33 = 1.0 / 3.0;
-                        faces[face1][x, 2] = faces[face1][x, 2] * _66 + ((1 * slope + yIntercept) * _33);
-                        faces[face1][x, 1] = faces[face1][x, 1] * _33 + ((2 * slope + yIntercept) * _66);
-                        faces[face1][x, 0] = 3 * slope + yIntercept;
-                        faces[face2][x, 2047] = 4 * slope + yIntercept;
-                        faces[face2][x, 2046] = faces[face2][x, 2046] * _33 + ((5 * slope + yIntercept) * _66);
-                        faces[face2][x, 2045] = faces[face2][x, 2045] * _66 + ((6 * slope + yIntercept) * _33);
+                        //Debug.WriteLine("");
+                        //Debug.WriteLine("3: " + faces[face1][x, 0]);
+                        //Debug.WriteLine("4: " + faces[face2][x, 2047]);
+                        PolynomialRegression(points, out regFunc);
+                        faces[face1][x, 0] = regFunc(3);
+                        faces[face2][x, 2047] = regFunc(4);
+                        //Debug.WriteLine("3: " + faces[face1][x, 0]);
+                        //Debug.WriteLine("4: " + faces[face2][x, 2047]);
                     }
                 }));
             }
+
+            Task.WhenAll(tasks).GetAwaiter().GetResult();
+            return;
 
             // Equator:
             CubeMapFace[][] equator = new CubeMapFace[][]
@@ -94,16 +102,18 @@ namespace PlanetCreator
                     for (int y = 0; y < TileWidth; ++y)
                     {
                         if (token.IsCancellationRequested) return;
-                        PointD[] points = new PointD[4];
-                        points[0] = new PointD { X = 1, Y = faces[face1][2045, y] };
-                        points[1] = new PointD { X = 2, Y = faces[face1][2046, y] };
+                        PointD[] points = new PointD[6];
+                        points[0] = new PointD { X = 0, Y = faces[face1][2044, y] };
+                        points[1] = new PointD { X = 1, Y = faces[face1][2045, y] };
+                        points[2] = new PointD { X = 2, Y = faces[face1][2046, y] };
                         //                      skip 3                   2047, y
                         //                      skip 4                   0, y
-                        points[2] = new PointD { X = 5, Y = faces[face2][1, y] };
-                        points[3] = new PointD { X = 6, Y = faces[face2][2, y] };
-                        LinearRegression(points, out var slope, out var yIntercept);
-                        faces[face1][2047, y] = 3 * slope + yIntercept;
-                        faces[face2][0, y] = 4 * slope + yIntercept;
+                        points[3] = new PointD { X = 5, Y = faces[face2][1, y] };
+                        points[4] = new PointD { X = 6, Y = faces[face2][2, y] };
+                        points[5] = new PointD { X = 7, Y = faces[face2][3, y] };
+                        PolynomialRegression(points, out regFunc);
+                        faces[face1][2047, y] = regFunc(3);
+                        faces[face2][0, y] = regFunc(4);
                     }
                 }));
             }
@@ -225,6 +235,7 @@ namespace PlanetCreator
             Task.WhenAll(tasks).GetAwaiter().GetResult();
         }
 
+        // Special thanks to ChatGPT for these regression codes.
         static void LinearRegression(PointD[] points, out double slope, out double yIntercept)
         {
             // Calculate the mean of x and y
@@ -248,6 +259,37 @@ namespace PlanetCreator
             }
             slope = numerator / denominator;
             yIntercept = y_mean - slope * x_mean;
+        }
+
+        static void PolynomialRegression(PointD[] points, out Func<double,double> regFunc)
+        {
+            // Debug.WriteLine("PolyReg");
+            double[] xValues = new double[points.Length];
+            double[] yValues = new double[points.Length];
+            for (int i = 0; i < points.Length; i++)
+            {
+                xValues[i] = points[i].X;
+                yValues[i] = points[i].Y;
+                //Debug.WriteLine(points[i].Y);
+            }
+
+            // Create the design matrix with columns for x, x^2, x^3, and x^4
+            var designMatrix = Matrix<double>.Build.DenseOfRowArrays(
+                xValues.Select(x => new double[] { 1.0, x, x * x, x * x * x, x * x * x * x }).ToArray());
+
+            // Fit the model using least squares regression
+            var regression = MultipleRegression.NormalEquations(designMatrix, Vector<double>.Build.Dense(yValues));
+
+            // Get the coefficients of the fitted polynomial
+            var coeff = regression.ToArray();
+
+            //Debug.WriteLine("Coeff:");
+            //foreach (var d in coeff) { Debug.WriteLine(d); }
+
+            regFunc = xx =>
+            {
+                return coeff[0] + coeff[1] * xx + coeff[2] * Math.Pow(xx, 2) + coeff[3] * Math.Pow(xx, 3) + coeff[4] * Math.Pow(xx, 4);
+            };
         }
     }
 }
