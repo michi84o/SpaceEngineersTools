@@ -154,7 +154,7 @@ namespace PlanetCreator
             }
 
             // Fix glitches at border of cubemaps
-            //EdgeFixer.MakeSeemless(_faces, token);
+            EdgeFixer.MakeSeemless(_faces, token);
 
             if (token.IsCancellationRequested) return;
             if (_debug)
@@ -251,6 +251,9 @@ namespace PlanetCreator
             {
                 MakeLakes(token);
             }
+
+            // Fix glitches at border of cubemaps, again since erosion does not care about duplicate edge pixels
+            EdgeFixer.MakeSeemless(_faces, token);
 
             ProgressChanged?.Invoke(this, new ProgressEventArgs(95));
 

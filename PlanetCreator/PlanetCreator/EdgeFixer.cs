@@ -1,5 +1,6 @@
 ﻿using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.LinearRegression;
+using SixLabors.ImageSharp.ColorSpaces.Conversion;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -27,20 +28,75 @@ namespace PlanetCreator
 
         static void ApplyPolyRegression(List<PointWrapper> edgePoints)
         {
+            // The caveat about the cubemap edges: Adjacent pixels of two cubemaps must have the same value!
+            // Our procedurally generated map does not have these duplicates.
+            // In order to create duplicates we need to adjust the regression
+            // Before we have these x coordinates:
+            // 0 1 2 3 4 5 6 7 8 9
+            // Coordinate #5 must be duplicated from 4. It is basically beeing skipped
+            // Resulting x values:
+            // 0 1 2 3 4 4 5 6 7 8
+
+            //Debug.WriteLine("REG PRE");
+            //for (int i = 0; i < 10; ++i)
+            //{
+            //    Debug.WriteLine(edgePoints[i].GetValue());
+            //}
+
             PointD[] points = new PointD[6];
             int nextIndex = 0;
             for (int i = 0; i < 10; ++i)
             {
                 if (i >= 3 && i <= 6) continue;
+                var x = i;
+                if (x > 6) --x; // <- Pixel skip for duplicating
                 points[nextIndex++] = new PointD { X = i, Y = edgePoints[i].GetValue() };
             }
+
+            //Debug.WriteLine("REG PTS Y");
+            //for (int i = 0; i < points.Length; ++i)
+            //{
+            //    Debug.WriteLine(points[i].Y);
+            //}
+            //Debug.WriteLine("REG PTS X");
+            //for (int i = 0; i < points.Length; ++i)
+            //{
+            //    Debug.WriteLine(points[i].X);
+            //}
+
             PolynomialRegression(points, out var regFunc);
             // 0 1 2 3 4 5 6 7 8 9
             //       | | | |        <- these are skipped and reconstructed
-            for (int i = 4; i <= 6; ++i)
-                edgePoints[i].SetValue(regFunc(i));
-        }
+            edgePoints[3].SetValue(regFunc(3));
+            edgePoints[4].SetValue(regFunc(4));
+            edgePoints[5].SetValue(regFunc(4));
+            edgePoints[6].SetValue(regFunc(5));
 
+            // Blend calculated points with original points
+            // Remember X Mapping
+            // 0 1 2 3 4 5 6 7 8 9
+            // 0 1 2 3 4 4 5 6 7 8
+            // | | |         | | | <- these are beeing set here:
+            double[] factors = new double[] { 1.0 / 6.0, 1.0 / 3.0, 2.0 / 3.0 };
+            // 0;9 : 16%
+            edgePoints[0].SetValue((regFunc(0) * factors[0]) + (edgePoints[0].GetValue() * (1 - factors[0])));
+            edgePoints[9].SetValue((regFunc(8) * factors[0]) + (edgePoints[9].GetValue() * (1 - factors[0])));
+            // 1;8 : 33%
+            edgePoints[1].SetValue((regFunc(1) * factors[1]) + (edgePoints[1].GetValue() * (1 - factors[1])));
+            edgePoints[8].SetValue((regFunc(7) * factors[1]) + (edgePoints[8].GetValue() * (1 - factors[1])));
+            // 2;7 : 66%
+            edgePoints[2].SetValue((regFunc(2) * factors[2]) + (edgePoints[2].GetValue() * (1 - factors[2])));
+            edgePoints[7].SetValue((regFunc(6) * factors[2]) + (edgePoints[7].GetValue() * (1 - factors[2])));
+
+            //Debug.WriteLine("REG POST");
+            //for (int i = 0; i < 10; ++i)
+            //{
+            //    Debug.WriteLine(edgePoints[i].GetValue());
+            //}
+        }
+        //static object LL = new object();
+
+        // BAD! Creates sudden junps on steep terrain
         static void ApplyBlend(List<PointWrapper> edgePoints)
         {
             double[] copy = new double[10];
@@ -58,9 +114,6 @@ namespace PlanetCreator
         {
             ApplyPolyRegression(edgePoints);
             //ApplyBlend(edgePoints);
-            //ApplyBlend(edgePoints);
-            //ApplyBlend(edgePoints);
-            //ApplyBlend(edgePoints);
         }
 
         public static void MakeSeemless(Dictionary<CubeMapFace, double[,]> faces, CancellationToken token)
@@ -70,6 +123,8 @@ namespace PlanetCreator
             // Fix cubemap edges if there are sudden jumps
             List<Task> tasks = new List<Task>();
 
+            // IMPORTANT: Edge pixels must always be duplicated. This means the cubemaps always overlay by one pixel
+
             // Strategy: polynomial regression:
             // Glitched terrain looks like this:
             //       /
@@ -78,15 +133,9 @@ namespace PlanetCreator
             //   /
             //  /
             //x:123456
-            // To fix this, we ignore points at location 3+4
-            // Take 4 other points (1,2,5,6), calculate polynomial regression,
-            // then calculate points 3+4 from it.
-
-            // Since this does not fix everything, we also apply some blending afterwards:
-            // Blend pixels:
-            // a b c ][ d e f
-            // Schema:  c = 0.5c + 0.25b + 0.25d
-            // Apply for b,c,d,e
+            // To fix this, we ignore n points at the edges
+            // Take other points further away from edge and calculate polynomial regression,
+            // then calculate ignore points from it
 
             // Front <-> Up
             // Down <-> Back
@@ -118,10 +167,14 @@ namespace PlanetCreator
                             new PointWrapper(()=>faces[face2][x, 2044], d => faces[face2][x, 2044] = d),
                             new PointWrapper(()=>faces[face2][x, 2043], d => faces[face2][x, 2043] = d),
                         };
+                        //if (x == 1880) Debugger.Break();
                         ApplyEdgeFix(edgePoints);
                     }
                 }));
             }
+
+            //Task.WhenAll(tasks).GetAwaiter().GetResult();
+            //return;
 
             // Equator:
             CubeMapFace[][] equator = new CubeMapFace[][]
