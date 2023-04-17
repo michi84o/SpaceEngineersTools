@@ -1126,7 +1126,7 @@ namespace PlanetCreator
 
     }
 
-    enum CubeMapFace
+    public enum CubeMapFace
     {
         Front,
         Back,

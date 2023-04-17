@@ -23,7 +23,7 @@ namespace PlanetCreator
         void DebugClearPixels(CubeMapFace face);
     }
 
-    class MainWindowViewModel : PropChangeNotifier, IDebugOverlay
+    public class MainWindowViewModel : PropChangeNotifier, IDebugOverlay
     {
         BitmapImage _tileUp;
         public BitmapImage TileUp
@@ -506,7 +506,7 @@ namespace PlanetCreator
 
         public ICommand EdgeFixCommand => new RelayCommand(o =>
         {
-            MessageBox.Show("This is test code to test edge fix code.\r\nWarning! It will override your files!\r\nClose the next dialog to abort.");
+            MessageBox.Show("Select one of the files to be fixed.\r\nI will fix all 6 cube map files that belong to this file.\r\nWarning! It will override your files!\r\nClose the next dialog to abort.");
             var dlg = new OpenFileDialog();
             dlg.Filter = "PNG Files|*.png";
             if (dlg.ShowDialog() != true) return;
@@ -522,6 +522,7 @@ namespace PlanetCreator
                 "right.png",
                 "up.png",
             };
+            string filesList = "";
             foreach (var file in files)
             {
                 var fileName = Path.Combine(folder, file);
@@ -529,7 +530,12 @@ namespace PlanetCreator
                 {
                     MessageBox.Show(file + " is missing!", "Missing file", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
+                else filesList += fileName + "\r\n";
             }
+
+            if (MessageBox.Show("Please confirm that these files should be overriden:\r\n" + filesList.TrimEnd(), "Question", MessageBoxButton.YesNo) != MessageBoxResult.Yes)
+                return;
+
             Dictionary<CubeMapFace, double[,]> images = new();
             CubeMapFace[] faces = new[]
             {
@@ -597,6 +603,7 @@ namespace PlanetCreator
                     return;
                 }
             }
+            MessageBox.Show("Finished!");
         });
 
     }
