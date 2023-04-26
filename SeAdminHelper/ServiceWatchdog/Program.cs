@@ -50,7 +50,7 @@ namespace ServiceWatchdog
         }
 
         static async Task WatchdogTask(string serviceName)
-        {            
+        {
             DateTime now = DateTime.Now;
             while (now < ShutDownTime)
             {
@@ -64,10 +64,10 @@ namespace ServiceWatchdog
                         }
                     }
                 }
-                catch { }                
+                catch { }
                 await Task.Delay(30000);
                 now = DateTime.Now;
-            }                       
+            }
         }
     }
 }

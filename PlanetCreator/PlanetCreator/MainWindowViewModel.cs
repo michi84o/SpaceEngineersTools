@@ -246,7 +246,7 @@ namespace PlanetCreator
             get => _octaves;
             set => SetProp(ref _octaves, value);
         }
-        int _erosionIterations = 1000000;
+        int _erosionIterations = 2500000;
         public int ErosionIterations
         {
             get => _erosionIterations;
@@ -264,7 +264,7 @@ namespace PlanetCreator
             get => _erosionInteria;
             set => SetProp(ref _erosionInteria, value);
         }
-        double _erosionSedimentCapacityFactor = 25;
+        double _erosionSedimentCapacityFactor = 35;
         public double ErosionSedimentCapacityFactor
         {
             get => _erosionSedimentCapacityFactor;
@@ -282,13 +282,13 @@ namespace PlanetCreator
             get => _erosionErodeSpeed;
             set => SetProp(ref _erosionErodeSpeed, value);
         }
-        double _erosionDepositBrush = 3;
+        double _erosionDepositBrush = 2;
         public double ErosionDepositBrush
         {
             get => _erosionDepositBrush;
             set => SetProp(ref _erosionDepositBrush, value);
         }
-        double _erosionErodeBrush = 3;
+        double _erosionErodeBrush = 2;
         public double ErosionErodeBrush
         {
             get => _erosionErodeBrush;
