@@ -23,7 +23,7 @@ namespace SpaceEngineersOreRedistribution
         public Bitmap GetHeightMap()
         {
             var file = FileName.Replace("_mat", "");
-            if (!File.Exists(file)) return null;
+            if (!File.Exists(file)) return new System.Drawing.Bitmap(2048,2048);
             using var image = System.Drawing.Image.FromFile(file);
             return new System.Drawing.Bitmap(image);
         }
