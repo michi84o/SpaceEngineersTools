@@ -41,3 +41,7 @@ Area with hydralic erosion:
 In a separate step, droplets are simulated to find the locally lowest points and use them to generate lakes:
 This feature is not finished yet, WIP.
 ![Screenshot of planet creator](Screenshots/LakeBedFinder.jpg)
+
+## HeightMapEdgeFixer
+
+Exposes the edge fixer of PlanetCreator. This simple tool can be used to fix the edges of existing planet height maps like the vanilla ones. PNGs must be 16 bit grayscale and have a size of 2048x2048 pixels.
