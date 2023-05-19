@@ -36,63 +36,94 @@ namespace PlanetCreator
             // Coordinate #5 must be duplicated from 4. It is basically beeing skipped
             // Resulting x values:
             // 0 1 2 3 4 4 5 6 7 8
-
-            //Debug.WriteLine("REG PRE");
-            //for (int i = 0; i < 10; ++i)
-            //{
-            //    Debug.WriteLine(edgePoints[i].GetValue());
-            //}
-
-            PointD[] points = new PointD[6];
+            //       * * * *  <- following for() skips these
             int nextIndex = 0;
-            for (int i = 0; i < 10; ++i)
+
+            int version = 2;
+
+            if (version == 1)
             {
-                if (i >= 3 && i <= 6) continue;
-                var x = i;
-                if (x > 6) --x; // <- Pixel skip for duplicating
-                points[nextIndex++] = new PointD { X = i, Y = edgePoints[i].GetValue() };
+                PointD[] points = new PointD[6];
+                for (int i = 0; i < 10; ++i)
+                {
+                    if (i >= 3 && i <= 6) continue;
+                    var x = i;
+                    if (x > 6) --x; // <- Pixel skip for duplicating
+                    points[nextIndex++] = new PointD { X = i, Y = edgePoints[i].GetValue() };
+                }
+
+                PolynomialRegression(points, out var regFunc);
+                // 0 1 2 3 4 5 6 7 8 9
+                //       | | | |        <- these are skipped and reconstructed
+                edgePoints[3].SetValue(regFunc(3));
+                edgePoints[4].SetValue(regFunc(4));
+                edgePoints[5].SetValue(regFunc(4));
+                edgePoints[6].SetValue(regFunc(5));
+
+                // Blend calculated points with original points
+                // Remember X Mapping
+                // 0 1 2 3 4 5 6 7 8 9
+                // 0 1 2 3 4 4 5 6 7 8
+                // | | |         | | | <- these are beeing set here:
+                double[] factors = new double[] { 1.0 / 6.0, 1.0 / 3.0, 2.0 / 3.0 };
+                // 0;9 : 16%
+                edgePoints[0].SetValue((regFunc(0) * factors[0]) + (edgePoints[0].GetValue() * (1 - factors[0])));
+                edgePoints[9].SetValue((regFunc(8) * factors[0]) + (edgePoints[9].GetValue() * (1 - factors[0])));
+                // 1;8 : 33%
+                edgePoints[1].SetValue((regFunc(1) * factors[1]) + (edgePoints[1].GetValue() * (1 - factors[1])));
+                edgePoints[8].SetValue((regFunc(7) * factors[1]) + (edgePoints[8].GetValue() * (1 - factors[1])));
+                // 2;7 : 66%
+                edgePoints[2].SetValue((regFunc(2) * factors[2]) + (edgePoints[2].GetValue() * (1 - factors[2])));
+                edgePoints[7].SetValue((regFunc(6) * factors[2]) + (edgePoints[7].GetValue() * (1 - factors[2])));
+            }
+            else if (version == 2)
+            {
+                PointD[] points = new PointD[8];
+                // Version 2: We only skip the edge points
+
+                // Before we have these x coordinates:
+                // 0 1 2 3 4 5 6 7 8 9
+                // Resulting x values:
+                // 0 1 2 3 4 4 5 6 7 8
+                //         * *    <- following for() skips these
+                for (int i = 0; i < 10; ++i)
+                {
+                    if (i == 4 || i == 5) continue;
+                    var x = i;
+                    if (x > 6) --x; // <- Pixel skip for duplicating
+                    points[nextIndex++] = new PointD { X = i, Y = edgePoints[i].GetValue() };
+                }
+
+                PolynomialRegression(points, out var regFunc);
+                // 0 1 2 3 4 5 6 7 8 9
+                //         | |          <- these are skipped and reconstructed
+                edgePoints[4].SetValue(regFunc(4));
+                edgePoints[5].SetValue(regFunc(4));
+
+                // Blend calculated points with original points
+                // Remember X Mapping
+                // 0 1 2 3 4 5 6 7 8 9
+                // 0 1 2 3 4 4 5 6 7 8
+
+                double[] factors = new double[] { 0.12, 0.25, 0.5, 0.8, 0.8 };
+                // 0;9 : 10%
+                edgePoints[0].SetValue((regFunc(0) * factors[0]) + (edgePoints[0].GetValue() * (1 - factors[0])));
+                edgePoints[9].SetValue((regFunc(8) * factors[0]) + (edgePoints[9].GetValue() * (1 - factors[0])));
+                // 1;8 : 30%
+                edgePoints[1].SetValue((regFunc(1) * factors[1]) + (edgePoints[1].GetValue() * (1 - factors[1])));
+                edgePoints[8].SetValue((regFunc(7) * factors[1]) + (edgePoints[8].GetValue() * (1 - factors[1])));
+                // 2;7 : 60%
+                edgePoints[2].SetValue((regFunc(2) * factors[2]) + (edgePoints[2].GetValue() * (1 - factors[2])));
+                edgePoints[7].SetValue((regFunc(6) * factors[2]) + (edgePoints[7].GetValue() * (1 - factors[2])));
+                // 3,6 : 80 %
+                edgePoints[3].SetValue((regFunc(3) * factors[3]) + (edgePoints[3].GetValue() * (1 - factors[3])));
+                edgePoints[6].SetValue((regFunc(5) * factors[3]) + (edgePoints[6].GetValue() * (1 - factors[3])));
+                //// 4,5 : 80 %
+                //double avg = (edgePoints[4].GetValue() + edgePoints[5].GetValue()) / 2;
+                //edgePoints[4].SetValue((regFunc(4) * factors[4]) + (avg * (1 - factors[4])));
+                //edgePoints[5].SetValue((regFunc(4) * factors[4]) + (avg * (1 - factors[4])));
             }
 
-            //Debug.WriteLine("REG PTS Y");
-            //for (int i = 0; i < points.Length; ++i)
-            //{
-            //    Debug.WriteLine(points[i].Y);
-            //}
-            //Debug.WriteLine("REG PTS X");
-            //for (int i = 0; i < points.Length; ++i)
-            //{
-            //    Debug.WriteLine(points[i].X);
-            //}
-
-            PolynomialRegression(points, out var regFunc);
-            // 0 1 2 3 4 5 6 7 8 9
-            //       | | | |        <- these are skipped and reconstructed
-            edgePoints[3].SetValue(regFunc(3));
-            edgePoints[4].SetValue(regFunc(4));
-            edgePoints[5].SetValue(regFunc(4));
-            edgePoints[6].SetValue(regFunc(5));
-
-            // Blend calculated points with original points
-            // Remember X Mapping
-            // 0 1 2 3 4 5 6 7 8 9
-            // 0 1 2 3 4 4 5 6 7 8
-            // | | |         | | | <- these are beeing set here:
-            double[] factors = new double[] { 1.0 / 6.0, 1.0 / 3.0, 2.0 / 3.0 };
-            // 0;9 : 16%
-            edgePoints[0].SetValue((regFunc(0) * factors[0]) + (edgePoints[0].GetValue() * (1 - factors[0])));
-            edgePoints[9].SetValue((regFunc(8) * factors[0]) + (edgePoints[9].GetValue() * (1 - factors[0])));
-            // 1;8 : 33%
-            edgePoints[1].SetValue((regFunc(1) * factors[1]) + (edgePoints[1].GetValue() * (1 - factors[1])));
-            edgePoints[8].SetValue((regFunc(7) * factors[1]) + (edgePoints[8].GetValue() * (1 - factors[1])));
-            // 2;7 : 66%
-            edgePoints[2].SetValue((regFunc(2) * factors[2]) + (edgePoints[2].GetValue() * (1 - factors[2])));
-            edgePoints[7].SetValue((regFunc(6) * factors[2]) + (edgePoints[7].GetValue() * (1 - factors[2])));
-
-            //Debug.WriteLine("REG POST");
-            //for (int i = 0; i < 10; ++i)
-            //{
-            //    Debug.WriteLine(edgePoints[i].GetValue());
-            //}
         }
         //static object LL = new object();
 
