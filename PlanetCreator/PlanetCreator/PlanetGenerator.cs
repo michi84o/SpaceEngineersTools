@@ -983,7 +983,7 @@ namespace PlanetCreator
             int coordX = (int)pos.X;
             int coordY = (int)pos.Y;
             // Calculate droplet's offset inside the cell (0,0) = at NW node, (1,1) = at SE node
-            // Remarks x and y are not coordinates, but offsets!
+            // Remarks: x and y are not coordinates, but offsets!
             double x = pos.X - coordX;
             double y = pos.Y - coordY;
 

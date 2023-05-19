@@ -359,65 +359,48 @@ namespace SpaceEngineersOreRedistribution
                 if (value == null) return;
 
                 List<OreMapping> oreMappings = null;
-
                 if (SelectedOreType != null && OreMappings != null && OreMappings.Count > 0)
                 {
                     oreMappings = OreMappings.ToList();
                 }
-                System.Drawing.Bitmap b;
-                if (ShowGradients)
-                {
-                    b = value.CalculateGradients();
-                }
-                else
-                {
-                    b = value.GetHeightMap();
-                }
-                if (ShowOreLocations)
-                {
-                    var oreMap = value.ShowOre(b, oreMappings);
-                    b.Dispose();
-                    b = oreMap;
-                }
-
-                var img = ImageData.FromBitmap(b);
-                b.Dispose();
+                var image = value.CreateBitmapImage(!ShowGradients, ShowOreLocations, true, oreMappings, false);
 
                 switch (key)
                 {
-                    case "back": TileBack = img; break;
-                    case "down": TileDown = img; break;
-                    case "front": TileFront = img; break;
-                    case "left": TileLeft = img; break;
-                    case "right": TileRight = img; break;
-                    case "up": TileUp = img; break;
+                    case CubeMapFace.Back: TileBack = image; break;
+                    case CubeMapFace.Down: TileDown = image; break;
+                    case CubeMapFace.Front: TileFront = image; break;
+                    case CubeMapFace.Left: TileLeft = image; break;
+                    case CubeMapFace.Right: TileRight = image; break;
+                    case CubeMapFace.Up: TileUp = image; break;
                 }
             }
         }
 
+        Dictionary<CubeMapFace, ImageData> _images = new();
+
         void LoadImages()
         {
             ClearImages();
-            _images["back"] = GetInfo("back_mat.png");
-            _images["down"] = GetInfo("down_mat.png");
-            _images["front"] = GetInfo("front_mat.png");
-            _images["left"] = GetInfo("left_mat.png");
-            _images["right"] = GetInfo("right_mat.png");
-            _images["up"] = GetInfo("up_mat.png");
+            _images[CubeMapFace.Back] = GetInfo(CubeMapFace.Back);
+            _images[CubeMapFace.Down] = GetInfo(CubeMapFace.Down);
+            _images[CubeMapFace.Front] = GetInfo(CubeMapFace.Front);
+            _images[CubeMapFace.Left] = GetInfo(CubeMapFace.Left);
+            _images[CubeMapFace.Right] = GetInfo(CubeMapFace.Right);
+            _images[CubeMapFace.Up] = GetInfo(CubeMapFace.Up);
             UpdateImages();
         }
 
-        ImageData GetInfo(string pngName)
+        ImageData GetInfo(CubeMapFace face)
         {
             var dir = Path.GetDirectoryName(_lastOpenedFile);
             var imageDir = Path.Combine(dir, "PlanetDataFiles", SelectedPlanetDefinition.Name);
             if (!Directory.Exists(imageDir)) return null;
-            var file = Path.Combine(imageDir, pngName);
-            if (!File.Exists(file)) return null;
-            return new ImageData() { FileName = file };
+            return ImageData.Create(imageDir, face);
         }
 
-        Dictionary<string, ImageData> _images = new();
+        Dictionary<CubeMapFace, ImageData> _materialMaps = new();
+        Dictionary<CubeMapFace, ImageData> _heightMaps = new();
 
         public ICommand NoiseMapGeneratorCommand => new RelayCommand(o =>
         {
@@ -427,9 +410,6 @@ namespace SpaceEngineersOreRedistribution
 
         public ICommand RedistributeOreCommand => new RelayCommand(o =>
         {
-            //MessageBox.Show("WIP, Sorry not implemented yet!");
-            //return;
-
             var sfd = new SaveFileDialog();
             sfd.Filter = "PNG Files|*.png";
             sfd.FileName = "specifyFolder.png";
@@ -532,31 +512,31 @@ namespace SpaceEngineersOreRedistribution
                     overridefiles = true;
                 }
 
-                // Final touch: Create the 'add' file:
-                // All ore locations are drawn with a red value of 144 onto a black image
-                var addFileName = Path.Combine(directory, key + "_add.png");
-                using var bmap = new System.Drawing.Bitmap(2048, 2048, PixelFormat.Format32bppArgb);
-                var lbmap = new LockBitmap(bmap);
-                lbmap.LockBits();
+                //using var bmap = new System.Drawing.Bitmap(2048, 2048, PixelFormat.Format32bppArgb);
+                //var lbmap = new LockBitmap(bmap);
+                //lbmap.LockBits();
 
-                using var gradients = value.CalculateGradients();
-                using var materialMap = value.GetBitmap();
+                //using var gradients = value.CalculateGradients();
+                //using var materialMap = value.GetBitmap();
 
-                var g = new LockBitmap(gradients);
-                var m = new LockBitmap(materialMap);
-                g.LockBits();
-                m.LockBits();
+                //var g = new LockBitmap(gradients);
+                //var m = new LockBitmap(materialMap);
+                //g.LockBits();
+                //m.LockBits();
+
+                var image = new ImageData(key);
 
                 // Clear ores: Blue = 255
-                for (int x = 0; x < 2048; ++x)
+                Parallel.For(0, 2048, x =>
                 {
-                    for (int y = 0; y < 2048; ++y)
+                    Parallel.For(0, 2048, y =>
                     {
-                        var px = m.GetPixel(x, y);
-                        m.SetPixel(x, y, System.Drawing.Color.FromArgb(px.R, px.G, 255));
-                        lbmap.SetPixel(x, y, System.Drawing.Color.FromArgb(255, 0, 0, 0));
-                    }
-                }
+                        image.R[x, y] = value.R[x, y];
+                        image.G[x, y] = value.G[x, y];
+                        image.B[x, y] = 255;
+                    });
+                });
+
                 int spawnRate = setup.ViewModel.OreSpawnRate; // Default 3000
                 if (spawnRate < 100) spawnRate = 100;
                 else if (spawnRate > 2000000) spawnRate = 2000000;
@@ -725,21 +705,12 @@ namespace SpaceEngineersOreRedistribution
 
                         foreach (var drawn in drawnOre)
                         {
-                            var px = m.GetPixel(drawn.X, drawn.Y);
-                            m.SetPixel(drawn.X, drawn.Y, System.Drawing.Color.FromArgb(px.R, px.G, drawn.Value));
-                            lbmap.SetPixel(drawn.X, drawn.Y, System.Drawing.Color.FromArgb(255,144, 0, 0));
+                            image.B[drawn.X, drawn.Y] = (byte)drawn.Value;
+
                         }
                     }
                 }
-
-                g.UnlockBits();
-                m.UnlockBits();
-
-                materialMap.Save(fileName);
-
-                lbmap.UnlockBits();
-                bmap.Save(addFileName);
-
+                image.SaveMaterialMap(fileName);
             }
             MessageBox.Show("Finished!\r\nPlease copy the pngs to the 'PlanetDataFiles\\PlanetName' folder.\r\nThen open the planet definition SBC\r\nand copy the content of 'oremappings.xml' to the corresponding section.", "Ore Redistribution", MessageBoxButton.OK, MessageBoxImage.Information);
         },
