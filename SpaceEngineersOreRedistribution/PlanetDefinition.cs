@@ -13,6 +13,7 @@ namespace SpaceEngineersOreRedistribution
         public ObservableCollection<OreMapping> OreMappings { get; } = new();
         public ObservableCollection<MaterialType> MaterialTypes { get; } = new();
         public ObservableCollection<EnvironmentItem> EnvironmentItems { get; } = new();
+        public ObservableCollection<ComplexMaterial> ComplexMaterials { get; } = new();
 
     }
 }

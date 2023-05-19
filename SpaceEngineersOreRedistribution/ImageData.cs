@@ -125,7 +125,7 @@ namespace SpaceEngineersOreRedistribution
             R = B = G = H = HGrad = null;
         }
 
-        public BitmapImage CreateBitmapImage(bool heightMap, bool ore, bool lakes, List<OreMapping> oreMappings, bool biomes, int? selectedBiome)
+        public BitmapImage CreateBitmapImage(bool heightMap, bool ore, bool complexMaterials, int? selectedComplexMaterial, List<OreMapping> oreMappings, bool biomes, int? selectedBiome)
         {
             using MemoryStream memory = new MemoryStream();
             var image = new Image<Rgb24>(2048, 2048);
@@ -159,12 +159,15 @@ namespace SpaceEngineersOreRedistribution
                         }
                     }
                     // Lakes
-                    if (lakes && R[x, y] > 0)
+                    if (complexMaterials && selectedComplexMaterial != null)
                     {
-                        double blend = 0.4;
-                        var newRed = (int)((blend * R[x, y]) + (1-blend) * r + .5);
-                        if (newRed > 255) newRed = 255;
-                        r = (byte)newRed; g = 0; b = 0;
+                        if (R[x, y] == selectedComplexMaterial.Value)
+                        {
+                            double blend = 0.4;
+                            var newRed = (int)((blend * 82) + (1 - blend) * r + .5);
+                            if (newRed > 255) newRed = 255;
+                            r = (byte)newRed; g = 0; b = 0;
+                        }
                     }
                     // Ore
                     if (ore && B[x,y] != 255)

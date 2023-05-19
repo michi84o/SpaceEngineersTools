@@ -15,6 +15,7 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
@@ -31,7 +32,7 @@
             <MenuItem Header="Map">
                 <CheckBox Content="Show Ore Locations" IsChecked="{Binding ShowOreLocations, UpdateSourceTrigger=PropertyChanged}" />
                 <CheckBox Content="Show Gradients" IsChecked="{Binding ShowGradients, UpdateSourceTrigger=PropertyChanged}" />
-                <CheckBox Content="Show Lakes" IsChecked="{Binding ShowLakes, UpdateSourceTrigger=PropertyChanged}" />
+                <CheckBox Content="Show Lakes (Complex Materials)" IsChecked="{Binding ShowLakes, UpdateSourceTrigger=PropertyChanged}" />
                 <CheckBox Content="Show Biomes" IsChecked="{Binding ShowBiomes, UpdateSourceTrigger=PropertyChanged}" />
             </MenuItem>
             <MenuItem Header="Redistribute Ore" Command="{Binding RedistributeOreCommand}" />
@@ -52,16 +53,22 @@
             Grid.Row="2" Grid.Column="0" VerticalAlignment="Top" HorizontalAlignment="Right"
             Content="Deselect" Margin="0,3,9,0" FontSize="8" Command="{Binding DeselectOreTypeCommand}"   />
         <GroupBox
-            Grid.Row="3" Grid.Column="0" Header="Environment" MinWidth="150" Margin="3">
+            Grid.Row="3" Grid.Column="0" Header="Complex Materials" MinWidth="150" Margin="3">
+            <ListBox
+                ItemsSource="{Binding ComplexMaterials}"
+                SelectedItem="{Binding SelectedComplexMaterial}"/>
+        </GroupBox>
+        <GroupBox
+            Grid.Row="4" Grid.Column="0" Header="Environment" MinWidth="150" Margin="3">
             <ListBox
                 ItemsSource="{Binding EnvironmentItems}"
                 SelectedItem="{Binding SelectedEnvironmentItem}"/>
         </GroupBox>
         <Button
-            Grid.Row="3" Grid.Column="0" VerticalAlignment="Top" HorizontalAlignment="Right"
+            Grid.Row="4" Grid.Column="0" VerticalAlignment="Top" HorizontalAlignment="Right"
             Content="Deselect" Margin="0,3,9,0" FontSize="8" Command="{Binding DeselectEvironmentItemCommand}"   />
         <Grid
-            Grid.Row="1" Grid.Column="1" Grid.RowSpan="3">
+            Grid.Row="1" Grid.Column="1" Grid.RowSpan="4">
             <Grid.RowDefinitions>
                 <RowDefinition/>
                 <RowDefinition Height="Auto"/>
@@ -171,7 +178,7 @@
         </Grid>
 
         <GroupBox
-            Grid.Row="1" Grid.Column="3" Grid.RowSpan="3" Header="Map" Margin="3">
+            Grid.Row="1" Grid.Column="3" Grid.RowSpan="4" Header="Map" Margin="3">
             <Border Margin="3" x:Name="BorderView" ClipToBounds="True" Background="Gray">
                 <Canvas x:Name="ImageView" Width="8192" Height="6144" Background="DarkGray">
                     <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="0" Canvas.Top="0" Source="{Binding TileUp}" />

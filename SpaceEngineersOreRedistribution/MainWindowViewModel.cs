@@ -46,6 +46,7 @@ namespace SpaceEngineersOreRedistribution
                 ClearImages();
                 OreTypes.Clear();
                 EnvironmentItems.Clear();
+                ComplexMaterials.Clear();
                 if (value == null)
                 {
                     return;
@@ -57,7 +58,10 @@ namespace SpaceEngineersOreRedistribution
                 }
                 foreach (var type in types)
                     OreTypes.Add(type);
-
+                foreach (var item in value.ComplexMaterials)
+                {
+                    ComplexMaterials.Add(item);
+                }
                 foreach (var item in value.EnvironmentItems)
                 {
                     EnvironmentItems.Add(item);
@@ -150,6 +154,22 @@ namespace SpaceEngineersOreRedistribution
         {
             get => _ignoreOreMappingsForRedestribution;
             set => SetProp(ref _ignoreOreMappingsForRedestribution, value);
+        }
+
+        public ObservableCollection<ComplexMaterial> ComplexMaterials { get; } = new();
+        ComplexMaterial _selectedComplexMaterial;
+        int _lastComplexMaterial;
+        public ComplexMaterial SelectedComplexMaterial
+        {
+            get => _selectedComplexMaterial;
+            set
+            {
+                SetProp(ref _selectedComplexMaterial, value);
+                var number = value?.Value ?? 0;
+                if (ShowLakes && !_updatingImages && number != _lastComplexMaterial)
+                    UpdateImages();
+                _lastComplexMaterial = number;
+            }
         }
 
         public ObservableCollection<EnvironmentItem> EnvironmentItems { get; } = new();
@@ -306,6 +326,21 @@ namespace SpaceEngineersOreRedistribution
                 }
             }
 
+            var complexMaterials = definition.Element("ComplexMaterials");
+            if (complexMaterials != null)
+            {
+                foreach ( var complexMaterial in complexMaterials.Elements("MaterialGroup"))
+                {
+                    var name = complexMaterial.Attribute("Name")?.Value;
+                    var value = complexMaterial.Attribute("Value")?.Value;
+                    if (int.TryParse(value, out var iValue))
+                    {
+                        var cm = new ComplexMaterial { Name = name, Value = iValue };
+                        def.ComplexMaterials.Add(cm);
+                    }
+                }
+            }
+
             var environmentItems = definition.Element("EnvironmentItems");
             if (environmentItems != null)
             {
@@ -432,7 +467,9 @@ namespace SpaceEngineersOreRedistribution
                 }
                 int? biome = null;
                 if (SelectedEnvironmentItem != null) biome = SelectedEnvironmentItem.Biome;
-                var image = value.CreateBitmapImage(!ShowGradients, ShowOreLocations, ShowLakes, oreMappings, ShowBiomes, biome);
+                int? complexMaterial = null;
+                if (SelectedComplexMaterial != null) complexMaterial = SelectedComplexMaterial.Value;
+                var image = value.CreateBitmapImage(!ShowGradients, ShowOreLocations, ShowLakes, complexMaterial, oreMappings, ShowBiomes, biome);
 
                 switch (key)
                 {
