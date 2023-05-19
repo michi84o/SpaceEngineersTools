@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
 using System.Windows;
 using SixLabors.ImageSharp.Formats.Png;
+using System.Threading;
 
 namespace SpaceEngineersOreRedistribution
 {
@@ -27,7 +28,7 @@ namespace SpaceEngineersOreRedistribution
         public byte[,] HGrad { get; private set; }
 
 
-        public static ImageData Create(string directory, CubeMapFace face)
+        public static ImageData Create(string directory, CubeMapFace face, CancellationToken token)
         {
             string materialMapFile = Path.Combine(directory, face.ToString().ToLowerInvariant()+"_mat.png");
             string heightMapFile = Path.Combine(directory, face.ToString().ToLowerInvariant() + ".png");
@@ -62,11 +63,13 @@ namespace SpaceEngineersOreRedistribution
                 return null;
             }
 
+            if (token.IsCancellationRequested) return null;
             var retval = new ImageData(face);
             Parallel.For(0, 2048, x =>
             {
                 Parallel.For(0, 2048, y =>
                 {
+                    if (token.IsCancellationRequested) return;
                     var pixVal = matMap[x, y];
                     retval.G[x, y] = pixVal.G;
                     retval.R[x, y] = pixVal.R;
@@ -79,8 +82,9 @@ namespace SpaceEngineersOreRedistribution
             // Gradients
             Parallel.For(1, 2047, x =>
             {
-                Parallel.For(1, 2047 - 1, y =>
+                Parallel.For(1, 2047, y =>
                 {
+                    if (token.IsCancellationRequested) return;
                     List<int> neighbors = new()
                     {
                         hMap[x - 1, y].PackedValue,
@@ -121,7 +125,7 @@ namespace SpaceEngineersOreRedistribution
             R = B = G = H = HGrad = null;
         }
 
-        public BitmapImage CreateBitmapImage(bool heightMap, bool ore, bool lakes, List<OreMapping> oreMappings, bool biomes)
+        public BitmapImage CreateBitmapImage(bool heightMap, bool ore, bool lakes, List<OreMapping> oreMappings, bool biomes, int? selectedBiome)
         {
             using MemoryStream memory = new MemoryStream();
             var image = new Image<Rgb24>(2048, 2048);
@@ -138,18 +142,26 @@ namespace SpaceEngineersOreRedistribution
                     // Biomes
                     if (biomes)
                     {
-                        double blend = 0.1;
-                        var newVal = (int)((blend * G[x, y]) + (1 - blend) * g + .5);
-                        if (newVal > 255) newVal = 255;
-                        g = (byte)newVal;
-                        var rb = (int)((1 - blend) * g + 0.5);
-                        if (rb > 255) rb = 255;
-                        r = b = (byte)rb;
+                        if (selectedBiome != null && G[x, y] == selectedBiome.Value)
+                        {
+                            r = b = 255;
+                            g = 0;
+                        }
+                        else
+                        {
+                            double blend = 0.2;
+                            var newVal = (int)((blend * G[x, y]) + (1 - blend) * g + .5);
+                            if (newVal > 255) newVal = 255;
+                            g = (byte)newVal;
+                            var rb = (int)((1 - blend) * g + 0.5);
+                            if (rb > 255) rb = 255;
+                            r = b = (byte)rb;
+                        }
                     }
                     // Lakes
                     if (lakes && R[x, y] > 0)
                     {
-                        double blend = 0.5;
+                        double blend = 0.4;
                         var newRed = (int)((blend * R[x, y]) + (1-blend) * r + .5);
                         if (newRed > 255) newRed = 255;
                         r = (byte)newRed; g = 0; b = 0;

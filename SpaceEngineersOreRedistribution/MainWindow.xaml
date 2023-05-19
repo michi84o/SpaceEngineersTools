@@ -31,7 +31,8 @@
             <MenuItem Header="Map">
                 <CheckBox Content="Show Ore Locations" IsChecked="{Binding ShowOreLocations, UpdateSourceTrigger=PropertyChanged}" />
                 <CheckBox Content="Show Gradients" IsChecked="{Binding ShowGradients, UpdateSourceTrigger=PropertyChanged}" />
-                <!--<CheckBox Content="Show TerrainTypes" IsChecked="{Binding ShowTerrainTypes}" />-->
+                <CheckBox Content="Show Lakes" IsChecked="{Binding ShowLakes, UpdateSourceTrigger=PropertyChanged}" />
+                <CheckBox Content="Show Biomes" IsChecked="{Binding ShowBiomes, UpdateSourceTrigger=PropertyChanged}" />
             </MenuItem>
             <MenuItem Header="Redistribute Ore" Command="{Binding RedistributeOreCommand}" />
         </Menu>
@@ -47,12 +48,18 @@
                 ItemsSource="{Binding OreTypes}"
                 SelectedItem="{Binding SelectedOreType}"/>
         </GroupBox>
+        <Button
+            Grid.Row="2" Grid.Column="0" VerticalAlignment="Top" HorizontalAlignment="Right"
+            Content="Deselect" Margin="0,3,9,0" FontSize="8" Command="{Binding DeselectOreTypeCommand}"   />
         <GroupBox
             Grid.Row="3" Grid.Column="0" Header="Environment" MinWidth="150" Margin="3">
             <ListBox
                 ItemsSource="{Binding EnvironmentItems}"
                 SelectedItem="{Binding SelectedEnvironmentItem}"/>
         </GroupBox>
+        <Button
+            Grid.Row="3" Grid.Column="0" VerticalAlignment="Top" HorizontalAlignment="Right"
+            Content="Deselect" Margin="0,3,9,0" FontSize="8" Command="{Binding DeselectEvironmentItemCommand}"   />
         <Grid
             Grid.Row="1" Grid.Column="1" Grid.RowSpan="3">
             <Grid.RowDefinitions>

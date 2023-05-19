@@ -5,7 +5,9 @@ using System.Collections.ObjectModel;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
+using System.Runtime.Intrinsics.X86;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -23,6 +25,9 @@ namespace SpaceEngineersOreRedistribution
         public ObservableCollection<PlanetDefinition> PlanetDefinitions { get; } = new();
         public ObservableCollection<string> OreTypes { get; } = new();
 
+        CancellationTokenSource _imageUpdateTcs;
+        bool _updatingImages = false;
+
         PlanetDefinition _selectedPlanetDefinition;
         public PlanetDefinition SelectedPlanetDefinition
         {
@@ -30,12 +35,19 @@ namespace SpaceEngineersOreRedistribution
             set
             {
                 if (!SetProp(ref _selectedPlanetDefinition, value)) return;
+
+                if (_imageUpdateTcs != null)
+                {
+                    _imageUpdateTcs.Cancel();
+                    _imageUpdateTcs.Dispose();
+                    _imageUpdateTcs = null;
+                }
+
                 ClearImages();
                 OreTypes.Clear();
                 EnvironmentItems.Clear();
                 if (value == null)
                 {
-                    UpdateImages();
                     return;
                 }
                 HashSet<string> types = new();
@@ -50,7 +62,28 @@ namespace SpaceEngineersOreRedistribution
                 {
                     EnvironmentItems.Add(item);
                 }
-                LoadImages();
+
+                _imageUpdateTcs = new();
+                var token = _imageUpdateTcs.Token;
+                _updatingImages = true;
+
+
+                Task.Run(() =>
+                {
+                    Parallel.ForEach(Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>(), f =>
+                    {
+                        if (token.IsCancellationRequested) return;
+                        _images[f] = GetInfo(f, token);
+                    });
+                    if (token.IsCancellationRequested) return;
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        if (token.IsCancellationRequested) return;
+                        _updatingImages = false;
+                        UpdateImages();
+                    });
+                });
+
             }
         }
 
@@ -83,7 +116,7 @@ namespace SpaceEngineersOreRedistribution
                 OreMappings.Clear();
                 if (value == null || SelectedPlanetDefinition == null)
                 {
-                    if (ShowOreLocations)
+                    if (ShowOreLocations && !_updatingImages)
                         UpdateImages();
                     return;
                 }
@@ -100,7 +133,7 @@ namespace SpaceEngineersOreRedistribution
                         mapping.MapRgbValue = new(0, 255, 0);
                     OreMappings.Add(mapping);
                 }
-                if (ShowOreLocations)
+                if (ShowOreLocations && !_updatingImages)
                     UpdateImages();
             }
         }
@@ -120,11 +153,19 @@ namespace SpaceEngineersOreRedistribution
         }
 
         public ObservableCollection<EnvironmentItem> EnvironmentItems { get; } = new();
+        int _lastBiome;
         EnvironmentItem _selectedEnvironmentItem;
         public EnvironmentItem SelectedEnvironmentItem
         {
             get => _selectedEnvironmentItem;
-            set => SetProp(ref _selectedEnvironmentItem, value);
+            set
+            {
+                SetProp(ref _selectedEnvironmentItem, value);
+                var biome = value?.Biome ?? 0;
+                if (ShowBiomes && !_updatingImages && biome != _lastBiome)
+                    UpdateImages();
+                _lastBiome = biome;
+            }
         }
 
         bool _showOreLocations = true;
@@ -134,7 +175,8 @@ namespace SpaceEngineersOreRedistribution
             set
             {
                 if (!SetProp(ref _showOreLocations, value)) return;
-                UpdateImages();
+                if (!_updatingImages)
+                    UpdateImages();
             }
         }
 
@@ -145,7 +187,32 @@ namespace SpaceEngineersOreRedistribution
             set
             {
                 if (!SetProp(ref _showGradients, value)) return;
-                UpdateImages();
+                if (!_updatingImages)
+                    UpdateImages();
+            }
+        }
+
+        bool _showLakes = true;
+        public bool ShowLakes
+        {
+            get => _showLakes;
+            set
+            {
+                if (!SetProp(ref _showLakes, value)) return;
+                if (!_updatingImages)
+                    UpdateImages();
+            }
+        }
+
+        bool _showBiomes = false;
+        public bool ShowBiomes
+        {
+            get => _showBiomes;
+            set
+            {
+                if (!SetProp(ref _showBiomes, value)) return;
+                if (!_updatingImages)
+                    UpdateImages();
             }
         }
 
@@ -363,7 +430,9 @@ namespace SpaceEngineersOreRedistribution
                 {
                     oreMappings = OreMappings.ToList();
                 }
-                var image = value.CreateBitmapImage(!ShowGradients, ShowOreLocations, true, oreMappings, false);
+                int? biome = null;
+                if (SelectedEnvironmentItem != null) biome = SelectedEnvironmentItem.Biome;
+                var image = value.CreateBitmapImage(!ShowGradients, ShowOreLocations, ShowLakes, oreMappings, ShowBiomes, biome);
 
                 switch (key)
                 {
@@ -379,24 +448,12 @@ namespace SpaceEngineersOreRedistribution
 
         Dictionary<CubeMapFace, ImageData> _images = new();
 
-        void LoadImages()
-        {
-            ClearImages();
-            _images[CubeMapFace.Back] = GetInfo(CubeMapFace.Back);
-            _images[CubeMapFace.Down] = GetInfo(CubeMapFace.Down);
-            _images[CubeMapFace.Front] = GetInfo(CubeMapFace.Front);
-            _images[CubeMapFace.Left] = GetInfo(CubeMapFace.Left);
-            _images[CubeMapFace.Right] = GetInfo(CubeMapFace.Right);
-            _images[CubeMapFace.Up] = GetInfo(CubeMapFace.Up);
-            UpdateImages();
-        }
-
-        ImageData GetInfo(CubeMapFace face)
+        ImageData GetInfo(CubeMapFace face, CancellationToken token)
         {
             var dir = Path.GetDirectoryName(_lastOpenedFile);
             var imageDir = Path.Combine(dir, "PlanetDataFiles", SelectedPlanetDefinition.Name);
             if (!Directory.Exists(imageDir)) return null;
-            return ImageData.Create(imageDir, face);
+            return ImageData.Create(imageDir, face, token);
         }
 
         Dictionary<CubeMapFace, ImageData> _materialMaps = new();
@@ -715,6 +772,16 @@ namespace SpaceEngineersOreRedistribution
             MessageBox.Show("Finished!\r\nPlease copy the pngs to the 'PlanetDataFiles\\PlanetName' folder.\r\nThen open the planet definition SBC\r\nand copy the content of 'oremappings.xml' to the corresponding section.", "Ore Redistribution", MessageBoxButton.OK, MessageBoxImage.Information);
         },
         o => SelectedPlanetDefinition != null);
+
+        public ICommand DeselectOreTypeCommand => new RelayCommand(o =>
+        {
+            SelectedOreType = null;
+        }, o => SelectedOreType != null);
+
+        public ICommand DeselectEvironmentItemCommand => new RelayCommand(o =>
+        {
+            SelectedEnvironmentItem = null;
+        }, o=> SelectedEnvironmentItem != null);
 
         void GetDeltas(int direction, out int dx, out int dy)
         {
