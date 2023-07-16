@@ -1,10 +1,16 @@
 ﻿using Microsoft.Win32;
+using PlanetCreator;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Diagnostics.Eventing.Reader;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.Intrinsics.X86;
 using System.Text;
 using System.Threading;
@@ -882,5 +888,256 @@ namespace SpaceEngineersOreRedistribution
                 return X.GetHashCode() ^ Y.GetHashCode();
             }
         }
+
+        public ICommand RewriteBiomesCommand => new RelayCommand(o =>
+        {
+            //MessageBox.Show("Not implemented");
+
+            var dir = Path.GetDirectoryName(_lastOpenedFile);
+            var imageDir = Path.Combine(dir, "PlanetDataFiles", SelectedPlanetDefinition.Name);
+            if (!Directory.Exists(imageDir))
+            {
+                MessageBox.Show("Cannot find PlanetDataFiles folder.\r\nMake sure it exists!\r\n" + imageDir);
+                return;
+            }
+
+            HashSet<int> allBiomes = new HashSet<int>();
+            // Collect all required values:
+            foreach (var envItem in EnvironmentItems)
+            {
+                allBiomes.Add(envItem.Biome);
+            }
+
+            // Analyze existing files by latitude
+            // Remember all Biome values by number and quantity
+            Dictionary<int, Dictionary<int, int>> biomeDic = new();
+            foreach (var face in Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>())
+            {
+                var faceName = face.ToString().ToLower();
+                dynamic image = SixLabors.ImageSharp.Image.Load(faceName + "_mat.png");
+                for (int x = 0; x < 2048; ++x)
+                    for (int y = 0; y < 2048; ++y)
+                    {
+                       int val = image[x, y].G;
+                        if (!allBiomes.Contains(val))
+                            val = -1; // Count how many pixels don't have biome def
+
+                        var point = CoordinateHelper.GetNormalizedSphereCoordinates(face, x, y);
+                        var latitude = CoordinateHelper.ToLongitudeLatitude(point).latitude; // -90 to 90
+                        var bucket = GetLatitudeBucked(latitude);
+                        if (!biomeDic.ContainsKey(bucket)) { biomeDic[bucket] = new(); }
+                        if (!biomeDic[bucket].ContainsKey(val))
+                            biomeDic[bucket][val] = 1;
+                        else
+                            biomeDic[bucket][val]++;
+                    }
+            }
+
+            // Generate new biome map
+            byte[] planetSurface = new byte[2048 * 2048 * 6];
+            int surfaceBiomeCount = 0;
+            var random = new Random(0);
+
+            Action<int,int> placeBiome = (biomeIndex, biomeValue) =>
+            {
+                lock (planetSurface)
+                {
+                    if (biomeValue > 0)
+                    {
+                        if (planetSurface[biomeIndex] == 0) ++surfaceBiomeCount;
+                        planetSurface[biomeIndex] = (byte)biomeValue;
+                    }
+                    else
+                    {
+                        if (planetSurface[biomeIndex] > 0) --surfaceBiomeCount;
+                        planetSurface[biomeIndex] = 0;
+                    }
+                }
+            };
+
+            // Strategy: Drop random seeds of biomes that grow until map is filled to 83% (same value as vanilla)
+
+            // Part 1: place seeds on 10% of all pixels
+            while (surfaceBiomeCount < planetSurface.Length / 10)
+            {
+                var index = random.NextTS(planetSurface.Length);
+                var coord = PlanetSurfaceToCoordinates(index);
+                var point = CoordinateHelper.GetNormalizedSphereCoordinates(coord.face, coord.x, coord.y);
+                var latitude = CoordinateHelper.ToLongitudeLatitude(point).latitude; // -90 to 90
+                var bucket = GetLatitudeBucked(latitude);
+                var dic = biomeDic[bucket];
+                placeBiome(index, RandomBiomePick(dic, random));
+            }
+
+            int abortAfter = 100;
+            int abortCnt = 0;
+            // Part 2: Let the seeds grow until 83% of surface is covered
+            while (surfaceBiomeCount < planetSurface.Length * 0.83 && abortCnt++ < abortAfter)
+            {
+                // Find all current seeds
+                List<(int surfaceIndex, byte value)> seeds = new();
+                for (int i = 0; i< planetSurface.Length; i++)
+                {
+                    var surfaceValue = planetSurface[i];
+                    if (surfaceValue == 0) continue;
+                    seeds.Add((i, surfaceValue));
+                }
+                // Randonly pick seeds and let them grow
+                Parallel.For(0, seeds.Count, seedIndex =>
+                {
+                    (int surfaceIndex, byte value) seed;
+                    lock (planetSurface)
+                    {
+                        seed = seeds[seedIndex];
+                        if (seed.value != planetSurface[seed.surfaceIndex])
+                            return; // Seed got destroyed
+                    }
+
+                    var coords = PlanetSurfaceToCoordinates(seed.surfaceIndex);
+                    var pt = new CubeMapPointLight { Face = coords.face, X = coords.x, Y = coords.y };
+                    int[] nmap = new int[4];
+                    // Get all four neigbors
+                    var nUp = CubeMapPointLight.GetPointRelativeTo(pt, 0, 1);
+                    var indexUp = CoordinatesToPlanetSurface(nUp.Face, nUp.X, nUp.Y);
+                    nmap[0] = planetSurface[indexUp];
+                    var nDown = CubeMapPointLight.GetPointRelativeTo(pt, 0, -1);
+                    var indexDown = CoordinatesToPlanetSurface(nDown.Face, nDown.X, nDown.Y);
+                    nmap[1] = planetSurface[indexDown];
+                    var nLeft = CubeMapPointLight.GetPointRelativeTo(pt, -1, 0);
+                    var indexLeft = CoordinatesToPlanetSurface(nLeft.Face, nLeft.X, nLeft.Y);
+                    nmap[2] = planetSurface[indexLeft];
+                    var nRight = CubeMapPointLight.GetPointRelativeTo(pt, 1, 0);
+                    var indexRight = CoordinatesToPlanetSurface(nRight.Face, nRight.X, nRight.Y);
+                    nmap[3] = planetSurface[indexRight];
+
+                    Func<int, int> NeighborMapIndexToSurfaceMapIndex = (nIndex) =>
+                    {
+                        if (nIndex == 0) return indexUp;
+                        if (nIndex == 1) return indexDown;
+                        if (nIndex == 2) return indexLeft;
+                        return indexRight;
+                    };
+
+                    // Rules:
+                    // - Prefer to grow into unoccupied spaces
+                    // - Never grow into same biome
+                    // - Grow into other biome if same neighbor count is larger than that other biomes neighbor count
+                    List<int> emptyNeighbors = new List<int>();
+                    List<int> differentNeighbors = new List<int>();
+                    for (int i = 0; i < 4; ++i)
+                    {
+                        if (nmap[i] > 0)
+                        {
+                            if (nmap[i] != seed.value)
+                            {
+                                differentNeighbors.Add(i);
+                            }
+                        }
+                        else emptyNeighbors.Add(i);
+                    }
+                    if (emptyNeighbors.Count > 0)
+                    {
+                        // Grow into unoccupied space
+                        var growTo = emptyNeighbors[random.NextTS(emptyNeighbors.Count)];
+                        placeBiome(NeighborMapIndexToSurfaceMapIndex(growTo), seed.value);
+                    }
+                    else if (differentNeighbors.Count > 0)
+                    {
+                        int power = 4 - differentNeighbors.Count;
+                        if (power < 2) return;
+
+                        // Check how many distinct neighbors we have
+                        Dictionary<int, int> neighborCounts = new(); // Key=Biome, Value=Count
+                        foreach (var neighbor in differentNeighbors)
+                        {
+                            var neighborVal = nmap[neighbor];
+                            if (!neighborCounts.ContainsKey(neighborVal)) neighborCounts[neighborVal] = 1;
+                            else neighborCounts[neighborVal]++;
+                        }
+                        var weakNeighbors = neighborCounts.Where(o => o.Value < power).ToList();
+                        if (weakNeighbors.Count > 0)
+                        {
+                            weakNeighbors.Sort((a, b) => a.Value.CompareTo(b.Value));
+                            var weakNeighborKey = weakNeighbors.First().Key;
+                            List<int> neighborIndexes = new();
+                            for (int i = 0; i < 4; ++i)
+                                if (nmap[i] == weakNeighborKey) neighborIndexes.Add(i);
+                            var growTo = neighborIndexes[random.NextTS(neighborIndexes.Count)];
+                            placeBiome(NeighborMapIndexToSurfaceMapIndex(growTo), seed.value);
+                        }
+                    }
+                });
+            }
+
+            // Write files
+
+            foreach (var face in Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>())
+            {
+                var faceName = face.ToString().ToLower();
+                var image = new SixLabors.ImageSharp.Image<Rgba32>(2048,2048);
+                dynamic source = SixLabors.ImageSharp.Image.Load(Path.Combine(imageDir, faceName + "_mat.png"));
+                for (int x = 0; x < 2048; ++x)
+                    for (int y = 0; y < 2048; ++y)
+                    {
+                        var surfaceVal = planetSurface[CoordinatesToPlanetSurface(face, x, y)];
+                        image[x, y] = new Rgba32(source[x,y].R, surfaceVal, source[x,y].B);
+                    }
+                image.SaveAsPng(faceName + "_mat2.png");
+            }
+        }, o => SelectedPlanetDefinition != null);
+
+        // Use a biome dictionary for a latitude.
+        // Choose a random biome from that latitude.
+        // Take relative quantities of different biomes into account
+        int RandomBiomePick(Dictionary<int,int> dic, Random rnd)
+        {
+            // Sum up all biomes
+            var sum = 0;
+            var kvps = dic.ToList();
+            foreach (var kvp in kvps)
+            {
+                sum += kvp.Value;
+            }
+            // Pick random number
+            var pick = rnd.NextTS(sum);
+
+            // Use counts like an index in a list
+            // This should preserve the relative amounts of different biomes
+            sum = 0;
+            for (int i=0;i< kvps.Count; i++)
+            {
+                sum += kvps[i].Value;
+                if (pick < sum) return kvps[i].Key;
+            }
+            // Fallback. Should not be hit.
+            Debug.Assert(false);
+            return kvps[0].Key;
+        }
+
+        (CubeMapFace face, int x, int y) PlanetSurfaceToCoordinates(int surfaceIndex)
+        {
+            var div = surfaceIndex / (2048*2048);
+            var start = 2048 * 2048 * div;
+            var posRel = surfaceIndex % (2048*2048);
+            var y = posRel / 2048;
+            var x = surfaceIndex % 2048;
+            return ((CubeMapFace)div, x, y);
+        }
+
+        int CoordinatesToPlanetSurface(CubeMapFace face, int x, int y)
+        {
+            return (int)face * 2048 * 2048 + x + y * 2048;
+        }
+
+        // Turn latitude values into dictionary keys
+        // Bucket size is width of longitude area to cover for one key.
+        // Keens SBC use a granularity of 5°.
+        int GetLatitudeBucked(double latitude, int bucketsize = 5)
+        {
+            for (int i = -90; i <= 90; i += bucketsize)
+                if (latitude < i) return i;
+            return 90;
+        }
+
     }
 }

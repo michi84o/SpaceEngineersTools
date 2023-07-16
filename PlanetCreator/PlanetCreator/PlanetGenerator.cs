@@ -1082,7 +1082,8 @@ namespace PlanetCreator
             // w=4   [0][1]|[2][3]  -> middle = 1.5, [0] on 3d axis = -1.5
 
             // offset at 2048 -> 1023.5
-            // Problem: Edges between 2 tiles will have duplicate pixels
+            // "Problem": Edges between 2 tiles will have duplicate pixels
+            // ==> Update: Duplicated pixels are expected by the game. NOT a problem
             // What did NOT work so far:
             // - Moving faces closer or further away from sphere by using an offset for 1 axis
 

@@ -36,6 +36,7 @@
                 <CheckBox Content="Show Biomes" IsChecked="{Binding ShowBiomes, UpdateSourceTrigger=PropertyChanged}" />
             </MenuItem>
             <MenuItem Header="Redistribute Ore" Command="{Binding RedistributeOreCommand}" />
+            <MenuItem Header="Rewrite Biomes" Command="{Binding RewriteBiomesCommand}" />
         </Menu>
         <GroupBox
             Grid.Row="1" Grid.Column="0" MinWidth="150" Header="Planets" Margin="3">
