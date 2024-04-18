@@ -45,3 +45,9 @@ This feature is not finished yet, WIP.
 ## HeightMapEdgeFixer
 
 Exposes the edge fixer of PlanetCreator. This simple tool can be used to fix the edges of existing planet height maps like the vanilla ones. PNGs must be 16 bit grayscale and have a size of 2048x2048 pixels.
+
+## ComplexMaterialViewer
+
+Shows the complex material rules. Possibility to filter by latitude. I used this to create new climate zone definitions for my Seams Fixed 2.0 mod.
+
+![Screenshot of Complex Material Viewer](Screenshots/CpmplexMatView.png)
