@@ -1,0 +1,105 @@
+﻿<Window x:Class="ComplexMaterialViewer.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:ComplexMaterialViewer"
+        mc:Ignorable="d"
+        Title="Complex Material Viewer" Height="450" Width="800">
+    <Window.DataContext>
+        <local:MainWindowViewModel x:Name="ViewModel"/>
+    </Window.DataContext>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition/>
+        </Grid.RowDefinitions>
+        <Menu>
+            <MenuItem Header="Open SBC" Command="{Binding OpenSbcCommand}"/>
+        </Menu>
+        <Grid
+            Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" MinWidth="150"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <GroupBox
+                Header="SBC">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height=".5*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="0.5*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition/>
+                    </Grid.RowDefinitions>
+                    <TextBlock
+                        Text="Planets"
+                        Grid.Row="0" />
+                    <ListBox
+                        Grid.Row="1"
+                        ItemsSource="{Binding Definitions}" DisplayMemberPath="Name"
+                        SelectedItem="{Binding SelectedDefinition}"/>
+                    <TextBlock
+                        Text="Material Groups"
+                        Grid.Row="2" />
+                    <ListBox
+                        Grid.Row="3"
+                        ItemsSource="{Binding SelectedDefinition.ComplexMaterials}" DisplayMemberPath="Name"
+                        SelectedItem="{Binding SelectedMaterialGroup}"/>
+                    <TextBlock
+                        Text="Rules"
+                        Grid.Row="4" />
+                    <ListBox
+                        Grid.Row="5"
+                        ItemsSource="{Binding SelectedMaterialGroup.Rules}"
+                        SelectedItem="{Binding SelectedRule}"/>
+                </Grid>
+            </GroupBox>
+            <GroupBox
+                Header="Summary"
+                Grid.Column="1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition/>
+                        <ColumnDefinition Width="Auto" MinWidth="30"/>
+                        <ColumnDefinition Width="Auto" MinWidth="80"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock
+                        Grid.Row="0" Grid.Column="0"
+                        Text="Min Latitude" VerticalAlignment="Center"/>
+                    <Slider
+                        Grid.Row="0" Grid.Column="1"
+                        Minimum="0" Maximum="90" Value="{Binding MinLatitude}" TickFrequency="5" TickPlacement="Both"
+                        IsSnapToTickEnabled="True"/>
+                    <TextBlock
+                        Grid.Row="0" Grid.Column="2" Text="{Binding MinLatitude}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    <TextBlock
+                        Grid.Row="1" Grid.Column="0"
+                        Text="Max Latitude" VerticalAlignment="Center"/>
+                    <Slider
+                        Grid.Row="1" Grid.Column="1"
+                        Minimum="0" Maximum="90" Value="{Binding MaxLatitude}" TickFrequency="5" TickPlacement="Both"
+                        IsSnapToTickEnabled="True"/>
+                    <TextBlock
+                        Grid.Row="1" Grid.Column="2" Text="{Binding MaxLatitude}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    <TextBox
+                        Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3"
+                        AcceptsReturn="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                        Text="{Binding Summary, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock
+                        Grid.Row="1" Grid.Column="3" Text="By Height:" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    <ListBox
+                        Grid.Row="2" Grid.Column="3" ItemsSource="{Binding Heights}"/>
+                </Grid>
+            </GroupBox>
+        </Grid>
+    </Grid>
+</Window>

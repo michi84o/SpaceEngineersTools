@@ -96,9 +96,9 @@ namespace SpaceEngineersOreRedistribution
             ViewModel.OpenPlanetDefinition(@"C:\Users\Michael\AppData\Roaming\SpaceEngineers\Mods\OreRedistribution\Data\PlanetGeneratorDefinitions.sbc");
 #endif
 
-            bool test = false;
+            bool test = true;
             // Testcode for material maps:
-            bool makeLatitudeLines = false;
+            bool makeLatitudeLines = true;
             bool makeBiomeStatistics = false;
             if (test)
             {
@@ -111,21 +111,33 @@ namespace SpaceEngineersOreRedistribution
                         StringBuilder sb = new();
                         Dictionary<int, int> counts = new();
                         var image = new SixLabors.ImageSharp.Image<Rgb24>(2048, 2048);
+                        var climateZone = new SixLabors.ImageSharp.Image<Rgb24>(2048, 2048);
                         for (int x = 0; x < 2048; ++x)
                             for (int y = 0; y < 2048; ++y)
                             {
                                 // Latitude lines
                                 var point = CoordinateHelper.GetNormalizedSphereCoordinates(face, x, y);
                                 var lolat = CoordinateHelper.ToLongitudeLatitude(point);
-                                var rest = Math.Abs(lolat.latitude) % 10;
-                                if (rest >= 9.5) rest = 10 - rest;
-                                if (rest <= 0.5)
+                                var latAbs = Math.Abs(lolat.latitude);
+                                var rest = latAbs % 5;
+                                if (rest >= 4.9) rest = 5 - rest;
+                                if (rest <= 0.1)
                                 {
                                     var val = (byte)((1 - rest) * 255 + 0.5);
                                     image[x, y] = new Rgb24(val, val, val);
                                 }
+                                for (int ii = 5; ii < 100; ii += 5)
+                                {
+                                    if (latAbs < ii)
+                                    {
+                                        climateZone[x, y] = new Rgb24((byte)(95+ii), (byte)(95 + ii), (byte)(95 + ii));
+                                        break;
+                                    }
+                                }
+
                             }
                         image.SaveAsPng(faceName +  "_lines.png");
+                        climateZone.SaveAsPng(faceName + "_climatezones.png");
                     } // foreach
                 }
                 if (makeBiomeStatistics)
