@@ -31,7 +31,8 @@ namespace SpaceEngineersOreRedistribution
     internal class MainWindowViewModel : PropChangeNotifier
     {
         public ObservableCollection<PlanetDefinition> PlanetDefinitions { get; } = new();
-        public ObservableCollection<string> OreTypes { get; } = new();
+
+        public ObservableCollection<OreDistributionStatViewModel> OreTypes { get; } = new();
 
         CancellationTokenSource _imageUpdateTcs;
         bool _updatingImages = false;
@@ -59,13 +60,13 @@ namespace SpaceEngineersOreRedistribution
                 {
                     return;
                 }
-                HashSet<string> types = new();
-                foreach (var item in value.OreMappings)
-                {
-                    types.Add(item.Type);
-                }
-                foreach (var type in types)
-                    OreTypes.Add(type);
+                //HashSet<string> types = new();
+                //foreach (var item in value.OreMappings)
+                //{
+                //    types.Add(item.Type);
+                //}
+                //foreach (var type in types)
+                //    OreTypes.Add(type);
                 foreach (var item in value.ComplexMaterials)
                 {
                     ComplexMaterials.Add(item);
@@ -88,6 +89,48 @@ namespace SpaceEngineersOreRedistribution
                         _images[f] = GetInfo(f, token);
                     });
                     if (token.IsCancellationRequested) return;
+
+                    // Update ore
+                    Dictionary<string, int> oreDist = new();
+                    Parallel.ForEach(_images.Values, img =>
+                    {
+                        if (img == null) return;
+                        for (int x = 0; x < 2048; ++x)
+                            for (int y = 0; y < 2048; ++y)
+                            {
+                                var blue = img.B[x, y];
+                                var mapping = value.OreMappings.FirstOrDefault(x => x.Value == blue);
+                                if (mapping != null)
+                                {
+                                    lock (oreDist)
+                                    {
+                                        if (!oreDist.ContainsKey(mapping.Type))
+                                            oreDist[mapping.Type] = 1;
+                                        else
+                                            oreDist[mapping.Type] += 1;
+                                    }
+                                }
+                            }
+                    });
+                    int oreSum = oreDist.Values.Sum();
+                    List<OreDistributionStatViewModel> list = new();
+                    foreach (var key in oreDist.Keys)
+                    {
+                        list.Add(new OreDistributionStatViewModel
+                        { OreType = key, Percentage = (int)(oreDist[key] * 100.0 / oreSum + 0.5) });
+                    }
+                    list.Sort((a,b)=>b.Percentage.CompareTo(a.Percentage));
+                    if (list.Count > 0)
+                    {
+                        var maxP = list.Max(x => x.Percentage);
+                        foreach (var x in list)
+                            x.ScaledPercentage = (int)(0.5 + x.Percentage * 100 / maxP);
+                    }
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        foreach (var item in list) OreTypes.Add(item);
+                    });
+
                     Application.Current.Dispatcher.Invoke(() =>
                     {
                         if (token.IsCancellationRequested) return;
@@ -118,8 +161,8 @@ namespace SpaceEngineersOreRedistribution
             System.Windows.Media.Colors.OliveDrab,
         };
         System.Windows.Media.SolidColorBrush _defaultOreBrush = new(System.Windows.Media.Color.FromRgb(0, 0xff, 0));
-        string _selectedOreType;
-        public string SelectedOreType
+        OreDistributionStatViewModel _selectedOreType;
+        public OreDistributionStatViewModel SelectedOreType
         {
             get => _selectedOreType;
             set
@@ -132,7 +175,7 @@ namespace SpaceEngineersOreRedistribution
                         UpdateImages();
                     return;
                 }
-                var mappings = SelectedPlanetDefinition.OreMappings.Where(x => x.Type == value);
+                var mappings = SelectedPlanetDefinition.OreMappings.Where(x => x.Type == value.OreType);
                 int colorIndex = 0;
                 foreach (var mapping in mappings)
                 {
@@ -520,10 +563,10 @@ namespace SpaceEngineersOreRedistribution
 
             // Collect ore info
             var setup = new RedistributionSetup();
-            var existingOreDefs = SelectedPlanetDefinition.OreMappings.Select(o => o.Type).Distinct().ToList();
-            foreach (var oredef in existingOreDefs)
+            //var existingOreDefs = SelectedPlanetDefinition.OreMappings.Select(o => o.Type).Distinct().ToList();
+            foreach (var oredef in OreTypes)
             {
-                setup.ViewModel.OreInfos.Add(new() { Name = oredef });
+                setup.ViewModel.OreInfos.Add(new() { Name = oredef.OreType, SpawnWeight = oredef.Percentage });
             }
             if (setup.ShowDialog() != true)
                 return;
@@ -532,7 +575,12 @@ namespace SpaceEngineersOreRedistribution
             // Build the ore mapping list.
             // See the OreMappings.png in the screenshots folder of this repository to see the design of the mapping.
             Dictionary<string, List<OreMapping>> mappingsDictionary = new();
+
+
+            // TODO: Use existing percentages
             var oreTypeList = setup.ViewModel.OreInfos.Select(o => o.Name).Distinct().ToList();
+
+
             int nextOreValue = 1;
             foreach (var oreType in oreTypeList)
             {
@@ -598,14 +646,14 @@ namespace SpaceEngineersOreRedistribution
 
 
             var keys = _images.Keys;
-            var rnd = new Random(0); // Seed 0 is better for debugging.
+            var rnd = new Random(setup.ViewModel.Seed); // Seed 0 is better for debugging.
             var normal = new Normal(50, 10, 0);
             bool overridefiles = false;
             foreach (var key in keys)
             {
                 if (!_images.TryGetValue(key, out var value)) return;
 
-                var fileName = Path.Combine(directory, key + "_mat.png");
+                var fileName = Path.Combine(directory, key.ToString().ToLower() + "_mat.png");
                 if (!overridefiles && File.Exists(fileName))
                 {
                     if (MessageBox.Show("File \r\n'" + fileName + "'\r\n already exists. " +
@@ -893,6 +941,9 @@ namespace SpaceEngineersOreRedistribution
 
         public ICommand RewriteBiomesCommand => new RelayCommand(o =>
         {
+            var msgRes = MessageBox.Show("This will override the biomes of the currently selected planet.\r\nContinue?", "Warning", MessageBoxButton.OKCancel);
+            if (msgRes != MessageBoxResult.OK) return;
+
             var dir = Path.GetDirectoryName(_lastOpenedFile);
             var imageDir = Path.Combine(dir, "PlanetDataFiles", SelectedPlanetDefinition.Name);
             if (!Directory.Exists(imageDir))

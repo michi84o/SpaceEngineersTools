@@ -25,6 +25,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <ListView
                     Grid.Row="0" Margin="3"
@@ -88,8 +89,12 @@
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Grid.Row="4" >
                     <TextBlock Text="Randomly spawn ore every "/>
-                    <TextBox Width="40" Text="{Binding OreSpawnRate}" HorizontalContentAlignment="Center"/>
+                    <TextBox Width="40" Text="{Binding OreSpawnRate}" HorizontalContentAlignment="Center" Margin="3,0,3,0"/>
                     <TextBlock Text="pixels on average. (Default: 2000) "/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Grid.Row="5" >
+                    <TextBlock Text="Seed"/>
+                    <TextBox Width="40" Text="{Binding Seed}" HorizontalContentAlignment="Center" Margin="3,0,3,0"/>
                 </StackPanel>
             </Grid>
         </GroupBox>

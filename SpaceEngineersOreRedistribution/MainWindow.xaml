@@ -18,7 +18,7 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto" MinWidth="202"/>
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
@@ -46,9 +46,15 @@
         </GroupBox>
         <GroupBox
             Grid.Row="2" Grid.Column="0" Header="Ore Types" MinWidth="150" Margin="3">
-            <ListBox
+            <ListView
                 ItemsSource="{Binding OreTypes}"
-                SelectedItem="{Binding SelectedOreType}"/>
+                SelectedItem="{Binding SelectedOreType}">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <local:OreDistributionStatView/>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
         </GroupBox>
         <Button
             Grid.Row="2" Grid.Column="0" VerticalAlignment="Top" HorizontalAlignment="Right"
@@ -72,10 +78,11 @@
             Grid.Row="1" Grid.Column="1" Grid.RowSpan="4">
             <Grid.RowDefinitions>
                 <RowDefinition/>
+                <RowDefinition/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <GroupBox
-                Grid.Row="0"
+                Grid.Row="0" Grid.RowSpan="2"
                 Header="Selected Ore Type" MinWidth="350" Margin="3">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -115,10 +122,10 @@
                             Text="List above will not be used for ore redistribution feature!"/>
                     </Grid>
                 </Grid>
-
             </GroupBox>
+
             <GroupBox
-                Grid.Row="1" Header="Selected Environment Item" Margin="3">
+                Grid.Row="2" Header="Selected Environment Item" Margin="3">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition/>

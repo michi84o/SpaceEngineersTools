@@ -111,6 +111,13 @@ namespace SpaceEngineersOreRedistribution
             set => SetProp(ref _oreSpawnRate, value);
         }
 
+        int _seed;
+        public int Seed
+        {
+            get => _seed;
+            set => SetProp(ref _seed, value);
+        }
+
         public Action ConfirmAction;
         public ICommand ConfirmCommand => new RelayCommand(o =>
         {
@@ -165,7 +172,6 @@ namespace SpaceEngineersOreRedistribution
             if (e.PropertyName == nameof(OreInfo.VeryDeepOre))
                 OnPropertyChanged(nameof(ValuesCount));
         }
-
 
         public class OreInfo : PropChangeNotifier
         {
