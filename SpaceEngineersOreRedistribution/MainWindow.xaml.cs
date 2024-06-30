@@ -96,7 +96,7 @@ namespace SpaceEngineersOreRedistribution
             ViewModel.OpenPlanetDefinition(@"C:\Users\Michael\AppData\Roaming\SpaceEngineers\Mods\DebugVanillaSolarSystem\Data\PlanetGeneratorDefinitions.sbc");
 #endif
 
-            bool test = true;
+            bool test = false;
             // Testcode for material maps:
             bool makeLatitudeLines = true;
             bool makeBiomeStatistics = false;
