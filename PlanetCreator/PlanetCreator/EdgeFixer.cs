@@ -147,9 +147,11 @@ namespace PlanetCreator
             //ApplyBlend(edgePoints);
         }
 
-        public static void MakeSeemless(Dictionary<CubeMapFace, double[,]> faces, CancellationToken token)
+        public static void MakeSeamless(Dictionary<CubeMapFace, double[,]> faces, CancellationToken token, bool cornersOnly = false, bool erodeCorners = false)
         {
             if (token.IsCancellationRequested) return;
+
+            FixCubeTriplets(faces);
 
             // Fix cubemap edges if there are sudden jumps
             List<Task> tasks = new List<Task>();
@@ -184,6 +186,7 @@ namespace PlanetCreator
                 {
                     for (int x = 0; x < TileWidth; ++x)
                     {
+                        if (cornersOnly && x == 5) x = TileWidth - 6;
                         if (token.IsCancellationRequested) return;
                         List<PointWrapper> edgePoints = new List<PointWrapper>
                         {
@@ -223,6 +226,7 @@ namespace PlanetCreator
                 {
                     for (int y = 0; y < TileWidth; ++y)
                     {
+                        if (cornersOnly && y == 5) y = TileWidth - 6;
                         if (token.IsCancellationRequested) return;
                         List<PointWrapper> edgePoints = new List<PointWrapper>
                         {
@@ -247,6 +251,7 @@ namespace PlanetCreator
             {
                 for (int x = 0; x < TileWidth; ++x)
                 {
+                    if (cornersOnly && x == 5) x = TileWidth - 6;
                     if (token.IsCancellationRequested) return;
                     List<PointWrapper> edgePoints = new List<PointWrapper>
                     {
@@ -270,6 +275,7 @@ namespace PlanetCreator
             {
                 for (int z = 0; z < TileWidth; ++z)
                 {
+                    if (cornersOnly && z == 5) z = TileWidth - 6;
                     if (token.IsCancellationRequested) return;
                     List<PointWrapper> edgePoints = new List<PointWrapper>
                     {
@@ -293,6 +299,7 @@ namespace PlanetCreator
             {
                 for (int z = 0; z < TileWidth; ++z)
                 {
+                    if (cornersOnly && z == 5) z = TileWidth - 6;
                     if (token.IsCancellationRequested) return;
                     List<PointWrapper> edgePoints = new List<PointWrapper>
                     {
@@ -316,6 +323,7 @@ namespace PlanetCreator
             {
                 for (int z = 0; z < TileWidth; ++z)
                 {
+                    if (cornersOnly && z == 5) z = TileWidth - 6;
                     if (token.IsCancellationRequested) return;
                     List<PointWrapper> edgePoints = new List<PointWrapper>
                     {
@@ -339,6 +347,7 @@ namespace PlanetCreator
             {
                 for (int z = 0; z < TileWidth; ++z)
                 {
+                    if (cornersOnly && z == 5) z = TileWidth - 6;
                     if (token.IsCancellationRequested) return;
                     List<PointWrapper> edgePoints = new List<PointWrapper>
                     {
@@ -362,6 +371,7 @@ namespace PlanetCreator
             {
                 for (int z = 0; z < TileWidth; ++z)
                 {
+                    if (cornersOnly && z == 5) z = TileWidth - 6;
                     if (token.IsCancellationRequested) return;
                     List<PointWrapper> edgePoints = new List<PointWrapper>
                     {
@@ -382,12 +392,112 @@ namespace PlanetCreator
 
             Task.WhenAll(tasks).GetAwaiter().GetResult();
 
+            FixCubeTriplets(faces);
+
+            // Make triplet points smoother
+            if (!cornersOnly)
+            {
+                //MakeSeamless(faces, token, true);
+                MakeSeamless(faces, token, true, true);
+            }
+
+            if (erodeCorners)
+            {
+                var gen = new PlanetGenerator();
+                gen.Faces = faces;
+                gen.ErosionErodeBrush = 1.5;
+                gen.ErosionDepositBrush = 1.5;
+
+                gen.ErosionErodeSpeed = 0.025;
+                gen.ErosionDepositSpeed = 0.0125;
+
+                gen.EvaporateSpeed = 0.05;
+                gen.ErosionSedimentCapacityFactor = 10;
+
+                var faceVals = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToArray();
+                List<PointD> points = new List<PointD>
+                {
+                    new PointD { X = 0.5, Y=0.5 },
+                    new PointD { X = 1.5, Y= 0.5 },
+                    new PointD { X = 0.5, Y= 1.5 },
+                };
+                foreach (var face in faceVals)
+                {
+                    foreach (var point in points)
+                    {
+                        gen.Erode(null, CancellationToken.None, point, face);
+                        gen.Erode(null, CancellationToken.None, new PointD() { X = 2047-point.X, Y = 2047-point.Y }, face);
+                    }
+                }
+                FixCubeTriplets(faces);
+            }
+
             // TODO: Maybe apply low pass filter matrix on edge pixels at the end:
             //
             //     0    .125     0
             //    .125   .5    0.125
             //     0    .125     0
             //
+        }
+
+        /// <summary>
+        /// Make sure the edge pixels where 3 maps meet have the same value.
+        /// </summary>
+        /// <param name="faces"></param>
+        public static void FixCubeTriplets(Dictionary<CubeMapFace, double[,]> faces)
+        {
+            List<List<PointWrapper>> triplets = new List<List<PointWrapper>>();
+            // There are 8 points in total:
+            // - Front-Up-Left
+            var pw1 = new PointWrapper(() => faces[CubeMapFace.Front][0, 0], d => faces[CubeMapFace.Front][0, 0] = d);
+            var pw2 = new PointWrapper(() => faces[CubeMapFace.Up][0, 2047], d => faces[CubeMapFace.Up][0, 2047] = d);
+            var pw3 = new PointWrapper(() => faces[CubeMapFace.Left][2047, 0], d => faces[CubeMapFace.Left][2047, 0] = d);
+            triplets.Add(new List<PointWrapper> { pw1, pw2, pw3 });
+            // - Front-Up-Right
+            pw1 = new PointWrapper(() => faces[CubeMapFace.Front][2047, 0], d => faces[CubeMapFace.Front][2047, 0] = d);
+            pw2 = new PointWrapper(() => faces[CubeMapFace.Up][2047, 2047], d => faces[CubeMapFace.Up][2047, 2047] = d);
+            pw3 = new PointWrapper(() => faces[CubeMapFace.Right][0, 0], d => faces[CubeMapFace.Right][0, 0] = d);
+            triplets.Add(new List<PointWrapper> { pw1, pw2, pw3 });
+            // - Front-Down-Left
+            pw1 = new PointWrapper(() => faces[CubeMapFace.Front][0, 2047], d => faces[CubeMapFace.Front][0, 2047] = d);
+            pw2 = new PointWrapper(() => faces[CubeMapFace.Down][2047, 2047], d => faces[CubeMapFace.Down][2047, 2047] = d);
+            pw3 = new PointWrapper(() => faces[CubeMapFace.Left][2047, 2047], d => faces[CubeMapFace.Left][2047, 2047] = d);
+            triplets.Add(new List<PointWrapper> { pw1, pw2, pw3 });
+            // - Front-Down-Right
+            pw1 = new PointWrapper(() => faces[CubeMapFace.Front][2047, 2047], d => faces[CubeMapFace.Front][2047, 2047] = d);
+            pw2 = new PointWrapper(() => faces[CubeMapFace.Down] [0, 2047], d => faces[CubeMapFace.Down][0, 2047] = d);
+            pw3 = new PointWrapper(() => faces[CubeMapFace.Right][0, 2047], d => faces[CubeMapFace.Right][0, 2047] = d);
+            triplets.Add(new List<PointWrapper> { pw1, pw2, pw3 });
+
+            // - Back-Up-Right
+            pw1 = new PointWrapper(() => faces[CubeMapFace.Back][0, 0], d => faces[CubeMapFace.Back][0, 0] = d);
+            pw2 = new PointWrapper(() => faces[CubeMapFace.Up][2047, 0], d => faces[CubeMapFace.Up][2047, 0] = d);
+            pw3 = new PointWrapper(() => faces[CubeMapFace.Right][2047, 0], d => faces[CubeMapFace.Right][2047, 0] = d);
+            triplets.Add(new List<PointWrapper> { pw1, pw2, pw3 });
+            // - Back-Up-Left
+            pw1 = new PointWrapper(() => faces[CubeMapFace.Back][2047, 0], d => faces[CubeMapFace.Back][2047, 0] = d);
+            pw2 = new PointWrapper(() => faces[CubeMapFace.Up][0, 0], d => faces[CubeMapFace.Up][0, 0] = d);
+            pw3 = new PointWrapper(() => faces[CubeMapFace.Left][0, 0], d => faces[CubeMapFace.Left][0, 0] = d);
+            triplets.Add(new List<PointWrapper> { pw1, pw2, pw3 });
+            // - Back-Down-Right
+            pw1 = new PointWrapper(() => faces[CubeMapFace.Back][0, 2047], d => faces[CubeMapFace.Back][0, 2047] = d);
+            pw2 = new PointWrapper(() => faces[CubeMapFace.Down][0, 0], d => faces[CubeMapFace.Down][0, 0] = d);
+            pw3 = new PointWrapper(() => faces[CubeMapFace.Right][2047, 2047], d => faces[CubeMapFace.Right][2047, 2047] = d);
+            triplets.Add(new List<PointWrapper> { pw1, pw2, pw3 });
+            // - Back-Down-Left
+            pw1 = new PointWrapper(() => faces[CubeMapFace.Back][2047, 2047], d => faces[CubeMapFace.Back][2047, 2047] = d);
+            pw2 = new PointWrapper(() => faces[CubeMapFace.Down][2047, 0], d => faces[CubeMapFace.Down][2047, 0] = d);
+            pw3 = new PointWrapper(() => faces[CubeMapFace.Left][0, 2047], d => faces[CubeMapFace.Left][0, 2047] = d);
+            triplets.Add(new List<PointWrapper> { pw1, pw2, pw3 });
+
+            foreach (var triplet in triplets)
+            {
+                var sum = triplet[0].GetValue() + triplet[1].GetValue() + triplet[2].GetValue();
+                var avg = sum / 3;
+                triplet[0].SetValue(avg);
+                triplet[1].SetValue(avg);
+                triplet[2].SetValue(avg);
+            }
         }
 
         // Special thanks to ChatGPT for these regression codes.

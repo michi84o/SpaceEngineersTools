@@ -503,6 +503,10 @@ namespace PlanetCreator
             catch { return null; }
         }
 
+        public ICommand TripletFixCommand => new RelayCommand(o =>
+        {
+            EdgeFixCommand.Execute("triplet");
+        });
 
         public ICommand EdgeFixCommand => new RelayCommand(o =>
         {
@@ -571,7 +575,14 @@ namespace PlanetCreator
             // Apply fix
             try
             {
-                EdgeFixer.MakeSeemless(images, CancellationToken.None);
+                if (o is string s && s == "triplet")
+                {
+                    //EdgeFixer.MakeSeamless(images, CancellationToken.None, true);
+                    //EdgeFixer.MakeSeamless(images, CancellationToken.None, true);
+                    EdgeFixer.MakeSeamless(images, CancellationToken.None, true, true);
+                }
+                else
+                    EdgeFixer.MakeSeamless(images, CancellationToken.None);
             }
             catch (Exception e)
             {

@@ -84,6 +84,12 @@ namespace PlanetCreator
         */
 
         Dictionary<CubeMapFace, double[,]> _faces;
+        public Dictionary<CubeMapFace, double[,]> Faces
+        {
+            get => _faces;
+            set => _faces = value;
+        }
+
         Dictionary<CubeMapFace, byte[,]> _lakes;
         //Dictionary<CubeMapFace, List<object>> _quadrants; // Use for multitasking water fill
         double _lakeDepth = 30.0 / 65535;
@@ -154,7 +160,7 @@ namespace PlanetCreator
             }
 
             // Fix glitches at border of cubemaps
-            EdgeFixer.MakeSeemless(_faces, token);
+            EdgeFixer.MakeSeamless(_faces, token);
 
             if (token.IsCancellationRequested) return;
             if (_debug)
@@ -253,7 +259,7 @@ namespace PlanetCreator
             }
 
             // Fix glitches at border of cubemaps, again since erosion does not care about duplicate edge pixels
-            EdgeFixer.MakeSeemless(_faces, token);
+            EdgeFixer.MakeSeamless(_faces, token);
 
             ProgressChanged?.Invoke(this, new ProgressEventArgs(95));
 
@@ -305,21 +311,29 @@ namespace PlanetCreator
         public bool EnableErosion { get; set; } = true;
         public int ErosionMaxDropletLifeTime { get; set; } = 100;
         public double ErosionInteria { get; set; } = 0.01;
-        public double ErosionSedimentCapacityFactor { get; set; } = 25;
+        public double ErosionSedimentCapacityFactor { get; set; } = 35;
         public double ErosionDepositSpeed { get; set; } = 0.1;
         public double ErosionErodeSpeed { get; set; } = 0.3;
         public double ErosionDepositBrush { get; set; } = 3;
         public double ErosionErodeBrush { get; set; } = 3;
         public double Gravity { get; set; } = 10;
         public double EvaporateSpeed { get; set; } = 0.01;
-        void Erode(Random rnd, CancellationToken token)
+
+        /// <summary>
+        /// TODO: Edges not seamless!!! The duplicate point rule is not applied!
+        /// </summary>
+        /// <param name="rnd"></param>
+        /// <param name="token"></param>
+        /// <param name="startPoint">Can be used to start at a specific spot instead of random spot.</param>
+        /// <param name="startFace">Can be used to start at a specific face instead of random face.</param>
+        public void Erode(Random rnd, CancellationToken token, PointD? startPoint = null, CubeMapFace? startFace = null)
         {
             // Code based on Sebastian Lague
             // https://www.youtube.com/watch?v=eaXk97ujbPQ
             // https://github.com/SebLague/Hydraulic-Erosion
             // which is based on a paper by Hans Theobald Beyer
             // https://www.firespark.de/resources/downloads/implementation%20of%20a%20methode%20for%20hydraulic%20erosion.pdf
-            // which is based on a blog entry Alexey Volynskov
+            // which is based on a blog entry by Alexey Volynskov
             // http://ranmantaru.com/blog/2011/10/08/water-erosion-on-heightmap-terrain/
 
             int maxDropletLifetime = ErosionMaxDropletLifeTime;
@@ -352,28 +366,40 @@ namespace PlanetCreator
             PointD dir = new();
             var facesValues = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToArray();
 
-            lock (rnd)
+            if (rnd != null)
             {
-                if (!_debug)
+                lock (rnd)
                 {
-                    pos.X = rnd.NextDouble() * 2047;
-                    pos.Y = rnd.NextDouble() * 2047;
-                    face = facesValues[rnd.Next(0, facesValues.Length)];
-                }
-                else
-                {
-                    if (!ExtendedDebugMode)
-                    {
-                        pos.X = rnd.NextDouble() * 512 + 512;
-                        pos.Y = rnd.NextDouble() * 512 + 512;
-                    }
-                    else
+                    if (!_debug)
                     {
                         pos.X = rnd.NextDouble() * 2047;
                         pos.Y = rnd.NextDouble() * 2047;
+                        face = facesValues[rnd.Next(0, facesValues.Length)];
                     }
-                    face = _debugFace;
+                    else
+                    {
+                        if (!ExtendedDebugMode)
+                        {
+                            pos.X = rnd.NextDouble() * 512 + 512;
+                            pos.Y = rnd.NextDouble() * 512 + 512;
+                        }
+                        else
+                        {
+                            pos.X = rnd.NextDouble() * 2047;
+                            pos.Y = rnd.NextDouble() * 2047;
+                        }
+                        face = _debugFace;
+                    }
                 }
+            }
+            if (startPoint != null)
+            {
+                pos.X = startPoint.Value.X;
+                pos.Y = startPoint.Value.Y;
+            }
+            if (startFace != null)
+            {
+                face = startFace.Value;
             }
 
             #region Code based on Sebastian Lague
@@ -876,6 +902,7 @@ namespace PlanetCreator
             });
         }
 
+        // TODO: This code does not apply the duplicate pixel rule for map edges. Resulting height map is not seamless!
         void ApplyBrush(double brushRadius, CubeMapPoint mapLocation, PointD exactLocation, double materialAmount)
         {
             List<CubeMapPoint> brushPoints = new();
@@ -927,6 +954,55 @@ namespace PlanetCreator
 
                 if (brushPoints[ii].Value > 1) brushPoints[ii].Value = 1;
                 else if (brushPoints[ii].Value < 0) brushPoints[ii].Value = 0;
+            }
+
+            // Try to make map seamless by equalizing neighboring points between faces.
+            for (int ii = 0; ii < brushWeights.Count; ++ii)
+            {
+                var pt = brushPoints[ii];
+                int dx = 0;
+                int dy = 0;
+                bool triplet = false;
+                if (pt.PosX == 0 && pt.PosY > 0) dx = -1;
+                else if (pt.PosX == 2047 && pt.PosY > 0) dx = 1;
+                else if (pt.PosY == 0 && pt.PosX > 0) dy = -1;
+                else if (pt.PosY == 2047 && pt.PosX > 0) dy = 1;
+                else if (pt.PosX == 0 && pt.PosY == 0)
+                {
+                    triplet = true; dx = -1; dy = -1;
+                }
+                else if (pt.PosX == 2047 && pt.PosY == 0)
+                {
+                    triplet = true; dx = 1; dy = -1;
+                }
+                else if (pt.PosX == 0 && pt.PosY == 2047)
+                {
+                    triplet = true; dx = -1; dy = 1;
+                }
+                else if (pt.PosX == 2047 && pt.PosY == 2047)
+                {
+                    triplet = true; dx = 1; dy = 1;
+                }
+                else
+                {
+                    continue;
+                }
+                if (triplet)
+                {
+                    var n1 = pt.GetPointRelative(dx, 0);
+                    var n2 = pt.GetPointRelative(0, dy);
+                    var avg = (pt.Value + n1.Value + n2.Value) / 3;
+                    pt.Value = avg;
+                    n1.Value = avg;
+                    n2.Value = avg;
+                }
+                else
+                {
+                    var n = pt.GetPointRelative(dx, dy);
+                    var avg = (pt.Value + n.Value) / 2;
+                    pt.Value = avg;
+                    n.Value = avg;
+                }
             }
         }
 
