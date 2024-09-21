@@ -7,6 +7,7 @@ using System.Diagnostics.Metrics;
 using System.Drawing.Imaging;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -36,14 +37,124 @@ namespace SpaceEngineersOreRedistribution
 
             ImageView.MouseWheel += ImageView_MouseWheel;
             BorderView.MouseLeftButtonDown += ImageView_MouseLeftButtonDown; ;
-            BorderView.MouseLeftButtonUp += ImageView_MouseLeftButtonUp; ;
-            BorderView.MouseMove += ImageView_MouseMove; ;
+            BorderView.MouseLeftButtonUp += ImageView_MouseLeftButtonUp;
+            BorderView.MouseMove += ImageView_MouseMove;
+            BorderView.MouseRightButtonUp += BorderView_MouseRightButtonUp;
+            OreInspectorCb.Checked += OreInspectorCb_Checked;
+            OreInspectorCb.Unchecked += OreInspectorCb_Checked;
+        }
+
+        private void OreInspectorCb_Checked(object sender, RoutedEventArgs e)
+        {
+            UpdateOreInspectRect(new System.Windows.Point(0, 0));
+            ImageView.Focus();
+        }
+
+        void UpdateOreInspectRect(System.Windows.Point p)
+        {
+            Matrix m = ImageView.RenderTransform.Value;
+            if (p.X >= 0 && p.Y >= 0 && p.X < BorderView.ActualWidth && p.Y < BorderView.ActualHeight && OreInspectorCb.IsChecked
+                && ViewModel.SelectedPlanetDefinition != null)
+            {
+                OreInspectorRect.Visibility = Visibility.Visible;
+                // Canvas Top/Left ist based relative to Canvas. Canvas is render transformed.
+                // Need to convert mouse coordinates
+                // Offset in matrix is not scaled
+                double top = (p.Y - m.OffsetY) / m.M11 - OreInspectorRect.Height;
+                double left = (p.X - m.OffsetX) / m.M11 - OreInspectorRect.Width;
+                if (left < 0) left = 0;
+                if (top < 0) top = 0;
+                if (left > ImageView.Width - OreInspectorRect.Width) left = ImageView.Width - OreInspectorRect.Width;
+                if (top > ImageView.Height - OreInspectorRect.Height) top = ImageView.Height - OreInspectorRect.Height;
+                Canvas.SetTop(OreInspectorRect,top);
+                Canvas.SetLeft(OreInspectorRect,left);
+            }
+            else
+            {
+                OreInspectorRect.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void BorderView_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (BorderView.IsMouseCaptured || !OreInspectorCb.IsChecked ||
+                ViewModel.SelectedPlanetDefinition == null) return;
+            var x = (int)(Canvas.GetLeft(OreInspectorRect) + 0.5);
+            var y = (int)(Canvas.GetTop(OreInspectorRect) + 0.5);
+            // Check which image:
+            CubeMapFace face = CubeMapFace.Up;
+            if (x >= 0 && y >= 0 && x <= 2048 && y <= 2048)
+            {
+                face = CubeMapFace.Up;
+            }
+            else if (x >= 0 && y >= 2048 && x <= 2048 && y <= 4096)
+            {
+                face = CubeMapFace.Front;
+                y -= 2048;
+            }
+            else if (x >= 2048 && y >= 2048 && x <= 4096 && y <= 4096)
+            {
+                face = CubeMapFace.Right;
+                x -= 2048;
+                y -= 2048;
+            }
+            else if (x >= 4096 && y >= 2048 && x <= 6144 && y <= 4096)
+            {
+                face = CubeMapFace.Back;
+                x -= 4096;
+                y -= 2048;
+            }
+            else if (x >= 6144 && y >= 2048 && x <= 8192 && y <= 4096)
+            {
+                face = CubeMapFace.Left;
+                x -= 6144;
+                y -= 2048;
+            }
+            else if (x >= 4096 && y >= 4096 && x <= 6144 && y <= 6144)
+            {
+                face = CubeMapFace.Down;
+                x -= 4096;
+                y -= 4096;
+            }
+            else
+                return;
+
+            // Copy pixels into matrix
+            var width = (int)(OreInspectorRect.Width + .5);
+            var height = (int)(OreInspectorRect.Height + .5);
+            OreMapping[,] oreMap = new OreMapping[width, height];
+
+            //var types = ViewModel.OreTypes;
+
+            var info = ViewModel.GetInfo(face, CancellationToken.None);
+            for (int xx = 0; xx < width; ++xx)
+            {
+                for (int yy = 0; yy < height; ++yy)
+                {
+                    var xxx = xx + x;
+                    var yyy = yy + y;
+                    if (xxx >= 0 && xxx < 2048 && yyy >= 0 && yyy <= 2048)
+                    {
+                        var color = info.B[xxx, yyy];
+                        var mapping = ViewModel.SelectedPlanetDefinition.OreMappings.FirstOrDefault(o => o.Value == color);
+                        oreMap[xx, yy] = mapping;
+                    }
+                }
+            }
+
+            var win = new Ore3dView();
+            win.ViewModel.AddCuboids(oreMap);
+            win.ShowDialog();
         }
 
         bool _moved = false;
         private void ImageView_MouseMove(object sender, MouseEventArgs e)
         {
-            if (!BorderView.IsMouseCaptured) { return; }
+            if (!BorderView.IsMouseCaptured)
+            {
+                UpdateOreInspectRect(e.MouseDevice.GetPosition(BorderView));
+                return;
+            }
             if (!_moved)
             {
                 // For some reason we get a mouse moved event uppon first mouse_down.
@@ -59,6 +170,7 @@ namespace SpaceEngineersOreRedistribution
             m.OffsetX = _origin.X + (p.X - _start.X);
             m.OffsetY = _origin.Y + (p.Y - _start.Y);
             ImageView.RenderTransform = new MatrixTransform(m);
+            UpdateOreInspectRect(p);
         }
 
         private void ImageView_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -79,14 +191,19 @@ namespace SpaceEngineersOreRedistribution
             _origin.Y = ImageView.RenderTransform.Value.OffsetY;
         }
 
+
         private void ImageView_MouseWheel(object sender, MouseWheelEventArgs e)
         {
             System.Windows.Point p = e.MouseDevice.GetPosition(ImageView);
             Matrix m = ImageView.RenderTransform.Value;
             if (e.Delta > 0)
+            {
                 m.ScaleAtPrepend(1.1, 1.1, p.X, p.Y);
+            }
             else
+            {
                 m.ScaleAtPrepend(1 / 1.1, 1 / 1.1, p.X, p.Y);
+            }
             ImageView.RenderTransform = new MatrixTransform(m);
         }
 

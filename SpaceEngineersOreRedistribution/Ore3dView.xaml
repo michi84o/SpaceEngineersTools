@@ -1,0 +1,71 @@
+﻿<Window x:Class="SpaceEngineersOreRedistribution.Ore3dView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:SpaceEngineersOreRedistribution"
+        mc:Ignorable="d"
+        Title="Ore 3D Viewer" Height="480" Width="640">
+    <Window.DataContext>
+        <local:Ore3dViewModel x:Name="ViewModel"/>
+    </Window.DataContext>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition/>
+        </Grid.RowDefinitions>
+        <StackPanel Orientation="Vertical" Margin="3">
+            <StackPanel
+                Orientation="Horizontal">
+                <Slider Width="100" Minimum="-180" Maximum="180" Value="{Binding CamX}"/>
+                <TextBlock Text="{Binding CamX}"/>
+                <Slider Width="100" Minimum="-180" Maximum="180" Value="{Binding CamY}"/>
+                <TextBlock Text="{Binding CamY}"/>
+                <Slider Width="100" Minimum="-180" Maximum="180" Value="{Binding CamZ}"/>
+                <TextBlock Text="{Binding CamZ}"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal">
+                <Slider Width="100" Minimum="0" Maximum="200" Value="{Binding CamDistX}"/>
+                <TextBlock Text="{Binding CamDistX}"/>
+                <Slider Width="100" Minimum="0" Maximum="200" Value="{Binding CamDistY}"/>
+                <TextBlock Text="{Binding CamDistY}"/>
+                <Slider Width="100" Minimum="0" Maximum="200" Value="{Binding CamDistZ}"/>
+                <TextBlock Text="{Binding CamDistZ}"/>
+            </StackPanel>
+
+        </StackPanel>
+        <Viewbox Grid.Row="1">
+            <Canvas Width="320" Height="240">
+                <Viewport3D
+                x:Name="MyViewPort"
+                ClipToBounds="True" Width="320" Height="240">
+                    <Viewport3D.Camera>
+                        <PerspectiveCamera
+                            LookDirection="0,0,-1" FieldOfView="60"
+                            Position="{Binding CamPos}">
+                            <PerspectiveCamera.Transform>
+                                <Transform3DGroup>
+                                    <RotateTransform3D>
+                                        <RotateTransform3D.Rotation>
+                                            <AxisAngleRotation3D Axis="0 1 0" Angle="{Binding CamY}" />
+                                        </RotateTransform3D.Rotation>
+                                    </RotateTransform3D>
+                                    <RotateTransform3D>
+                                        <RotateTransform3D.Rotation>
+                                            <AxisAngleRotation3D Axis="1 0 0" Angle="{Binding CamX}" />
+                                        </RotateTransform3D.Rotation>
+                                    </RotateTransform3D>
+                                    <RotateTransform3D>
+                                        <RotateTransform3D.Rotation>
+                                            <AxisAngleRotation3D Axis="0 0 1" Angle="{Binding CamZ}" />
+                                        </RotateTransform3D.Rotation>
+                                    </RotateTransform3D>
+                                </Transform3DGroup>
+                            </PerspectiveCamera.Transform>
+                        </PerspectiveCamera>
+                    </Viewport3D.Camera>
+                </Viewport3D>
+            </Canvas>
+        </Viewbox>
+    </Grid>
+</Window>

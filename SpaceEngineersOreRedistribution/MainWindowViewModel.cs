@@ -536,7 +536,7 @@ namespace SpaceEngineersOreRedistribution
 
         Dictionary<CubeMapFace, ImageData> _images = new();
 
-        ImageData GetInfo(CubeMapFace face, CancellationToken token)
+        public ImageData GetInfo(CubeMapFace face, CancellationToken token)
         {
             var dir = Path.GetDirectoryName(_lastOpenedFile);
             var imageDir = Path.Combine(dir, "PlanetDataFiles", SelectedPlanetDefinition.Name);

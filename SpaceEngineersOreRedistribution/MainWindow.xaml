@@ -37,6 +37,7 @@
             </MenuItem>
             <MenuItem Header="Redistribute Ore" Command="{Binding RedistributeOreCommand}" />
             <MenuItem Header="Rewrite Biomes" Command="{Binding RewriteBiomesCommand}" />
+            <MenuItem x:Name="OreInspectorCb" Header="Ore Inspector" IsCheckable="True" IsChecked="True" VerticalAlignment="Center" />
         </Menu>
         <GroupBox
             Grid.Row="1" Grid.Column="0" MinWidth="150" Header="Planets" Margin="3">
@@ -195,6 +196,7 @@
                     <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="2048" Source="{Binding TileBack}"/>
                     <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="6144" Canvas.Top="2048" Source="{Binding TileLeft}"/>
                     <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="4096" Source="{Binding TileDown}"/>
+                    <Rectangle x:Name="OreInspectorRect"  Stroke="Violet" StrokeThickness="1" Width="20" Height="20" Visibility="Collapsed"/>
                 </Canvas>
             </Border>
         </GroupBox>
