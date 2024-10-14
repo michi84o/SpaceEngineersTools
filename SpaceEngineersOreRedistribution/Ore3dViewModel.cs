@@ -70,6 +70,53 @@ namespace SpaceEngineersOreRedistribution
             }
         }
 
+        double _camDirX = 0;
+        public double CamDirX
+        {
+            get => _camDirX;
+            set
+            {
+                if (SetProp(ref _camDirX, value))
+                {
+                    CamDir = new Vector3D(value, CamDirY, CamDirZ);
+                }
+            }
+        }
+
+        double _camDirY = 0;
+        public double CamDirY
+        {
+            get => _camDirY;
+            set
+            {
+                if (SetProp(ref _camDirY, value))
+                {
+                    CamDir = new Vector3D(CamDirX, value, CamDirZ);
+                }
+            }
+        }
+
+        double _camDirZ = -1;
+        public double CamDirZ
+        {
+            get => _camDirZ;
+            set
+            {
+                if (SetProp(ref _camDirZ, value))
+                {
+                    CamDir = new Vector3D(CamDirX, CamDirY, value);
+                }
+            }
+        }
+
+        Vector3D _camDir = new Vector3D(0, 0, -1);
+        public Vector3D CamDir
+        {
+            get => _camDir;
+            set => SetProp(ref _camDir, value);
+        }
+
+
         Point3D _camPos = new Point3D(50,40,120);
         public Point3D CamPos
         {

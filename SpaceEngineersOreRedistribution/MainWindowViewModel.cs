@@ -596,7 +596,7 @@ namespace SpaceEngineersOreRedistribution
                 // Tier 3: Very deep veins. Depth: 140m - 372m
                 mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 140, Depth = 62, ColorInfluence = "15", TargetColor = "616c83" });
                 mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 200, Depth = 72, ColorInfluence = "15", TargetColor = "616c83" });
-                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 370, Depth = 102, ColorInfluence = "15", TargetColor = "616c83" });
+                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 270, Depth = 102, ColorInfluence = "15", TargetColor = "616c83" });
                 // Bonus: Very deep ore. Depth: 370m - 450m
                 if (setup.ViewModel.OreInfos.Any(o => o.Name == oreType && o.VeryDeepOre))
                     mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 370, Depth = 80, ColorInfluence = "15", TargetColor = "616c83" });

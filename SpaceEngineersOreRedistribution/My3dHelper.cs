@@ -14,8 +14,8 @@ namespace SpaceEngineersOreRedistribution
         const double DepthUnit = 5;
         public static ModelVisual3D CreateCuboid(int x, int y, double start, double depth)
         {
-            var z1 = -1 * start * DepthUnit * BaseUnit;
-            var z2 = (-1 * start * DepthUnit - depth * DepthUnit) * BaseUnit;
+            var z1 = -1 * start * DepthUnit;
+            var z2 = (-1 * start * DepthUnit - depth * DepthUnit);
             var x1 = x * BaseUnit;
             var x2 = x * BaseUnit + BaseUnit;
             var y1 = y * BaseUnit;
@@ -39,29 +39,33 @@ namespace SpaceEngineersOreRedistribution
             // (a, c, d) // c crossed
             // flip b & d to change surface direction
 
+            var red = 255 - (int)(start*50);
+
+            var brush = new SolidColorBrush(Color.FromArgb(128, (byte)red, 0, 0));
+
             //front
-            cuboid.Children.Add(CreateTriangle(p0, p1, p2));
-            cuboid.Children.Add(CreateTriangle(p0, p2, p3));
+            cuboid.Children.Add(CreateTriangle(p0, p1, p2, brush));
+            cuboid.Children.Add(CreateTriangle(p0, p2, p3, brush));
 
             //right
-            cuboid.Children.Add(CreateTriangle(p1, p5, p6));
-            cuboid.Children.Add(CreateTriangle(p1, p6, p2));
+            cuboid.Children.Add(CreateTriangle(p1, p5, p6, brush));
+            cuboid.Children.Add(CreateTriangle(p1, p6, p2, brush));
 
             //back
-            cuboid.Children.Add(CreateTriangle(p6, p5, p4));
-            cuboid.Children.Add(CreateTriangle(p6, p4, p7));
+            cuboid.Children.Add(CreateTriangle(p6, p5, p4, brush));
+            cuboid.Children.Add(CreateTriangle(p6, p4, p7, brush));
 
             //left
-            cuboid.Children.Add(CreateTriangle(p0, p3, p7));
-            cuboid.Children.Add(CreateTriangle(p0, p7, p4));
+            cuboid.Children.Add(CreateTriangle(p0, p3, p7, brush));
+            cuboid.Children.Add(CreateTriangle(p0, p7, p4, brush));
 
             //top
-            cuboid.Children.Add(CreateTriangle(p3, p2, p6));
-            cuboid.Children.Add(CreateTriangle(p3, p6, p7));
+            cuboid.Children.Add(CreateTriangle(p3, p2, p6, brush));
+            cuboid.Children.Add(CreateTriangle(p3, p6, p7, brush));
 
             //bottom
-            cuboid.Children.Add(CreateTriangle(p0, p4, p5));
-            cuboid.Children.Add(CreateTriangle(p0, p5, p1));
+            cuboid.Children.Add(CreateTriangle(p0, p4, p5, brush));
+            cuboid.Children.Add(CreateTriangle(p0, p5, p1, brush));
 
             ModelVisual3D model = new ModelVisual3D();
             model.Content = cuboid;
@@ -77,8 +81,10 @@ namespace SpaceEngineersOreRedistribution
             var p2 = new Point3D(0 * BaseUnit, 20 * BaseUnit, .1);
             var p3 = new Point3D(20 * BaseUnit, 20 * BaseUnit, .1);
 
-            surface.Children.Add(CreateTriangle(p2, p0, p1, true));
-            surface.Children.Add(CreateTriangle(p2, p1, p3, true));
+            var brush = new SolidColorBrush(Color.FromArgb(50, 128, 128, 128));
+
+            surface.Children.Add(CreateTriangle(p2, p0, p1, brush));
+            surface.Children.Add(CreateTriangle(p2, p1, p3, brush));
 
             ModelVisual3D model = new ModelVisual3D();
             model.Content = surface;
@@ -86,7 +92,7 @@ namespace SpaceEngineersOreRedistribution
             return model;
         }
 
-        static public Model3DGroup CreateTriangle(Point3D p0, Point3D p1, Point3D p2, bool neutralColor = false)
+        static public Model3DGroup CreateTriangle(Point3D p0, Point3D p1, Point3D p2, Brush brush)
         {
             MeshGeometry3D mesh = new MeshGeometry3D();
             mesh.Positions.Add(p0);
@@ -101,17 +107,13 @@ namespace SpaceEngineersOreRedistribution
             mesh.Normals.Add(normal);
             mesh.Normals.Add(normal);
 
-            var brush = neutralColor ?
-                new SolidColorBrush(Color.FromArgb(50, 128, 128, 128)) :
-                new SolidColorBrush(Color.FromArgb(128, 255, 0, 0));
-
             Material material = new DiffuseMaterial(brush); //new DiffuseMaterial(Brushes.Red);
             MaterialGroup materialGroup = new MaterialGroup();
             materialGroup.Children.Add(material);
             //materialGroup.Children.Add(new EmissiveMaterial(Brushes.DarkBlue));
 
             GeometryModel3D model = new GeometryModel3D(mesh, materialGroup);
-            //model.BackMaterial = materialGroup;
+            model.BackMaterial = materialGroup;
             Model3DGroup group = new Model3DGroup();
             group.Children.Add(model);
             return group;
