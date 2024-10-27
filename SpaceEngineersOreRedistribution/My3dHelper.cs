@@ -12,7 +12,7 @@ namespace SpaceEngineersOreRedistribution
     {
         const double BaseUnit = 5;
         const double DepthUnit = 5;
-        public static ModelVisual3D CreateCuboid(int x, int y, double start, double depth)
+        public static ModelVisual3D CreateCuboid(int x, int y, double start, double depth, RgbValue rgb)
         {
             var z1 = -1 * start * DepthUnit;
             var z2 = (-1 * start * DepthUnit - depth * DepthUnit);
@@ -39,9 +39,13 @@ namespace SpaceEngineersOreRedistribution
             // (a, c, d) // c crossed
             // flip b & d to change surface direction
 
-            var red = 255 - (int)(start*50);
+            //var green = 255 - (int)(start*50);
 
-            var brush = new SolidColorBrush(Color.FromArgb(128, (byte)red, 0, 0));
+            SolidColorBrush brush;
+            if (rgb != null)
+                brush = new SolidColorBrush(Color.FromArgb(128, rgb.R, rgb.G, rgb.B));
+            else
+                brush = new SolidColorBrush(Color.FromArgb(128, 0, 0, 128));
 
             //front
             cuboid.Children.Add(CreateTriangle(p0, p1, p2, brush));
@@ -125,6 +129,23 @@ namespace SpaceEngineersOreRedistribution
             Vector3D v0 = new Vector3D(p1.X - p0.X, p1.Y - p0.Y, p1.Z - p0.Z);
             Vector3D v1 = new Vector3D(p2.X - p1.X, p2.Y - p1.Y, p2.Z - p1.Z);
             return Vector3D.CrossProduct(v0, v1);
+        }
+
+        public static void CalculateCamera(double radius, double longitude, double latitude, out Vector3D direction, out Vector3D position)
+        {
+            Vector3D centerOfSphere = new Vector3D(BaseUnit * 10, BaseUnit * 10, 0);
+            position = new Vector3D();
+
+            position.Z = radius * Math.Sin(latitude * Math.PI / 180);
+            // Z-Position other than 0 changes radius!
+            radius = position.Z / Math.Tan(latitude * Math.PI / 180);
+
+            position.X = radius * Math.Cos(longitude * Math.PI / 180);
+            position.Y = radius * Math.Sin(longitude * Math.PI / 180);
+
+            direction = position * -1;
+            direction.Normalize();
+            position += centerOfSphere;
         }
     }
 }

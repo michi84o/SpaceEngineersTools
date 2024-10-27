@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SpaceEngineersOreRedistribution"
         mc:Ignorable="d"
-        Title="Ore 3D Viewer - Sorry for the Camera Controls" Height="480" Width="640">
+        Title="Ore 3D Viewer" Height="480" Width="640">
     <Window.DataContext>
         <local:Ore3dViewModel x:Name="ViewModel"/>
     </Window.DataContext>
@@ -14,8 +14,17 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition/>
         </Grid.RowDefinitions>
-        <StackPanel Orientation="Vertical" Margin="3">
+        <!--<StackPanel Orientation="Vertical" Margin="3">
             <StackPanel
+     Orientation="Horizontal">
+                <Slider Width="100" Minimum="50" Maximum="300" Value="{Binding Radius}"/>
+                <TextBlock Text="{Binding Radius}"/>
+                <Slider Width="100" Minimum="0" Maximum="360" Value="{Binding Longitude}"/>
+                <TextBlock Text="{Binding Longitude}"/>
+                <Slider Width="100" Minimum="-89" Maximum="89" Value="{Binding Latitude}"/>
+                <TextBlock Text="{Binding Latitude}"/>
+            </StackPanel>
+            --><!--<StackPanel
                 Orientation="Horizontal">
                 <Slider Width="100" Minimum="-180" Maximum="180" Value="{Binding CamX}"/>
                 <TextBlock Text="{Binding CamX}"/>
@@ -23,8 +32,8 @@
                 <TextBlock Text="{Binding CamY}"/>
                 <Slider Width="100" Minimum="-180" Maximum="180" Value="{Binding CamZ}"/>
                 <TextBlock Text="{Binding CamZ}"/>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal">
+            </StackPanel>-->
+            <!--<StackPanel Orientation="Horizontal">
                 <Slider Width="100" Minimum="0" Maximum="200" Value="{Binding CamDistX}"/>
                 <TextBlock Text="{Binding CamDistX}"/>
                 <Slider Width="100" Minimum="0" Maximum="200" Value="{Binding CamDistY}"/>
@@ -39,20 +48,21 @@
                 <TextBlock Text="{Binding CamDirY}"/>
                 <Slider Width="100" Minimum="-1" Maximum="1" Value="{Binding CamDirZ}"/>
                 <TextBlock Text="{Binding CamDirZ}"/>
-            </StackPanel>
+            </StackPanel>--><!--
 
-        </StackPanel>
+        </StackPanel>-->
         <Viewbox Grid.Row="1">
-            <Canvas Width="320" Height="240">
+            <Canvas Width="320" Height="240" Background="White"
+                    x:Name="MyCanvas">
                 <Viewport3D
-                x:Name="MyViewPort"
-                ClipToBounds="True" Width="320" Height="240">
+                    x:Name="MyViewPort"
+                    ClipToBounds="True" Width="320" Height="240">
                     <Viewport3D.Camera>
                         <PerspectiveCamera
                             x:Name="MyCam"
                             LookDirection="{Binding CamDir}" FieldOfView="60"
                             Position="{Binding CamPos}">
-                            <PerspectiveCamera.Transform>
+                            <!--<PerspectiveCamera.Transform>
                                 <Transform3DGroup>
                                     <RotateTransform3D>
                                         <RotateTransform3D.Rotation>
@@ -70,7 +80,7 @@
                                         </RotateTransform3D.Rotation>
                                     </RotateTransform3D>
                                 </Transform3DGroup>
-                            </PerspectiveCamera.Transform>
+                            </PerspectiveCamera.Transform>-->
                         </PerspectiveCamera>
                     </Viewport3D.Camera>
                 </Viewport3D>

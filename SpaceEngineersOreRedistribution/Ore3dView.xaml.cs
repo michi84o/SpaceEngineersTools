@@ -1,6 +1,7 @@
 ﻿using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -26,6 +27,7 @@ namespace SpaceEngineersOreRedistribution
             InitializeComponent();
             ViewModel.Cuboids.CollectionChanged += Cuboids_CollectionChanged;
 
+            MyCam.UpDirection = new Vector3D(0, 0, 1);
             // Idea for mouse controls:
             // Camera is on virtual sphere:
             // - Camera always looks towards center
@@ -33,43 +35,64 @@ namespace SpaceEngineersOreRedistribution
             // - Mouse left right moves it longitude
             // - Mouse up down moves it latitude
 
-            //MyViewPort.MouseDown += MyViewPort_MouseDown;
-            //MyViewPort.MouseMove += MyViewPort_MouseMove;
-            //MyViewPort.MouseWheel += MyViewPort_MouseWheel;
+            MyCanvas.MouseDown += MyViewPort_MouseDown;
+            MyCanvas.MouseUp += MyViewPort_MouseUp; ;
+            MyCanvas.MouseMove += MyViewPort_MouseMove;
+            MyCanvas.MouseWheel += MyViewPort_MouseWheel;
         }
 
-        // TODO: Zoom, Pan, Rotate with mouse
-        //private void MyViewPort_MouseWheel(object sender, MouseWheelEventArgs e)
-        //{
-        //    // Zooming
-        //    double zoomFactor = 1.1;
-        //    if (e.Delta < 0)
-        //        zoomFactor = 1 / zoomFactor;
+        private void MyViewPort_MouseUp(object sender, MouseButtonEventArgs e)
+        {
+            MyCanvas.ReleaseMouseCapture();
+            _dragCount = 0;
+        }
 
-        //    // Berechne neuen Kameraposition für Zoom
-        //    MyCam.Position = new Point3D(
-        //        MyCam.Position.X * zoomFactor,
-        //        MyCam.Position.Y * zoomFactor,
-        //        MyCam.Position.Z * zoomFactor);
-        //}
+        private void MyViewPort_MouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            var delta = e.Delta / 20.0;
+            var radius = ViewModel.Radius + delta;
+            if (radius < 50) radius = 50;
+            if (radius > 300) radius = 300;
+            ViewModel.Radius = radius;
+        }
 
-        //private void MyViewPort_MouseMove(object sender, MouseEventArgs e)
-        //{
-        //    if (e.LeftButton == MouseButtonState.Pressed)
-        //    {
-        //        // Panning
-        //        Vector delta = e.GetPosition(MyViewPort) - _previousPosition;
-        //        MyCam.Position += new Vector3D(-delta.X, delta.Y, 0);
-        //        _previousPosition = e.GetPosition(MyViewPort);
-        //    }
-        //    // TODO: Rotation
-        //}
+        private void MyViewPort_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+            {
+                // There is a bug that causes first deltas to be too large
+                if (_dragCount < 3)
+                {
+                    _previousPosition = e.GetPosition(MyCanvas);
+                    ++_dragCount;
+                    return;
+                }
 
-        //Point _previousPosition;
-        //private void MyViewPort_MouseDown(object sender, MouseButtonEventArgs e)
-        //{
-        //    _previousPosition = e.GetPosition(MyViewPort);
-        //}
+                // Panning
+                Vector delta = e.GetPosition(MyCanvas) - _previousPosition;
+
+                var lo = ViewModel.Longitude - delta.X / 2;
+                var la = ViewModel.Latitude + delta.Y / 2;
+
+                if (lo < 0) lo = 0;
+                if (lo > 360) lo = 360;
+                if (la < -89) la = -89;
+                if (la > 89) la = 89;
+
+                ViewModel.Longitude = lo;
+                ViewModel.Latitude = la;
+
+                _previousPosition = e.GetPosition(MyCanvas);
+            }
+        }
+
+        Point _previousPosition;
+        int _dragCount = 0;
+        private void MyViewPort_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            MyCanvas.CaptureMouse();
+            _dragCount = 0;
+        }
 
         private void Cuboids_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {

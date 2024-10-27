@@ -15,7 +15,7 @@ namespace SpaceEngineersOreRedistribution
         public ObservableCollection<ModelVisual3D> Cuboids { get; } = new ObservableCollection<ModelVisual3D>();
 
 
-        double _radius;
+        double _radius = 120;
         public double Radius
         {
             get => _radius;
@@ -28,7 +28,7 @@ namespace SpaceEngineersOreRedistribution
             }
         }
 
-        double _longitude;
+        double _longitude = 270;
         public double Longitude
         {
             get => _longitude;
@@ -41,7 +41,7 @@ namespace SpaceEngineersOreRedistribution
             }
         }
 
-        double _latitude;
+        double _latitude = 45;
         public double Latitude
         {
             get => _latitude;
@@ -57,8 +57,10 @@ namespace SpaceEngineersOreRedistribution
         void UpdateCamera()
         {
             // Assume center of spere is ground center
+            My3dHelper.CalculateCamera(Radius, Longitude, Latitude, out var direction, out var position);
+            CamDir = direction;
+            CamPos = new Point3D(position.X, position.Y, position.Z);
         }
-
 
         double _camX = 40; double _camY; double _camZ;
         public double CamX
@@ -170,6 +172,11 @@ namespace SpaceEngineersOreRedistribution
             set => SetProp(ref _camPos, value);
         }
 
+        public Ore3dViewModel()
+        {
+            UpdateCamera();
+        }
+
         public void AddCuboids(OreMapping[,] oreMap)
         {
             Cuboids.Clear();
@@ -184,7 +191,7 @@ namespace SpaceEngineersOreRedistribution
                     // Base unit is 50m
                     var start = map.Start / 50.0;
                     var depth = map.Depth / 50.0;
-                    Cuboids.Add(My3dHelper.CreateCuboid(x, oreMap.GetLength(1) - y, start, depth));
+                    Cuboids.Add(My3dHelper.CreateCuboid(x, oreMap.GetLength(1) - y, start, depth, map.MapRgbValue));
                 }
             }
 
