@@ -14,6 +14,52 @@ namespace SpaceEngineersOreRedistribution
         public event PropertyChangedEventHandler PropertyChanged;
         public ObservableCollection<ModelVisual3D> Cuboids { get; } = new ObservableCollection<ModelVisual3D>();
 
+
+        double _radius;
+        public double Radius
+        {
+            get => _radius;
+            set
+            {
+                if (SetProp(ref _radius, value))
+                {
+                    UpdateCamera();
+                }
+            }
+        }
+
+        double _longitude;
+        public double Longitude
+        {
+            get => _longitude;
+            set
+            {
+                if (SetProp(ref _longitude, value))
+                {
+                    UpdateCamera();
+                }
+            }
+        }
+
+        double _latitude;
+        public double Latitude
+        {
+            get => _latitude;
+            set
+            {
+                if (SetProp(ref _latitude, value))
+                {
+                    UpdateCamera();
+                }
+            }
+        }
+
+        void UpdateCamera()
+        {
+            // Assume center of spere is ground center
+        }
+
+
         double _camX = 40; double _camY; double _camZ;
         public double CamX
         {

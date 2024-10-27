@@ -210,7 +210,7 @@ namespace SpaceEngineersOreRedistribution
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
 #if DEBUG
-            ViewModel.OpenPlanetDefinition(@"C:\Users\Michael\AppData\Roaming\SpaceEngineers\Mods\DebugVanillaSolarSystem\Data\PlanetGeneratorDefinitions.sbc");
+            ViewModel.OpenPlanetDefinition(@"C:\Users\Michael\AppData\Roaming\SpaceEngineers\Mods\OreRedistribution2\Data\PlanetGeneratorDefinitions.sbc");
 #endif
 
             bool test = false;

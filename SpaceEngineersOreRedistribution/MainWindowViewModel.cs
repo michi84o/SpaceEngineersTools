@@ -737,7 +737,6 @@ namespace SpaceEngineersOreRedistribution
                         // - While drawing
                         // - If last drawn height is not starting height give a 30% to jump back to starting height. 20% Chance of getting further away.
                         //   50% of staying at same height.
-
                         for (int i=0;i<spawnSize;++i)
                         {
                             var direction = rnd.Next(4);
@@ -751,9 +750,14 @@ namespace SpaceEngineersOreRedistribution
                                 if (direction > 3) direction = 0;
                                 // direction: 0 -> left, 1 -> up, 2 -> right, 3 -> down
                                 int dx, dy;
+
+                                // 10% chance of skipping over a pixel
+                                var skipX = rnd.NextDouble() < 0.1 ? 2 : 1;
+                                var skipY = rnd.NextDouble() < 0.1 ? 2 : 1;
+
                                 GetDeltas(direction, out dx, out dy);
-                                nextOreToDraw.X = lastX + dx;
-                                nextOreToDraw.Y = lastY + dy;
+                                nextOreToDraw.X = lastX + dx * skipX;
+                                nextOreToDraw.Y = lastY + dy * skipY;
 
                                 if (!drawnOre.Contains(nextOreToDraw))
                                 {

@@ -85,23 +85,55 @@ namespace SpaceEngineersOreRedistribution
                 Parallel.For(1, 2047, y =>
                 {
                     if (token.IsCancellationRequested) return;
-                    List<int> neighbors = new()
-                    {
-                        hMap[x - 1, y].PackedValue,
-                        hMap[x + 1, y].PackedValue,
-                        hMap[x, y - 1].PackedValue,
-                        hMap[x, y + 1].PackedValue
-                    };
-                    var currentPixel = hMap[x, y].PackedValue;
-                    int maxGradient = 0;
-                    foreach (var n in neighbors)
-                    {
-                        var gradient = Math.Abs(currentPixel - n);
-                        if (gradient > maxGradient) maxGradient = gradient;
-                    }
-                    maxGradient *= 20;
-                    if (maxGradient > 65535) maxGradient = 65535;
-                    retval.HGrad[x, y] = (byte)(255.0*maxGradient/65535.0 + 0.5);
+                    // Old Code: Just calc diff
+                    //List<int> neighbors = new()
+                    //{
+                    //    hMap[x - 1, y].PackedValue,
+                    //    hMap[x + 1, y].PackedValue,
+                    //    hMap[x, y - 1].PackedValue,
+                    //    hMap[x, y + 1].PackedValue
+                    //};
+                    //var currentPixel = hMap[x, y].PackedValue;
+                    //int maxGradient = 0;
+                    //foreach (var n in neighbors)
+                    //{
+                    //    var gradient = Math.Abs(currentPixel - n);
+                    //    if (gradient > maxGradient) maxGradient = gradient;
+                    //}
+                    //maxGradient *= 20;
+                    //if (maxGradient > 65535) maxGradient = 65535;
+                    //retval.HGrad[x, y] = (byte)(255.0 * maxGradient / 65535.0 + 0.5);
+
+                    // New Code: Calc degrees TODO: Not working
+                    double dh = hMap[x - 1, y].PackedValue - hMap[x, y].PackedValue;
+                    double dv = hMap[x, y - 1].PackedValue - hMap[x, y].PackedValue;
+
+                    var pixelWidthMeter = 100000.0 / (2048 * 4); // 100km planet;
+                    // 1 pixel = 12m ?
+                    var verticalPixelWidthMeter = 3*655.35 / 65535; // 3cm?
+
+                    var normal = My3dHelper.CalcNormal(
+                        new System.Windows.Media.Media3D.Point3D(
+                            -1 * pixelWidthMeter,
+                            0,
+                            hMap[x - 1, y].PackedValue * verticalPixelWidthMeter),
+                        new System.Windows.Media.Media3D.Point3D(
+                            0 ,
+                            -1 * pixelWidthMeter,
+                            hMap[x, y - 1].PackedValue * verticalPixelWidthMeter),
+                        new System.Windows.Media.Media3D.Point3D(
+                            x,
+                            y,
+                            hMap[x, y].PackedValue * verticalPixelWidthMeter));
+
+                    if (normal.Z < 0)
+                        normal *= -1;
+
+                    var angle = Math.Atan(normal.Z / Math.Sqrt(normal.X * normal.X + normal.Y * normal.Y));
+                    double slopeAngleDeg = angle * 180 / Math.PI;
+
+                    retval.HGrad[x, y] = (byte)(255 - slopeAngleDeg * 255.0 / 90); // Scale to 8-bit
+
                 });
             });
             matMap.Dispose();
