@@ -89,7 +89,7 @@
                     <Button Content="Import" Margin="3" Width="100" Command="{Binding ImportCommand}"/>
                     <Button Content="Export" Margin="3" Width="100" Command="{Binding ExportCommand}"/>
                 </StackPanel>
-                <TextBlock Grid.Row="2" Text="Multiple definition of same ore allowed.&#x0d;&#x0a;Weight: Spawn probability relative to other ore. Weights will be summed up to use relative %.&#x0d;&#x0a;Size: 1-50 ore patches per vein, 0 for random (5-25), default: 15&#x0d;&#x0a;Depth: 0-9 (9 only if deep ore enabled!), -1 for random (0-9), default: -1&#x0d;&#x0a;Size + Depth will still be randomized using a Gauss distribution."/>
+                <TextBlock Grid.Row="2" Text="Multiple definition of same ore allowed.&#x0d;&#x0a;Weight: Spawn probability relative to other ore. Weights will be summed up to use relative %.&#x0d;&#x0a;Size: 1-100 ore patches per vein, 0 for random (5-30), default: 15&#x0d;&#x0a;Depth: 0-9 (9 only if deep ore enabled!), -1 for random (0-9), default: -1&#x0d;&#x0a;Size + Depth will still be randomized using a Gauss distribution."/>
                 <StackPanel Orientation="Horizontal" Grid.Row="3" >
                     <TextBlock Text="Standard Deviation for Gauss (1-50% rel. to max, default: 10%): "/>
                     <TextBox Width="50" Text="{Binding StdDev}"/>

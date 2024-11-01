@@ -214,7 +214,7 @@ namespace SpaceEngineersOreRedistribution
                 {
                     if (SetProp(ref _typicalSize, value))
                     {
-                        if (value > 50) _typicalSize = 50;
+                        if (value > 100) _typicalSize = 100;
                         else if (value < 0) _typicalSize = 0;
                     }
                 }

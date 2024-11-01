@@ -740,7 +740,7 @@ namespace SpaceEngineersOreRedistribution
                         var spawnSize = info.TypicalSize;
                         var depth = info.TypicalDepth;
                         // Randomize if not set by user
-                        if (spawnSize == 0) spawnSize = rnd.Next(5, 26);
+                        if (spawnSize == 0) spawnSize = rnd.Next(5, 31);
                         if (depth == -1) depth = rnd.Next(0, info.VeryDeepOre ? 9:10);
                         // Gauss randomizer
                         var stdDevPercentage = setup.ViewModel.StdDev / 100.0;
