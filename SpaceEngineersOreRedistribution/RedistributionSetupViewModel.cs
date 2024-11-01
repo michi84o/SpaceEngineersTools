@@ -227,20 +227,40 @@ namespace SpaceEngineersOreRedistribution
                 set => SetProp(ref _expectedRatio, value);
             }
 
-            int _typicalDepth = -1;
-            public int TypicalDepth
+            int _typicalDepthMin = -1;
+            public int TypicalDepthMin
             {
-                get => _typicalDepth;
+                get => _typicalDepthMin;
                 set
                 {
-                    if (SetProp(ref _typicalDepth, value))
+                    if (SetProp(ref _typicalDepthMin, value))
                     {
                         if (value > 8)
                         {
-                            if (VeryDeepOre) TypicalDepth = 9;
-                            else TypicalDepth = 8;
+                            if (VeryDeepOre) TypicalDepthMin = 9;
+                            else TypicalDepthMin = 8;
                         }
-                        else if (value < -1) TypicalDepth = -1;
+                        else if (value < -1) TypicalDepthMin = -1;
+                        if (value != -1 && value > TypicalDepthMax && TypicalDepthMax != -1) TypicalDepthMin = TypicalDepthMax;
+                    }
+                }
+            }
+
+            int _typicalDepthMax = -1;
+            public int TypicalDepthMax
+            {
+                get => _typicalDepthMax;
+                set
+                {
+                    if (SetProp(ref _typicalDepthMax, value))
+                    {
+                        if (value > 8)
+                        {
+                            if (VeryDeepOre) TypicalDepthMax = 9;
+                            else TypicalDepthMax = 8;
+                        }
+                        else if (value < -1) TypicalDepthMax = -1;
+                        if (value != -1 && value < TypicalDepthMin) TypicalDepthMax = TypicalDepthMin;
                     }
                 }
             }
@@ -253,8 +273,13 @@ namespace SpaceEngineersOreRedistribution
                 {
                     if (SetProp(ref _veryDeepOre, value))
                     {
-                        if (!value && TypicalDepth == 10)
-                            TypicalDepth = 9;
+                        if (!value)
+                        {
+                            if (TypicalDepthMax == 9)
+                                TypicalDepthMax = 8;
+                            if (TypicalDepthMin == 9)
+                                TypicalDepthMin = 8;
+                        }
                     }
                 }
             }
@@ -266,7 +291,8 @@ namespace SpaceEngineersOreRedistribution
                 int tmp;
                 if (int.TryParse(node.Element("SpawnWeight")?.Value, out tmp)) info.SpawnWeight = tmp;
                 if (int.TryParse(node.Element("TypicalSize")?.Value, out tmp)) info.TypicalSize = tmp;
-                if (int.TryParse(node.Element("TypicalDepth")?.Value, out tmp)) info.TypicalDepth = tmp;
+                if (int.TryParse(node.Element("TypicalDepthMin")?.Value, out tmp)) info.TypicalDepthMin = tmp;
+                if (int.TryParse(node.Element("TypicalDepthMax")?.Value, out tmp)) info.TypicalDepthMax = tmp;
                 if (bool.TryParse(node.Element("VeryDeepOre")?.Value, out var bb)) info.VeryDeepOre = bb;
                 return info;
             }
@@ -278,7 +304,8 @@ namespace SpaceEngineersOreRedistribution
                     new XElement("Name", Name),
                     new XElement("SpawnWeight", SpawnWeight),
                     new XElement("TypicalSize", TypicalSize),
-                    new XElement("TypicalDepth", TypicalDepth),
+                    new XElement("TypicalDepthMin", TypicalDepthMin),
+                    new XElement("TypicalDepthMax", TypicalDepthMax),
                     new XElement("VeryDeepOre", VeryDeepOre));
             }
         }

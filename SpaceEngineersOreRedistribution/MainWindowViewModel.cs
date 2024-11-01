@@ -198,7 +198,7 @@ namespace SpaceEngineersOreRedistribution
                 // Reset colors so they don't appear in ore inspector
                 foreach (var m in SelectedPlanetDefinition.OreMappings)
                 {
-                    m.MapRgbValue = new(0, 255, 0);
+                    m.MapRgbValue = new(0, 0, 64);
                 }
 
                 var mappings = SelectedPlanetDefinition.OreMappings.Where(x => x.Type == value.OreType);
@@ -211,7 +211,7 @@ namespace SpaceEngineersOreRedistribution
                         mapping.MapRgbValue = new(color.R, color.G, color.B);
                     }
                     else
-                        mapping.MapRgbValue = new(0, 255, 0);
+                        mapping.MapRgbValue = new(0, 0, 255);
                     OreMappings.Add(mapping);
                 }
                 if (ShowOreLocations && !_updatingImages)
@@ -738,10 +738,29 @@ namespace SpaceEngineersOreRedistribution
                         // Decide which ore is spawned
                         var info = setup.ViewModel.PickRandomOreWeighted(rnd);
                         var spawnSize = info.TypicalSize;
-                        var depth = info.TypicalDepth;
+                        var depthMin = info.TypicalDepthMin;
+                        var depthMax = info.TypicalDepthMax;
+
+                        int depth;
+                        if (depthMin == -1 && depthMax == -1)
+                        {
+                            depth = rnd.Next(0, info.VeryDeepOre ? 9 : 10); // Max = 9
+                        }
+                        else if (depthMin == -1 && depthMax > -1)
+                        {
+                            depth = rnd.Next(0, depthMax+1);
+                        }
+                        else if (depthMin >= -1 && depthMax == -1)
+                        {
+                            depth = rnd.Next(depthMin, info.VeryDeepOre ? 9 : 10);
+                        }
+                        else //if (depthMin >= -1 && depthMax >= -1)
+                        {
+                            depth = rnd.Next(depthMin, depthMax + 1);
+                        }
+
                         // Randomize if not set by user
                         if (spawnSize == 0) spawnSize = rnd.Next(5, 31);
-                        if (depth == -1) depth = rnd.Next(0, info.VeryDeepOre ? 9:10);
                         // Gauss randomizer
                         var stdDevPercentage = setup.ViewModel.StdDev / 100.0;
                         spawnSize = (int)(normal.Next(spawnSize, 50 * stdDevPercentage) + 0.5);

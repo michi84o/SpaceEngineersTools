@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:SpaceEngineersOreRedistribution"
         mc:Ignorable="d"
         Title="Redistribution Setup"
-        MaxHeight="960" Width="580" SizeToContent="Height">
+        MaxHeight="960" Width="680" SizeToContent="Height">
     <Window.DataContext>
         <local:RedistributionSetupViewModel x:Name="ViewModel"/>
     </Window.DataContext>
@@ -29,7 +29,7 @@
                 </Grid.RowDefinitions>
                 <ListView
                     Grid.Row="0" Margin="3"
-                    ItemsSource="{Binding OreInfos}">
+                    ItemsSource="{Binding OreInfos}" SelectedItem="{Binding SelectedInfo}">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="{x:Type ListViewItem}">
                             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -40,35 +40,42 @@
                             <GridViewColumn Header="Name" Width="90" >
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBox Text="{Binding Name}" HorizontalAlignment="Stretch" />
+                                        <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Stretch" />
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
                             <GridViewColumn Header="Spawn Weight" Width="90">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBox Text="{Binding SpawnWeight}" HorizontalAlignment="Stretch" />
+                                        <TextBox Text="{Binding SpawnWeight, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Stretch" />
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
                             <GridViewColumn Header="Typical Size" Width="90">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBox Text="{Binding TypicalSize}" HorizontalAlignment="Stretch" />
+                                        <TextBox Text="{Binding TypicalSize, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Stretch" />
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
                             <GridViewColumn Header="Expected Ratio" Width="90">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding ExpectedRatio, StringFormat={}{0:P1}}" HorizontalAlignment="Stretch" />
+                                        <TextBlock Text="{Binding ExpectedRatio, UpdateSourceTrigger=PropertyChanged, StringFormat={}{0:P1}}" HorizontalAlignment="Stretch" />
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
-                            <GridViewColumn Header="Typical Depth" Width="90">
+                            <GridViewColumn Header="Typ. Depth Min" Width="90">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBox Text="{Binding TypicalDepth}"  HorizontalAlignment="Stretch" />
+                                        <TextBox Text="{Binding TypicalDepthMin, UpdateSourceTrigger=PropertyChanged}"  HorizontalAlignment="Stretch" />
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+                            <GridViewColumn Header="Typ. Depth Max" Width="90">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBox Text="{Binding TypicalDepthMax, UpdateSourceTrigger=PropertyChanged}"  HorizontalAlignment="Stretch" />
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
