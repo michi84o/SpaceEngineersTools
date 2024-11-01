@@ -165,12 +165,29 @@ namespace SpaceEngineersOreRedistribution
                 }
             }
             OnPropertyChanged(nameof(ValuesCount));
+            CalcRatios();
         }
 
         private void OreItem_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(OreInfo.VeryDeepOre))
                 OnPropertyChanged(nameof(ValuesCount));
+
+            CalcRatios();
+        }
+
+        void CalcRatios()
+        {
+            // Calc rations
+            double sum = 0;
+            foreach (var item in OreInfos)
+            {
+                sum += item.TypicalSize * item.SpawnWeight;
+            }
+            foreach (var item in OreInfos)
+            {
+                item.ExpectedRatio = (item.TypicalSize * item.SpawnWeight) / sum;
+            }
         }
 
         public class OreInfo : PropChangeNotifier
@@ -201,6 +218,13 @@ namespace SpaceEngineersOreRedistribution
                         else if (value < 0) _typicalSize = 0;
                     }
                 }
+            }
+
+            double _expectedRatio;
+            public double ExpectedRatio
+            {
+                get => _expectedRatio;
+                set => SetProp(ref _expectedRatio, value);
             }
 
             int _typicalDepth = -1;
