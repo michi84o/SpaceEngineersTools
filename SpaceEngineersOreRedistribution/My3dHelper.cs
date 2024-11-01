@@ -10,8 +10,8 @@ namespace SpaceEngineersOreRedistribution
 {
     public static class My3dHelper
     {
-        const double BaseUnit = 5;
-        const double DepthUnit = 5;
+        public const double BaseUnit = 5;
+        public const double DepthUnit = 5;
         public static ModelVisual3D CreateCuboid(int x, int y, double start, double depth, RgbValue rgb)
         {
             var z1 = -1 * start * DepthUnit;
@@ -76,14 +76,14 @@ namespace SpaceEngineersOreRedistribution
             return model;
         }
 
-        public static ModelVisual3D CreateSurface()
+        public static ModelVisual3D CreateSurface(int rectSize)
         {
             Model3DGroup surface = new Model3DGroup();
 
             var p0 = new Point3D(0 * BaseUnit, 0 * BaseUnit, .1);
-            var p1 = new Point3D(20 * BaseUnit, 0 * BaseUnit, .1);
-            var p2 = new Point3D(0 * BaseUnit, 20 * BaseUnit, .1);
-            var p3 = new Point3D(20 * BaseUnit, 20 * BaseUnit, .1);
+            var p1 = new Point3D(rectSize * BaseUnit, 0 * BaseUnit, .1);
+            var p2 = new Point3D(0 * BaseUnit, rectSize * BaseUnit, .1);
+            var p3 = new Point3D(rectSize * BaseUnit, rectSize * BaseUnit, .1);
 
             var brush = new SolidColorBrush(Color.FromArgb(50, 128, 128, 128));
 
@@ -131,9 +131,9 @@ namespace SpaceEngineersOreRedistribution
             return Vector3D.CrossProduct(v0, v1);
         }
 
-        public static void CalculateCamera(double radius, double longitude, double latitude, out Vector3D direction, out Vector3D position)
+        public static void CalculateCamera(double radius, double longitude, double latitude, double zOffset, double rectSize, out Vector3D direction, out Vector3D position)
         {
-            Vector3D centerOfSphere = new Vector3D(BaseUnit * 10, BaseUnit * 10, 0);
+            Vector3D centerOfSphere = new Vector3D(BaseUnit * rectSize/2, BaseUnit* rectSize / 2, zOffset);
             position = new Vector3D();
 
             position.Z = radius * Math.Sin(latitude * Math.PI / 180);

@@ -14,43 +14,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition/>
         </Grid.RowDefinitions>
-        <!--<StackPanel Orientation="Vertical" Margin="3">
-            <StackPanel
-     Orientation="Horizontal">
-                <Slider Width="100" Minimum="50" Maximum="300" Value="{Binding Radius}"/>
-                <TextBlock Text="{Binding Radius}"/>
-                <Slider Width="100" Minimum="0" Maximum="360" Value="{Binding Longitude}"/>
-                <TextBlock Text="{Binding Longitude}"/>
-                <Slider Width="100" Minimum="-89" Maximum="89" Value="{Binding Latitude}"/>
-                <TextBlock Text="{Binding Latitude}"/>
-            </StackPanel>
-            --><!--<StackPanel
-                Orientation="Horizontal">
-                <Slider Width="100" Minimum="-180" Maximum="180" Value="{Binding CamX}"/>
-                <TextBlock Text="{Binding CamX}"/>
-                <Slider Width="100" Minimum="-180" Maximum="180" Value="{Binding CamY}"/>
-                <TextBlock Text="{Binding CamY}"/>
-                <Slider Width="100" Minimum="-180" Maximum="180" Value="{Binding CamZ}"/>
-                <TextBlock Text="{Binding CamZ}"/>
-            </StackPanel>-->
-            <!--<StackPanel Orientation="Horizontal">
-                <Slider Width="100" Minimum="0" Maximum="200" Value="{Binding CamDistX}"/>
-                <TextBlock Text="{Binding CamDistX}"/>
-                <Slider Width="100" Minimum="0" Maximum="200" Value="{Binding CamDistY}"/>
-                <TextBlock Text="{Binding CamDistY}"/>
-                <Slider Width="100" Minimum="0" Maximum="200" Value="{Binding CamDistZ}"/>
-                <TextBlock Text="{Binding CamDistZ}"/>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal">
-                <Slider Width="100" Minimum="-1" Maximum="1" Value="{Binding CamDirX}"/>
-                <TextBlock Text="{Binding CamDirX}"/>
-                <Slider Width="100" Minimum="-1" Maximum="1" Value="{Binding CamDirY}"/>
-                <TextBlock Text="{Binding CamDirY}"/>
-                <Slider Width="100" Minimum="-1" Maximum="1" Value="{Binding CamDirZ}"/>
-                <TextBlock Text="{Binding CamDirZ}"/>
-            </StackPanel>--><!--
-
-        </StackPanel>-->
+        <TextBlock Grid.Row="0" Margin="1" Text="Left Mouse: Pan, Right Mouse: Height, Scroll: Zoom" />
         <Viewbox Grid.Row="1">
             <Canvas Width="320" Height="240" Background="White"
                     x:Name="MyCanvas">

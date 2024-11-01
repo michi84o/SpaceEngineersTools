@@ -37,6 +37,13 @@ namespace SpaceEngineersOreRedistribution
         CancellationTokenSource _imageUpdateTcs;
         bool _updatingImages = false;
 
+        Visibility _progressBarVisibility = Visibility.Collapsed;
+        public Visibility ProgressBarVisibility
+        {
+            get => _progressBarVisibility;
+            set => SetProp(ref _progressBarVisibility, value);
+        }
+
         PlanetDefinition _selectedPlanetDefinition;
         public PlanetDefinition SelectedPlanetDefinition
         {
@@ -83,61 +90,73 @@ namespace SpaceEngineersOreRedistribution
 
                 Task.Run(() =>
                 {
-                    Parallel.ForEach(Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>(), f =>
+                    try
                     {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            ProgressBarVisibility = Visibility.Visible;
+                        });
+                        Parallel.ForEach(Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>(), f =>
+                        {
+                            if (token.IsCancellationRequested) return;
+                            _images[f] = GetInfo(f, token);
+                        });
                         if (token.IsCancellationRequested) return;
-                        _images[f] = GetInfo(f, token);
-                    });
-                    if (token.IsCancellationRequested) return;
 
-                    // Update ore
-                    Dictionary<string, int> oreDist = new();
-                    Parallel.ForEach(_images.Values, img =>
-                    {
-                        if (img == null) return;
-                        for (int x = 0; x < 2048; ++x)
-                            for (int y = 0; y < 2048; ++y)
-                            {
-                                var blue = img.B[x, y];
-                                var mapping = value.OreMappings.FirstOrDefault(x => x.Value == blue);
-                                if (mapping != null)
+                        // Update ore
+                        Dictionary<string, int> oreDist = new();
+                        Parallel.ForEach(_images.Values, img =>
+                        {
+                            if (img == null) return;
+                            for (int x = 0; x < 2048; ++x)
+                                for (int y = 0; y < 2048; ++y)
                                 {
-                                    lock (oreDist)
+                                    var blue = img.B[x, y];
+                                    var mapping = value.OreMappings.FirstOrDefault(x => x.Value == blue);
+                                    if (mapping != null)
                                     {
-                                        if (!oreDist.ContainsKey(mapping.Type))
-                                            oreDist[mapping.Type] = 1;
-                                        else
-                                            oreDist[mapping.Type] += 1;
+                                        lock (oreDist)
+                                        {
+                                            if (!oreDist.ContainsKey(mapping.Type))
+                                                oreDist[mapping.Type] = 1;
+                                            else
+                                                oreDist[mapping.Type] += 1;
+                                        }
                                     }
                                 }
-                            }
-                    });
-                    int oreSum = oreDist.Values.Sum();
-                    List<OreDistributionStatViewModel> list = new();
-                    foreach (var key in oreDist.Keys)
-                    {
-                        list.Add(new OreDistributionStatViewModel
-                        { OreType = key, Percentage = (int)(oreDist[key] * 100.0 / oreSum + 0.5) });
-                    }
-                    list.Sort((a,b)=>b.Percentage.CompareTo(a.Percentage));
-                    if (list.Count > 0)
-                    {
-                        var maxP = list.Max(x => x.Percentage);
-                        foreach (var x in list)
-                            x.ScaledPercentage = (int)(0.5 + x.Percentage * 100 / maxP);
-                    }
-                    Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        foreach (var item in list) OreTypes.Add(item);
-                    });
+                        });
+                        int oreSum = oreDist.Values.Sum();
+                        List<OreDistributionStatViewModel> list = new();
+                        foreach (var key in oreDist.Keys)
+                        {
+                            list.Add(new OreDistributionStatViewModel
+                            { OreType = key, Percentage = (int)(oreDist[key] * 100.0 / oreSum + 0.5) });
+                        }
+                        list.Sort((a, b) => b.Percentage.CompareTo(a.Percentage));
+                        if (list.Count > 0)
+                        {
+                            var maxP = list.Max(x => x.Percentage);
+                            foreach (var x in list)
+                                x.ScaledPercentage = (int)(0.5 + x.Percentage * 100 / maxP);
+                        }
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            foreach (var item in list) OreTypes.Add(item);
+                        });
 
-                    Application.Current.Dispatcher.Invoke(() =>
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            if (token.IsCancellationRequested) return;
+                            _updatingImages = false;
+                            UpdateImages();
+                        });
+                    }
+                    finally
                     {
-                        if (token.IsCancellationRequested) return;
-                        _updatingImages = false;
-                        UpdateImages();
-                    });
+                        ProgressBarVisibility = Visibility.Collapsed;
+                    }
                 });
+
 
             }
         }
@@ -175,6 +194,13 @@ namespace SpaceEngineersOreRedistribution
                         UpdateImages();
                     return;
                 }
+
+                // Reset colors so they don't appear in ore inspector
+                foreach (var m in SelectedPlanetDefinition.OreMappings)
+                {
+                    m.MapRgbValue = new(0, 255, 0);
+                }
+
                 var mappings = SelectedPlanetDefinition.OreMappings.Where(x => x.Type == value.OreType);
                 int colorIndex = 0;
                 foreach (var mapping in mappings)
@@ -484,6 +510,13 @@ namespace SpaceEngineersOreRedistribution
         {
             get => _tileDown;
             set => SetProp(ref _tileDown, value);
+        }
+
+        int _oreInspectorSize = 20;
+        public int OreInspectorSize
+        {
+            get => _oreInspectorSize;
+            set => SetProp(ref _oreInspectorSize, value);
         }
 
         void ClearImages()
@@ -1241,5 +1274,14 @@ namespace SpaceEngineersOreRedistribution
             return 90;
         }
 
+        public ICommand PlusCommand => new RelayCommand(o =>
+        {
+            if (OreInspectorSize < 100) OreInspectorSize += 10;
+        });
+
+        public ICommand MinusCommand => new RelayCommand(o =>
+        {
+            if (OreInspectorSize > 10) OreInspectorSize -= 10;
+        });
     }
 }

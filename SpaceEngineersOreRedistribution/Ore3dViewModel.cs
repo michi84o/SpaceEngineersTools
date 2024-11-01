@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Configuration;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -13,6 +14,13 @@ namespace SpaceEngineersOreRedistribution
     {
         public event PropertyChangedEventHandler PropertyChanged;
         public ObservableCollection<ModelVisual3D> Cuboids { get; } = new ObservableCollection<ModelVisual3D>();
+
+        int _rectSize = 20;
+        public int RectSize
+        {
+            get => _rectSize;
+            set => SetProp(ref _rectSize, value);
+        }
 
 
         double _radius = 120;
@@ -54,10 +62,23 @@ namespace SpaceEngineersOreRedistribution
             }
         }
 
+        double _zOffset = 0;
+        public double ZOffset
+        {
+            get => _zOffset;
+            set
+            {
+                if (SetProp(ref _zOffset, value))
+                {
+                    UpdateCamera();
+                }
+            }
+        }
+
         void UpdateCamera()
         {
             // Assume center of spere is ground center
-            My3dHelper.CalculateCamera(Radius, Longitude, Latitude, out var direction, out var position);
+            My3dHelper.CalculateCamera(Radius, Longitude, Latitude, ZOffset, RectSize, out var direction, out var position);
             CamDir = direction;
             CamPos = new Point3D(position.X, position.Y, position.Z);
         }

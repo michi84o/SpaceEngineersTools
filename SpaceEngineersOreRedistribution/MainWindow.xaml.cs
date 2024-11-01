@@ -143,6 +143,7 @@ namespace SpaceEngineersOreRedistribution
             }
 
             var win = new Ore3dView();
+            win.SetRectSize(ViewModel.OreInspectorSize);
             win.ViewModel.AddCuboids(oreMap);
             win.ShowDialog();
         }
@@ -303,5 +304,7 @@ namespace SpaceEngineersOreRedistribution
 
             }
         }
+
+
     }
 }

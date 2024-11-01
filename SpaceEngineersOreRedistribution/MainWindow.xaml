@@ -38,6 +38,10 @@
             <MenuItem Header="Redistribute Ore" Command="{Binding RedistributeOreCommand}" />
             <MenuItem Header="Rewrite Biomes" Command="{Binding RewriteBiomesCommand}" />
             <MenuItem x:Name="OreInspectorCb" Header="Ore Inspector" IsCheckable="True" IsChecked="True" VerticalAlignment="Center" />
+            <TextBlock Text="Size:" IsHitTestVisible="False"/>
+            <TextBlock Text="{Binding OreInspectorSize}" IsHitTestVisible="False"/>
+            <MenuItem Header="-" Command="{Binding MinusCommand}"/>
+            <MenuItem Header="+" Command="{Binding PlusCommand}"/>
         </Menu>
         <GroupBox
             Grid.Row="1" Grid.Column="0" MinWidth="150" Header="Planets" Margin="3">
@@ -196,10 +200,21 @@
                     <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="2048" Source="{Binding TileBack}"/>
                     <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="6144" Canvas.Top="2048" Source="{Binding TileLeft}"/>
                     <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="4096" Source="{Binding TileDown}"/>
-                    <Rectangle x:Name="OreInspectorRect"  Stroke="Violet" StrokeThickness="1" Width="20" Height="20" Visibility="Collapsed"/>
+                    <Rectangle x:Name="OreInspectorRect"  Stroke="Violet" StrokeThickness="1" Width="{Binding OreInspectorSize}" Height="{Binding OreInspectorSize}" Visibility="Collapsed"/>
                 </Canvas>
             </Border>
         </GroupBox>
+        <Grid
+            Grid.Row="0" Grid.Column="0" Background="#FFFFFF" Opacity=".5"
+            Grid.RowSpan="5" Grid.ColumnSpan="3" Visibility="{Binding ProgressBarVisibility}">
+        </Grid>
+        <Grid
+            Grid.Row="0" Grid.Column="0"
+            Grid.RowSpan="5" Grid.ColumnSpan="3">
+            <ProgressBar
+                VerticalAlignment="Center" HorizontalAlignment="Center"
+                Width="200" Height="30" IsIndeterminate="True" Visibility="{Binding ProgressBarVisibility}"/>
+        </Grid>
     </Grid>
 </Window>
 
