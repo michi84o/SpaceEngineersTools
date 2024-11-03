@@ -26,9 +26,11 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <ListView
-                    Grid.Row="0" Margin="3"
+                    Grid.Row="0" Margin="3" MinHeight="50"
                     ItemsSource="{Binding OreInfos}" SelectedItem="{Binding SelectedInfo}">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="{x:Type ListViewItem}">
@@ -95,28 +97,77 @@
                     <Button Content="Remove" Margin="3" Width="100" Command="{Binding RemoveOreCommand}"/>
                     <Button Content="Import" Margin="3" Width="100" Command="{Binding ImportCommand}"/>
                     <Button Content="Export" Margin="3" Width="100" Command="{Binding ExportCommand}"/>
+                    <Button Content="Update Ore Mapping Diagram" Margin="3" Click="UpdateDiagramClick"/>
                 </StackPanel>
-                <TextBlock Grid.Row="2" Text="Multiple definition of same ore allowed.&#x0d;&#x0a;Weight: Spawn probability relative to other ore. Weights will be summed up to use relative %.&#x0d;&#x0a;Size: 1-100 ore patches per vein, 0 for random (5-30), default: 15&#x0d;&#x0a;Depth: 0-9 (9 only if deep ore enabled!), -1 for random (0-9), default: -1&#x0d;&#x0a;Size + Depth will still be randomized using a Gauss distribution."/>
-                <StackPanel Orientation="Horizontal" Grid.Row="3" >
+                <TextBlock Grid.Row="4" Text="Multiple definition of same ore allowed. Vanilla ore detectors have a maximum range of 150m.&#x0d;&#x0a;First start value of tier 3 (depth 6) should be within range. If ore spawns deeper it will dive from there to target depth. &#x0d;&#x0a; Weight: Spawn probability relative to other ore. Weights will be summed up to use relative %.&#x0d;&#x0a;Size: 1-100 ore patches per vein, 0 for random (5-30), default: 15&#x0d;&#x0a;Depth: 0-9 (9 only if deep ore enabled!), -1 for random (0-9), default: -1&#x0d;&#x0a;Size will still be randomized using a Gauss distribution."/>
+                <StackPanel Orientation="Horizontal" Grid.Row="5" >
                     <TextBlock Text="Standard Deviation for Gauss (1-50% rel. to max, default: 10%): "/>
-                    <TextBox Width="50" Text="{Binding StdDev}"/>
+                    <TextBox Width="50" Text="{Binding StdDev, UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Grid.Row="4" >
+                <StackPanel Orientation="Horizontal" Grid.Row="6" >
                     <TextBlock Text="Randomly spawn ore every "/>
-                    <TextBox Width="40" Text="{Binding OreSpawnRate}" HorizontalContentAlignment="Center" Margin="3,0,3,0"/>
+                    <TextBox Width="40" Text="{Binding OreSpawnRate, UpdateSourceTrigger=PropertyChanged}" HorizontalContentAlignment="Center" Margin="3,0,3,0"/>
                     <TextBlock Text="pixels on average. (Default: 2000) "/>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Grid.Row="5" >
+                <StackPanel Orientation="Horizontal" Grid.Row="7" >
                     <TextBlock Text="Seed"/>
-                    <TextBox Width="40" Text="{Binding Seed}" HorizontalContentAlignment="Center" Margin="3,0,3,0"/>
+                    <TextBox Width="40" Text="{Binding Seed, UpdateSourceTrigger=PropertyChanged}" HorizontalContentAlignment="Center" Margin="3,0,3,0"/>
                 </StackPanel>
+                <TextBlock Grid.Row="2" Text="Ore Mapping for selected Ore:" />
+                <Grid
+                    Grid.Row="3">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition/>
+                        <ColumnDefinition/>
+                    </Grid.ColumnDefinitions>
+                    <ListView MinHeight="50" Margin="3"
+                         ItemsSource="{Binding SelectedInfo.OreMappings}">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="{x:Type ListViewItem}">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Tier" Width="90" >
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Tier, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Stretch" />
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+
+                                <GridViewColumn Header="Start" Width="90" >
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding Start, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Stretch" />
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+
+                                <GridViewColumn Header="Depth" Width="90" >
+                                    <GridViewColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <TextBox Text="{Binding Depth, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Stretch" />
+                                        </DataTemplate>
+                                    </GridViewColumn.CellTemplate>
+                                </GridViewColumn>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                    <Viewbox
+                        Grid.Column="1" Margin="3">
+                        <Canvas Width="320" Height="240" x:Name="MyCanvas" Background="LightGray" />
+                    </Viewbox>
+
+                </Grid>
             </Grid>
         </GroupBox>
         <StackPanel
             Grid.Row="1" Orientation="Horizontal">
             <Button Content="Abort" Width="150" Height="28" Margin="5" Click="ButtonAbort_Click" />
             <Button Content="Confirm" Width="150" Height="28" Margin="5" Command="{Binding ConfirmCommand}" />
-            <TextBlock Text="Values Count (max: 254):" VerticalAlignment="Center" Margin="5,3,3,3"/>
+            <TextBlock Text="Values Count (max: 255):" VerticalAlignment="Center" Margin="5,3,3,3"/>
             <TextBlock Text="{Binding ValuesCount}" VerticalAlignment="Center"/>
         </StackPanel>
 

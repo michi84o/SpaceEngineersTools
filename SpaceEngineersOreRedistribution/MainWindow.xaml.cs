@@ -210,8 +210,11 @@ namespace SpaceEngineersOreRedistribution
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            //var n = new Normal(50,10,0);
+            //for (int i = 0; i < 20; ++i)
+            //    Debug.WriteLine(n.Next(5, 5*20.0/100));
 #if DEBUG
-            ViewModel.OpenPlanetDefinition(@"C:\Users\Michael\AppData\Roaming\SpaceEngineers\Mods\OreRedistribution2\Data\PlanetGeneratorDefinitions.sbc");
+            ViewModel.OpenPlanetDefinition(@"C:\Users\Michael\AppData\Roaming\SpaceEngineers\Mods\SeamsFixedDeluxeOreRedist\Data\PlanetGeneratorDefinitions.sbc");
 #endif
 
             bool test = false;

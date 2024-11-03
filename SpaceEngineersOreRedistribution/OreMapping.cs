@@ -10,6 +10,10 @@ namespace SpaceEngineersOreRedistribution
     // <Ore Value="200" Type="Iron_02" Start="3" Depth="7" TargetColor="#616c83" ColorInfluence="15"/>
     public class OreMapping : PropChangeNotifier
     {
+        int _tier;
+        // Needed for clearer understanding of table. UI only.
+        public int Tier { get => _tier; set => SetProp(ref _tier, value); }
+
         int _value;
         public int Value { get => _value; set => SetProp(ref _value, value); }
         string _type;
@@ -51,6 +55,17 @@ namespace SpaceEngineersOreRedistribution
                 new XAttribute("Depth", Depth),
                 new XAttribute("TargetColor", TargetColor),
                 new XAttribute("ColorInfluence", ColorInfluence));
+        }
+        public static OreMapping FromXElement(XElement x)
+        {
+            var elem = new OreMapping();
+            elem.Type = x.Attribute("Type").Value;
+            elem.Value = int.Parse(x.Attribute("Value").Value);
+            elem.Start = int.Parse(x.Attribute("Start").Value);
+            elem.Depth = int.Parse(x.Attribute("Depth").Value);
+            elem.TargetColor = x.Attribute("TargetColor").Value;
+            elem.ColorInfluence = x.Attribute("ColorInfluence").Value;
+            return elem;
         }
     }
 

@@ -38,10 +38,11 @@
             <MenuItem Header="Redistribute Ore" Command="{Binding RedistributeOreCommand}" />
             <MenuItem Header="Rewrite Biomes" Command="{Binding RewriteBiomesCommand}" />
             <MenuItem x:Name="OreInspectorCb" Header="Ore Inspector" IsCheckable="True" IsChecked="True" VerticalAlignment="Center" />
-            <TextBlock Text="Size:" IsHitTestVisible="False"/>
-            <TextBlock Text="{Binding OreInspectorSize}" IsHitTestVisible="False"/>
+            <TextBlock Text="Size:" IsHitTestVisible="False" IsEnabled="False"/>
+            <TextBlock Text="{Binding OreInspectorSize}" IsHitTestVisible="False" IsEnabled="False"/>
             <MenuItem Header="-" Command="{Binding MinusCommand}"/>
             <MenuItem Header="+" Command="{Binding PlusCommand}"/>
+            <!--<MenuItem Header="Calculate Ore Amount" Command="{Binding CalcOreAmountCommand}"/>-->
         </Menu>
         <GroupBox
             Grid.Row="1" Grid.Column="0" MinWidth="150" Header="Planets" Margin="3">
@@ -53,7 +54,7 @@
             Grid.Row="2" Grid.Column="0" Header="Ore Types" MinWidth="150" Margin="3">
             <ListView
                 ItemsSource="{Binding OreTypes}"
-                SelectedItem="{Binding SelectedOreType}">
+                SelectedItem="{Binding SelectedOreType}" Margin="0,0,0,9">
                 <ListView.ItemTemplate>
                     <DataTemplate>
                         <local:OreDistributionStatView/>
@@ -64,6 +65,11 @@
         <Button
             Grid.Row="2" Grid.Column="0" VerticalAlignment="Top" HorizontalAlignment="Right"
             Content="Deselect" Margin="0,3,9,0" FontSize="8" Command="{Binding DeselectOreTypeCommand}"   />
+        <StackPanel
+            Grid.Row="2" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Bottom" Margin="10,0,0,3">
+            <RadioButton Content="By Area" Margin="0,0,5,0" IsChecked="{Binding ShowOreDistByArea}"/>
+            <RadioButton Content="By Volume" IsChecked="{Binding ShowOreDistByVolume}"/>
+        </StackPanel>
         <GroupBox
             Grid.Row="3" Grid.Column="0" Header="Complex Materials" MinWidth="150" Margin="3">
             <ListBox

@@ -44,6 +44,47 @@ namespace SpaceEngineersOreRedistribution
             set => SetProp(ref _progressBarVisibility, value);
         }
 
+        bool _showDistByArea = true;
+        public bool ShowOreDistByArea
+        {
+            get => _showDistByArea;
+            set
+            {
+                if (SetProp(ref _showDistByArea, value))
+                {
+                    ShowDistByVolume = !value;
+                    foreach (var item in OreTypes)
+                        item.ShowByArea = value;
+                    var list = OreTypes.ToList();
+                    list.Sort((a, b) => b.Percentage.CompareTo(a.Percentage));
+                    //if (list.Count > 0)
+                    //{
+                    //    var maxP = list.Max(x => x.Percentage);
+                    //    foreach (var x in list)
+                    //        x.ScaledPercentage = (int)(0.5 + x.Percentage * 100 / maxP);
+                    //}
+                    OreTypes.Clear();
+                    foreach (var item in list)
+                    {
+                        OreTypes.Add(item);
+                    }
+                }
+            }
+        }
+
+        bool _showDistByVolume;
+        public bool ShowDistByVolume
+        {
+            get => _showDistByVolume;
+            set
+            {
+                if (SetProp(ref _showDistByVolume, value))
+                {
+                    ShowOreDistByArea = !value;
+                }
+            }
+        }
+
         PlanetDefinition _selectedPlanetDefinition;
         public PlanetDefinition SelectedPlanetDefinition
         {
@@ -104,7 +145,8 @@ namespace SpaceEngineersOreRedistribution
                         if (token.IsCancellationRequested) return;
 
                         // Update ore
-                        Dictionary<string, int> oreDist = new();
+                        Dictionary<string, int> oreArea = new(); // Counts ore area
+                        Dictionary<string, int> oreVolume = new(); // Counts ore volume
                         Parallel.ForEach(_images.Values, img =>
                         {
                             if (img == null) return;
@@ -115,33 +157,51 @@ namespace SpaceEngineersOreRedistribution
                                     var mapping = value.OreMappings.FirstOrDefault(x => x.Value == blue);
                                     if (mapping != null)
                                     {
-                                        lock (oreDist)
+                                        lock (oreArea)
                                         {
-                                            if (!oreDist.ContainsKey(mapping.Type))
-                                                oreDist[mapping.Type] = 1;
+                                            if (!oreArea.ContainsKey(mapping.Type))
+                                            {
+                                                oreArea[mapping.Type] = 1;
+                                                oreVolume[mapping.Type] = mapping.Depth;
+                                            }
                                             else
-                                                oreDist[mapping.Type] += 1;
+                                            {
+                                                oreArea[mapping.Type] += 1;
+                                                oreVolume[mapping.Type] += mapping.Depth;
+                                            }
                                         }
                                     }
                                 }
                         });
-                        int oreSum = oreDist.Values.Sum();
+                        int oreSumArea = oreArea.Values.Sum();
+                        int oreSumVolume = oreVolume.Values.Sum();
                         List<OreDistributionStatViewModel> list = new();
-                        foreach (var key in oreDist.Keys)
+                        foreach (var key in oreArea.Keys)
                         {
-                            list.Add(new OreDistributionStatViewModel
-                            { OreType = key, Percentage = (int)(oreDist[key] * 100.0 / oreSum + 0.5) });
+                            list.Add(new OreDistributionStatViewModel(
+                                key,
+                                oreArea[key] * 100.0 / oreSumArea,
+                                oreVolume[key] * 100.0 / oreSumVolume, oreArea[key], oreVolume[key])
+                            { ShowByArea = ShowOreDistByArea });
                         }
                         list.Sort((a, b) => b.Percentage.CompareTo(a.Percentage));
                         if (list.Count > 0)
                         {
-                            var maxP = list.Max(x => x.Percentage);
+                            var maxPArea = list.Max(x => x.PercentageArea);
+                            var maxPVolume = list.Max(x => x.PercentageVolume);
                             foreach (var x in list)
-                                x.ScaledPercentage = (int)(0.5 + x.Percentage * 100 / maxP);
+                            {
+                                x.ScaledPercentageArea = (int)(0.5 + x.PercentageArea * 100 / maxPArea);
+                                x.ScaledPercentageVolume = (int)(0.5 + x.PercentageVolume * 100 / maxPVolume);
+                            }
                         }
                         Application.Current.Dispatcher.Invoke(() =>
                         {
-                            foreach (var item in list) OreTypes.Add(item);
+                            foreach (var item in list)
+                            {
+                                item.ShowByArea = ShowOreDistByArea; // Update scaled percentages
+                                OreTypes.Add(item);
+                            }
                         });
 
                         Application.Current.Dispatcher.Invoke(() =>
@@ -599,56 +659,32 @@ namespace SpaceEngineersOreRedistribution
             //var existingOreDefs = SelectedPlanetDefinition.OreMappings.Select(o => o.Type).Distinct().ToList();
             foreach (var oredef in OreTypes)
             {
-                setup.ViewModel.OreInfos.Add(new() { Name = oredef.OreType, SpawnWeight = oredef.Percentage });
+                var info = new RedistributionSetupViewModel.OreInfo { Name = oredef.OreType, SpawnWeight = (int)(oredef.Percentage + .5) };
+                info.AddDefaultMapping();
+                setup.ViewModel.OreInfos.Add(info);
             }
             if (setup.ShowDialog() != true)
                 return;
 
-            setup.ViewModel.FinalizeList();
-            // Build the ore mapping list.
-            // See the OreMappings.png in the screenshots folder of this repository to see the design of the mapping.
-            Dictionary<string, List<OreMapping>> mappingsDictionary = new();
+            // Update ore mapping values
+            var nextOreValue = setup.ViewModel.FinalizeList();
 
-
-            // TODO: Use existing percentages
-            var oreTypeList = setup.ViewModel.OreInfos.Select(o => o.Name).Distinct().ToList();
-
-
-            int nextOreValue = 1;
-            foreach (var oreType in oreTypeList)
-            {
-                List<OreMapping> mList = new();
-                // Tier 1: Flat surface ore. Depth: 3m - 15m
-                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 3, Depth = 3, ColorInfluence = "15", TargetColor = "616c83" });
-                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 5, Depth = 5, ColorInfluence = "15", TargetColor = "616c83" });
-                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 8, Depth = 7, ColorInfluence = "15", TargetColor = "616c83" });
-                // Tier 2: Medium deep veins. Depth: 40m - 102m
-                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 40, Depth = 12, ColorInfluence = "15", TargetColor = "616c83" });
-                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 50, Depth = 22, ColorInfluence = "15", TargetColor = "616c83" });
-                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 70, Depth = 32, ColorInfluence = "15", TargetColor = "616c83" });
-                // Tier 3: Very deep veins. Depth: 140m - 372m
-                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 140, Depth = 62, ColorInfluence = "15", TargetColor = "616c83" });
-                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 200, Depth = 72, ColorInfluence = "15", TargetColor = "616c83" });
-                mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 270, Depth = 102, ColorInfluence = "15", TargetColor = "616c83" });
-                // Bonus: Very deep ore. Depth: 370m - 450m
-                if (setup.ViewModel.OreInfos.Any(o => o.Name == oreType && o.VeryDeepOre))
-                    mList.Add(new OreMapping { Value = nextOreValue++, Type = oreType, Start = 370, Depth = 80, ColorInfluence = "15", TargetColor = "616c83" });
-                mappingsDictionary[oreType] = mList;
-            }
             Func<int, int> GetTier = (d) =>
             {
                 if (d <= 2) return 1;
                 if (d <= 5) return 2;
                 return 3;
             };
-            if (nextOreValue > 255)
+            if (nextOreValue >= 256)
             {
-                MessageBox.Show("Oops! Something went wrong. We have too many ore definitions. Please try again.",
+                MessageBox.Show("Too many ore definitions in oremappings.xml. This will not work!",
                     "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
             var directory = Path.GetDirectoryName(sfd.FileName);
+
+            Dictionary<string, List<OreMapping>> mappingsDictionary = new();
 
             // Save ore mappings as XML
             var xmlFileName = Path.Combine(directory, "oremappings.xml");
@@ -661,11 +697,16 @@ namespace SpaceEngineersOreRedistribution
             try
             {
                 var node = new XElement("OreMappings");
-                foreach (var kv in mappingsDictionary)
+                foreach (var info in setup.ViewModel.OreInfos)
                 {
-                    foreach (var mapping in kv.Value)
+                    var list = new List<OreMapping>();
+                    list.AddRange(info.OreMappings);
+                    mappingsDictionary[info.Name] = list;
+
+                    foreach (var mapping in list)
                     {
-                        node.Add(mapping.ToXElement());
+                        if (mapping.Value > 0)
+                            node.Add(mapping.ToXElement());
                     }
                 }
                 var doc = new XDocument(node);
@@ -694,18 +735,6 @@ namespace SpaceEngineersOreRedistribution
                         return;
                     overridefiles = true;
                 }
-
-                //using var bmap = new System.Drawing.Bitmap(2048, 2048, PixelFormat.Format32bppArgb);
-                //var lbmap = new LockBitmap(bmap);
-                //lbmap.LockBits();
-
-                //using var gradients = value.CalculateGradients();
-                //using var materialMap = value.GetBitmap();
-
-                //var g = new LockBitmap(gradients);
-                //var m = new LockBitmap(materialMap);
-                //g.LockBits();
-                //m.LockBits();
 
                 var image = new ImageData(key);
 
@@ -763,14 +792,15 @@ namespace SpaceEngineersOreRedistribution
                         if (spawnSize == 0) spawnSize = rnd.Next(5, 31);
                         // Gauss randomizer
                         var stdDevPercentage = setup.ViewModel.StdDev / 100.0;
-                        spawnSize = (int)(normal.Next(spawnSize, 50 * stdDevPercentage) + 0.5);
-                        if (spawnSize < 1) spawnSize = 1; else if (spawnSize > 50) spawnSize = 50;
-                        depth = (int)(normal.Next(depth, 10 * stdDevPercentage) + 0.5);
-                        int maxDepthIndex = info.VeryDeepOre ? 9 : 8;
-                        if (depth < 0) depth = 0; else if (depth > 8) depth = maxDepthIndex;
+                        spawnSize = (int)(normal.Next(spawnSize, spawnSize * stdDevPercentage) + 0.5);
+                        if (spawnSize < 1) spawnSize = 1; else if (spawnSize > 100) spawnSize = 100;
 
-                        int defaultTier = GetTier(depth);
+                        //int defaultTier = GetTier(depth);
                         int defaultDepthIndex = depth;
+                        int maxDepthIndex = info.VeryDeepOre ? 9 : 8;
+                        if (depthMax > -1 && depthMax < maxDepthIndex) maxDepthIndex = depthMax;
+                        int minDepthIndex = 0;
+                        if (depthMin > -1 && depthMin > minDepthIndex) minDepthIndex = depthMin;
 
                         // Get mapping info for pixel value
                         var mappings = mappingsDictionary[info.Name];
@@ -780,6 +810,16 @@ namespace SpaceEngineersOreRedistribution
                         int lastDepthIndex = defaultDepthIndex;
                         int lastX = x;
                         int lastY = y;
+
+                        // Vanilla ore scanner max range is 150m
+                        // Only index 6 is detectable from surface
+                        // Start there and fall down to default depth index
+                        bool dive = false;
+                        if (lastDepthIndex > 6)
+                        {
+                            lastDepthIndex = 5; // We call ++ below to set it to 6
+                            dive = true;
+                        }
 
                         // Draw ore
                         // Strategy:
@@ -849,8 +889,15 @@ namespace SpaceEngineersOreRedistribution
                             lastY = nextOreToDraw.Y;
                             drawnOre.Add(nextOreToDraw);
                             var depthMod = rnd.NextDouble();
+
+                            if (dive)
+                            {
+                                lastDepthIndex++;
+                                if (lastDepthIndex >= defaultDepthIndex)
+                                    dive = false;
+                            }
                             // Give a 75% chance of staying at the same height if height is starting height
-                            if (lastDepthIndex == defaultDepthIndex)
+                            else if (lastDepthIndex == defaultDepthIndex)
                             {
                                 if (depthMod >= 0.75)
                                 {
@@ -903,15 +950,21 @@ namespace SpaceEngineersOreRedistribution
                                 }
                                 // else: 50% chance of staying
                             }
-                            if (lastDepthIndex > maxDepthIndex) lastDepthIndex = maxDepthIndex;
-                            else if (lastDepthIndex < 0) lastDepthIndex = 0;
+                            // Ignore limits while diving
+                            if (!dive)
+                            {
+                                if (lastDepthIndex > maxDepthIndex) lastDepthIndex = maxDepthIndex;
+                                else if (lastDepthIndex < minDepthIndex) lastDepthIndex = minDepthIndex;
+                            }
+
                             // Get value for depth
                             nextOreToDraw.Value = mappings[lastDepthIndex].Value;
                         }
 
                         foreach (var drawn in drawnOre)
                         {
-                            image.B[drawn.X, drawn.Y] = (byte)drawn.Value;
+                            if (drawn.Value > 0 && drawn.Value < 256) // don't draw disabled entries which have value -1. See FinalizeList()
+                                image.B[drawn.X, drawn.Y] = (byte)drawn.Value;
 
                         }
                     }
@@ -1301,6 +1354,11 @@ namespace SpaceEngineersOreRedistribution
         public ICommand MinusCommand => new RelayCommand(o =>
         {
             if (OreInspectorSize > 10) OreInspectorSize -= 10;
+        });
+
+        public ICommand CalcOreAmountCommand => new RelayCommand(o =>
+        {
+            // TODO: Calculate sum of ore patch * depth to get total volume of ore
         });
     }
 }
