@@ -14,12 +14,15 @@ Screenshot of a modded planet:
 
 The program takes a list of ore types to spawn and lets you change some variables to influence the size and depth of the ore veins. I might add additional parameters later. I need balance the probabilities a bit more.
 
-
 ![Screenshot of redistribution setup](Screenshots/Redistribution_Setup.png)
 
-Currently 9-10 different ore depths will be generated and used. The veins contain more ore than in the vanilla game as a compensation for the more hard to find ore.
+Currently 9-10 different ore depths will be generated and used. The veins contain more ore than in the vanilla game as a compensation for the more hard to find ore. The depths and spawn probabilities for each ore type can be edited individually.
 
 ![Screenshot of ore mappings](Screenshots/OreMappings.png)
+
+You can also see a preview of the ore veins on the map by enabling the ore inspector and right clicking on the map.
+
+![Screenshot of Ore Inspector](Screenshots/Ore3D.png)
 
 ## SeAdminHelper
 
