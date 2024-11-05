@@ -855,7 +855,7 @@ namespace SpaceEngineersOreRedistribution
                         // Only index 6 is detectable from surface
                         // Start there and fall down to default depth index
                         bool dive = false;
-                        if (lastDepthIndex > 6)
+                        if (lastDepthIndex > 6 && minDepthIndex <= 6)
                         {
                             lastDepthIndex = 5; // We call ++ below to set it to 6
                             dive = true;
