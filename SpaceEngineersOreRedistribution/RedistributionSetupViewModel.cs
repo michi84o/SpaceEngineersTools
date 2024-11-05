@@ -51,6 +51,7 @@ namespace SpaceEngineersOreRedistribution
             {
                 var root = new XElement("OreInfos");
                 root.Add(new XAttribute("StdDev", StdDev));
+                root.Add(new XAttribute("StdDevDepth", StdDevDepth));
                 root.Add(new XAttribute("OreSpawnRate", OreSpawnRate));
                 root.Add(new XAttribute("Seed", Seed));
                 foreach (var oreInfo in OreInfos)
@@ -81,6 +82,7 @@ namespace SpaceEngineersOreRedistribution
                 var root = doc.Root;
                 if (root?.Name != "OreInfos") throw new Exception("Invalid file!");
                 if (int.TryParse(root.Attribute("StdDev")?.Value, out var stdDev)) StdDev = stdDev;
+                if (int.TryParse(root.Attribute("StdDevDepth")?.Value, out var stdDevDepth)) StdDevDepth = stdDevDepth;
                 if (int.TryParse(root.Attribute("OreSpawnRate")?.Value, out var oresp)) OreSpawnRate = oresp;
                 if (int.TryParse(root.Attribute("Seed")?.Value, out var seed)) Seed= seed;
                 OreInfos.Clear();
@@ -105,6 +107,20 @@ namespace SpaceEngineersOreRedistribution
                 {
                     if (value < 1) StdDev = 1;
                     if (value > 50) StdDev = 50;
+                }
+            }
+        }
+
+        int _stdDevDepth = 4;
+        public int StdDevDepth
+        {
+            get => _stdDevDepth;
+            set
+            {
+                if (SetProp(ref _stdDevDepth, value))
+                {
+                    if (value < 1) StdDevDepth = 1;
+                    if (value > 10) StdDevDepth = 10;
                 }
             }
         }
@@ -243,6 +259,13 @@ namespace SpaceEngineersOreRedistribution
                 }
             }
 
+            int _preferredDepth = -1;
+            public int PreferredDepth
+            {
+                get => _preferredDepth;
+                set => SetProp(ref _preferredDepth, value);
+            }
+
             int _typicalDepthMax = -1;
             public int TypicalDepthMax
             {
@@ -312,6 +335,7 @@ namespace SpaceEngineersOreRedistribution
                 if (int.TryParse(node.Element("TypicalSize")?.Value, out tmp)) info.TypicalSize = tmp;
                 if (int.TryParse(node.Element("TypicalDepthMin")?.Value, out tmp)) info.TypicalDepthMin = tmp;
                 if (int.TryParse(node.Element("TypicalDepthMax")?.Value, out tmp)) info.TypicalDepthMax = tmp;
+                if (int.TryParse(node.Element("PreferredDepth")?.Value, out tmp)) info.PreferredDepth = tmp;
                 if (bool.TryParse(node.Element("VeryDeepOre")?.Value, out var bb)) info.VeryDeepOre = bb;
 
                 var mappings = node.Element("Mappings");
@@ -347,6 +371,7 @@ namespace SpaceEngineersOreRedistribution
                     new XElement("TypicalSize", TypicalSize),
                     new XElement("TypicalDepthMin", TypicalDepthMin),
                     new XElement("TypicalDepthMax", TypicalDepthMax),
+                    new XElement("PreferredDepth", PreferredDepth),
                     new XElement("VeryDeepOre", VeryDeepOre));
 
                 if (OreMappings.Count > 0)

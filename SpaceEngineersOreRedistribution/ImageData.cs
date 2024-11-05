@@ -34,10 +34,15 @@ namespace SpaceEngineersOreRedistribution
             string heightMapFile = Path.Combine(directory, face.ToString().ToLowerInvariant() + ".png");
 
             if (!File.Exists(materialMapFile)) return null;
-            if (!File.Exists(heightMapFile)) return null;
+
+            bool skipHeightMap = false;
+            if (!File.Exists(heightMapFile)) skipHeightMap = true;
 
             var img1 = SixLabors.ImageSharp.Image.Load(materialMapFile);
-            var img2 = SixLabors.ImageSharp.Image.Load(heightMapFile);
+
+            SixLabors.ImageSharp.Image img2 = null;
+            if (!skipHeightMap)
+                img2 = SixLabors.ImageSharp.Image.Load(heightMapFile);
 
             Image<Rgb24> matMap;
             Image<L16> hMap;
@@ -48,11 +53,11 @@ namespace SpaceEngineersOreRedistribution
                 matMap = img1.CloneAs<Rgb24>();
                 img1.Dispose();
             }
-            if (img2 is Image<L16>) hMap = (Image<L16>)img2;
+            if (!skipHeightMap && img2 is Image<L16>) hMap = (Image<L16>)img2;
             else
             {
-                hMap = img1.CloneAs<L16>();
-                img2.Dispose();
+                hMap = new SixLabors.ImageSharp.Image<L16>(2048, 2048); // img1.CloneAs<L16>();
+                img2?.Dispose();
             }
 
             if (matMap.Width != 2048 || hMap.Width != 2048)

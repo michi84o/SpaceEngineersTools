@@ -9,20 +9,10 @@ namespace SpaceEngineersOreRedistribution
     // Credits: https://stackoverflow.com/questions/218060/random-gaussian-variables
     internal class Normal
     {
-        public double Mean { get; }
-        public double StdDev { get; }
-
         Random _rnd;
-        public Normal(double mean, double stdDev, int seed)
+        public Normal(Random rnd)
         {
-            _rnd = new Random(seed);
-            Mean = mean;
-            StdDev = stdDev;
-        }
-
-        public double Next()
-        {
-            return Next(Mean, StdDev);
+            _rnd = rnd;
         }
 
         public double Next(double mean, double stdDev)

@@ -721,7 +721,7 @@ namespace SpaceEngineersOreRedistribution
 
             var keys = _images.Keys;
             var rnd = new Random(setup.ViewModel.Seed); // Seed 0 is better for debugging.
-            var normal = new Normal(50, 10, 0);
+            var normal = new Normal(rnd);
             bool overridefiles = false;
             foreach (var key in keys)
             {
@@ -770,23 +770,63 @@ namespace SpaceEngineersOreRedistribution
                         var depthMin = info.TypicalDepthMin;
                         var depthMax = info.TypicalDepthMax;
 
-                        int depth;
-                        if (depthMin == -1 && depthMax == -1)
+                        int depth = -1;
+                        if (info.PreferredDepth > -1)
                         {
-                            depth = rnd.Next(0, info.VeryDeepOre ? 9 : 10); // Max = 9
+                            double[] depthWeights = new double[10] { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 };
+                            if (!info.VeryDeepOre) depthWeights[9] = 0;
+                            if (depthMin > 0)
+                            {
+                                for (int i = 0; i < depthMin; ++i) depthWeights[i] = 0;
+                            }
+                            if (depthMax > -1)
+                            {
+                                for (int i = 8; i > depthMax; --i) depthWeights[i] = 0;
+                            }
+                            double weightSum = 0;
+                            for (int i = 0; i < 10; ++i)
+                            {
+                                if (depthWeights[i] == 0) continue;
+                                double stdDev = setup.ViewModel.StdDevDepth;
+                                var divider = stdDev * Math.Sqrt(2 * Math.PI);
+                                var eTerm = -0.5 * Math.Pow((i - info.PreferredDepth) / stdDev, 2);
+                                depthWeights[i] = Math.Exp(eTerm) / divider; // 10 is used to roughly get a prob of 1.0 for preferred depth
+                                weightSum += depthWeights[i];
+                            }
+                            var depthRnd = rnd.NextDouble() * weightSum;
+                            weightSum = 0;
+                            for (int i = 0; i < 10; ++i)
+                            {
+                                if (depthWeights[i] == 0) continue;
+                                weightSum += weightSum += depthWeights[i];
+                                if (depthRnd <= weightSum)
+                                {
+                                    depth = i;
+                                    break;
+                                }
+                            }
                         }
-                        else if (depthMin == -1 && depthMax > -1)
+                        else
                         {
-                            depth = rnd.Next(0, depthMax+1);
+                            if (depthMin == -1 && depthMax == -1)
+                            {
+                                depth = rnd.Next(0, info.VeryDeepOre ? 9 : 10); // Max = 9
+                            }
+                            else if (depthMin == -1 && depthMax > -1)
+                            {
+                                depth = rnd.Next(0, depthMax + 1);
+                            }
+                            else if (depthMin >= -1 && depthMax == -1)
+                            {
+                                depth = rnd.Next(depthMin, info.VeryDeepOre ? 9 : 10);
+                            }
+                            else //if (depthMin >= -1 && depthMax >= -1)
+                            {
+                                depth = rnd.Next(depthMin, depthMax + 1);
+                            }
                         }
-                        else if (depthMin >= -1 && depthMax == -1)
-                        {
-                            depth = rnd.Next(depthMin, info.VeryDeepOre ? 9 : 10);
-                        }
-                        else //if (depthMin >= -1 && depthMax >= -1)
-                        {
-                            depth = rnd.Next(depthMin, depthMax + 1);
-                        }
+                        if (depth == -1) continue;
+
 
                         // Randomize if not set by user
                         if (spawnSize == 0) spawnSize = rnd.Next(5, 31);

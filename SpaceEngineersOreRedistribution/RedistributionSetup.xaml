@@ -6,11 +6,11 @@
         xmlns:local="clr-namespace:SpaceEngineersOreRedistribution"
         mc:Ignorable="d"
         Title="Redistribution Setup"
-        MaxHeight="960" Width="680" SizeToContent="Height">
+        MaxHeight="960" SizeToContent="WidthAndHeight" ResizeMode="NoResize">
     <Window.DataContext>
         <local:RedistributionSetupViewModel x:Name="ViewModel"/>
     </Window.DataContext>
-    <Grid>
+    <Grid Width="760">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -81,6 +81,13 @@
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
+                            <GridViewColumn Header="Preferred Depth" Width="90">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBox Text="{Binding PreferredDepth, UpdateSourceTrigger=PropertyChanged}"  HorizontalAlignment="Stretch" />
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
                             <GridViewColumn Header="Very Deep Ore" Width="90">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
@@ -99,10 +106,12 @@
                     <Button Content="Export" Margin="3" Width="100" Command="{Binding ExportCommand}"/>
                     <Button Content="Update Ore Mapping Diagram" Margin="3" Click="UpdateDiagramClick"/>
                 </StackPanel>
-                <TextBlock Grid.Row="4" Text="Multiple definition of same ore allowed. Vanilla ore detectors have a maximum range of 150m.&#x0d;&#x0a;First start value of tier 3 (depth 6) should be within range. If ore spawns deeper it will dive from there to target depth. &#x0d;&#x0a; Weight: Spawn probability relative to other ore. Weights will be summed up to use relative %.&#x0d;&#x0a;Size: 1-100 ore patches per vein, 0 for random (5-30), default: 15&#x0d;&#x0a;Depth: 0-9 (9 only if deep ore enabled!), -1 for random (0-9), default: -1&#x0d;&#x0a;Size will still be randomized using a Gauss distribution."/>
+                <TextBlock Grid.Row="4" Text="Multiple definition of same ore allowed. Vanilla ore detectors have a maximum range of 150m.&#x0d;&#x0a;First start value of tier 3 (depth 6) should be within range. If ore spawns deeper it will dive from there to target depth. &#x0d;&#x0a;Weight: Spawn probability relative to other ore. Weights will be summed up to use relative %.&#x0d;&#x0a;Size: 1-100 ore patches per vein, 0 for random (5-30), default: 15&#x0d;&#x0a;Depth: 0-9 (9 only if deep ore enabled!), -1 for random (0-9), default: -1, set preferred depth to Gauss distribute around that value (std dev 4).&#x0d;&#x0a;Size will still be randomized using a Gauss distribution."/>
                 <StackPanel Orientation="Horizontal" Grid.Row="5" >
-                    <TextBlock Text="Standard Deviation for Gauss (1-50% rel. to max, default: 10%): "/>
+                    <TextBlock Text="Standard Deviation for patch size (1-50% rel. to max, default: 10%): "/>
                     <TextBox Width="50" Text="{Binding StdDev, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Text="Standard Deviation for depth (default 4): "/>
+                    <TextBox Width="50" Text="{Binding StdDevDepth, UpdateSourceTrigger=PropertyChanged}"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Grid.Row="6" >
                     <TextBlock Text="Randomly spawn ore every "/>
@@ -113,7 +122,7 @@
                     <TextBlock Text="Seed"/>
                     <TextBox Width="40" Text="{Binding Seed, UpdateSourceTrigger=PropertyChanged}" HorizontalContentAlignment="Center" Margin="3,0,3,0"/>
                 </StackPanel>
-                <TextBlock Grid.Row="2" Text="Ore Mapping for selected Ore:" />
+                <TextBlock Grid.Row="2" Text="Ore Mapping for selected Ore: Depths 0-9 refer to these 10 mappings. Left gray bar in diagram is spawn probability." />
                 <Grid
                     Grid.Row="3">
                     <Grid.ColumnDefinitions>
@@ -159,6 +168,23 @@
                         Grid.Column="1" Margin="3">
                         <Canvas Width="320" Height="240" x:Name="MyCanvas" Background="LightGray" />
                     </Viewbox>
+                    <Grid
+                        Grid.Column="1" Margin="3">
+                        <Grid.RowDefinitions>
+                            <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                            <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Text="0" VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="White"/>
+                        <TextBlock Grid.Row="1" Text="1" VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="White"/>
+                        <TextBlock Grid.Row="2" Text="2" VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="White"/>
+                        <TextBlock Grid.Row="3" Text="3" VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="White"/>
+                        <TextBlock Grid.Row="4" Text="4" VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="White"/>
+                        <TextBlock Grid.Row="5" Text="5" VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="White"/>
+                        <TextBlock Grid.Row="6" Text="6" VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="White"/>
+                        <TextBlock Grid.Row="7" Text="7" VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="White"/>
+                        <TextBlock Grid.Row="8" Text="8" VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="White"/>
+                        <TextBlock Grid.Row="9" Text="9" VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="White"/>
+                    </Grid>
 
                 </Grid>
             </Grid>
