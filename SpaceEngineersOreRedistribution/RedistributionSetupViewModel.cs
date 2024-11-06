@@ -379,6 +379,7 @@ namespace SpaceEngineersOreRedistribution
                     var mappings = new XElement("Mappings");
                     foreach (var mapping in OreMappings)
                     {
+                        mapping.Type = Name;
                         mappings.Add(mapping.ToXElement());
                     }
                     elem.Add(mappings);
