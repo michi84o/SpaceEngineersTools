@@ -12,4 +12,16 @@
     <OreTierItem Start="270" Depth="102" />
     <OreTierItem Start="370" Depth="80" />
   </OreTierPreset>
+  <OreTierPreset Name="Small Medium Depth">
+    <OreTierItem Start="3" Depth="3" />
+    <OreTierItem Start="5" Depth="5" />
+    <OreTierItem Start="8" Depth="7" />
+    <OreTierItem Start="40" Depth="10" />
+    <OreTierItem Start="50" Depth="12" />
+    <OreTierItem Start="60" Depth="14" />
+    <OreTierItem Start="100" Depth="22" />
+    <OreTierItem Start="120" Depth="28" />
+    <OreTierItem Start="146" Depth="34" />
+    <OreTierItem Start="178" Depth="38" />
+  </OreTierPreset>
 </OreTierPresets>

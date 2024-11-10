@@ -219,7 +219,7 @@ namespace SpaceEngineersOreRedistribution
                                 {
                                     OreTierListContainer container = new();
                                     container.Name = elem.Attribute("Name")?.Value ?? "Undefined";
-                                    foreach (var item in elem.Elements("Ore"))
+                                    foreach (var item in elem.Elements("OreTierPreset"))
                                     {
                                         var tierItem = new OreTierItem
                                         {
