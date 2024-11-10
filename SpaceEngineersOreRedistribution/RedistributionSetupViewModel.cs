@@ -194,6 +194,8 @@ namespace SpaceEngineersOreRedistribution
         public RedistributionSetupViewModel()
         {
             OreInfos.CollectionChanged += OreInfos_CollectionChanged;
+            LoadPresets();
+            SelectedOreMappingPreset = OreMappingPresets.FirstOrDefault();
         }
 
         void LoadPresets()
