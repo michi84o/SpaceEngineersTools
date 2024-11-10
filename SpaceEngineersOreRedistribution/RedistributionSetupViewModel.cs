@@ -2,7 +2,9 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Security.AccessControl;
 using System.Text;
 using System.Threading.Tasks;
@@ -157,10 +159,140 @@ namespace SpaceEngineersOreRedistribution
             get { return FinalizeList(); }
         }
 
+        public class OreTierItem
+        {
+            public int Start;
+            public int Depth;
+        }
+        public class OreTierListContainer
+        {
+            public string Name { get; set; }
+            public List<OreTierItem> Items { get; } = new List<OreTierItem>();
+
+            public XElement ToXelement()
+            {
+                var elem = new XElement("OreTierPreset", new XAttribute("Name", Name));
+                foreach (var item in Items)
+                {
+                    elem.Add(
+                        new XElement("OreTierItem",
+                            new XAttribute("Start", item.Start),
+                            new XAttribute("Depth", item.Depth)));
+                }
+                return elem;
+            }
+        }
+
+        OreTierListContainer _selectedOreMappingPreset;
+        public OreTierListContainer SelectedOreMappingPreset
+        {
+            get => _selectedOreMappingPreset;
+            set => SetProp(ref _selectedOreMappingPreset, value);
+        }
+        public ObservableCollection<OreTierListContainer> OreMappingPresets { get; } = new();
+
         public RedistributionSetupViewModel()
         {
             OreInfos.CollectionChanged += OreInfos_CollectionChanged;
         }
+
+        void LoadPresets()
+        {
+            try
+            {
+                OreMappingPresets.Clear();
+                SelectedOreMappingPreset = null;
+                var dir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                if (Directory.Exists(dir))
+                {
+                    var path = Path.Combine(dir, "OreTierPresets.xml");
+                    if (File.Exists(path))
+                    {
+                        var doc = XDocument.Load(path);
+                        if (doc.Root?.Name == "OreTierPrests")
+                        {
+                            try
+                            {
+                                foreach (var elem in doc.Root.Elements("OreTierPreset"))
+                                {
+                                    OreTierListContainer container = new();
+                                    container.Name = elem.Attribute("Name")?.Value ?? "Undefined";
+                                    foreach (var item in elem.Elements("Ore"))
+                                    {
+                                        var tierItem = new OreTierItem
+                                        {
+                                            Start = int.Parse(item?.Attribute("Start")?.Value ?? "1"),
+                                            Depth = int.Parse(item?.Attribute("Depth")?.Value ?? "1")
+                                        };
+                                        container.Items.Add(tierItem);
+                                    }
+                                    OreMappingPresets.Add(container);
+                                }
+                            }
+                            catch { /* silent */ }
+                        }
+                    }
+                }
+                SelectedOreMappingPreset = OreMappingPresets.FirstOrDefault();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        public ICommand LoadPresetCommand => new RelayCommand(o =>
+        {
+            var items = SelectedOreMappingPreset.Items;
+            for (int i = 0; i < items.Count && i < SelectedInfo.OreMappings.Count; ++i)
+            {
+                SelectedInfo.OreMappings[i].Start = items[i].Start;
+                SelectedInfo.OreMappings[i].Depth = items[i].Depth;
+            }
+        }, o => SelectedOreMappingPreset != null && SelectedInfo != null);
+
+        public Window Parent;
+        public ICommand SavePresetCommand => new RelayCommand(o =>
+        {
+            try
+            {
+                var dir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                var path = Path.Combine(dir, "OreTierPresets.xml");
+                XDocument doc;
+                try
+                {
+                    doc = XDocument.Load(path);
+                    if (doc.Root.Name != "OreTierPresets") throw new Exception();
+                }
+                catch
+                {
+                    var elem = new XElement("OreTierPresets");
+                    doc = new XDocument(elem);
+                }
+
+                TextInputPopup popup = new TextInputPopup();
+                popup.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                popup.Owner = Parent;
+                var res = popup.ShowDialog();
+                if (res != true) return;
+
+                OreTierListContainer container = new();
+                foreach (var item in SelectedInfo.OreMappings)
+                {
+                    container.Items.Add(new OreTierItem { Start = item.Start, Depth = item.Depth });
+                }
+                container.Name = popup.MyText.Text;
+                doc.Root.Add(container.ToXelement());
+                doc.Save(path);
+
+                OreMappingPresets.Add(container);
+                SelectedOreMappingPreset = container;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }, o => SelectedInfo != null);
 
         private void OreInfos_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {

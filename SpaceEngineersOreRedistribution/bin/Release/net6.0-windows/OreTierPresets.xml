@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<OreTierPresets>
+  <OreTierPreset Name="Default">
+    <OreTierItem Start="3" Depth="3" />
+    <OreTierItem Start="5" Depth="5" />
+    <OreTierItem Start="8" Depth="7" />
+    <OreTierItem Start="40" Depth="12" />
+    <OreTierItem Start="50" Depth="22" />
+    <OreTierItem Start="70" Depth="32" />
+    <OreTierItem Start="140" Depth="62" />
+    <OreTierItem Start="200" Depth="72" />
+    <OreTierItem Start="270" Depth="102" />
+    <OreTierItem Start="370" Depth="80" />
+  </OreTierPreset>
+</OreTierPresets>

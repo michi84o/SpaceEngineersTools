@@ -125,6 +125,10 @@
                 <TextBlock Grid.Row="2" Text="Ore Mapping for selected Ore: Depths 0-9 refer to these 10 mappings. Left gray bar in diagram is spawn probability." />
                 <Grid
                     Grid.Row="3">
+                    <Grid.RowDefinitions>
+                        <RowDefinition/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition/>
                         <ColumnDefinition/>
@@ -165,11 +169,11 @@
                         </ListView.View>
                     </ListView>
                     <Viewbox
-                        Grid.Column="1" Margin="3">
+                        Grid.Column="1" Grid.Row="0" Margin="3">
                         <Canvas Width="320" Height="240" x:Name="MyCanvas" Background="LightGray" />
                     </Viewbox>
                     <Grid
-                        Grid.Column="1" Margin="3">
+                        Grid.Column="1" Grid.Row="0" Margin="3">
                         <Grid.RowDefinitions>
                             <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
                             <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
@@ -185,7 +189,12 @@
                         <TextBlock Grid.Row="8" Text="8" VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="White"/>
                         <TextBlock Grid.Row="9" Text="9" VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="White"/>
                     </Grid>
-
+                    <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal">
+                        <TextBlock Text="Presets:" Margin="3" VerticalAlignment="Center"/>
+                        <ComboBox Width="200" Margin="3" ItemsSource="{Binding OreMappingPresets}" DisplayMemberPath="Name" SelectedItem="{Binding SelectedOreMappingPreset}"/>
+                        <Button Content="Use selected Preset" Margin="3"  Command="{Binding LoadPresetCommand}"/>
+                        <Button Content="Save current values as Preset" Margin="3"  Command="{Binding SavePresetCommand}" />
+                    </StackPanel>
                 </Grid>
             </Grid>
         </GroupBox>

@@ -24,6 +24,12 @@ namespace SpaceEngineersOreRedistribution
             InitializeComponent();
             ViewModel.ConfirmAction = ConfirmAction;
             ViewModel.PropertyChanged += ViewModel_PropertyChanged;
+            ViewModel.Parent = this;
+        }
+
+        private void RedistributionSetup_Loaded(object sender, RoutedEventArgs e)
+        {
+            throw new NotImplementedException();
         }
 
         private void ViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)

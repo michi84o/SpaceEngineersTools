@@ -1,0 +1,19 @@
+﻿<Window x:Class="SpaceEngineersOreRedistribution.TextInputPopup"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:SpaceEngineersOreRedistribution"
+        mc:Ignorable="d"
+        Title="Name Input" ResizeMode="NoResize" SizeToContent="WidthAndHeight">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition/>
+            <RowDefinition/>
+            <RowDefinition/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Text="Name?" Margin="5" x:Name="MyLabel"/>
+        <TextBox Grid.Row="1" Text="" Margin="5" Width="150" x:Name="MyText"/>
+        <Button Grid.Row="2" Content="OK" Margin="5" Click="Button_Click" IsDefault="True"/>
+    </Grid>
+</Window>
