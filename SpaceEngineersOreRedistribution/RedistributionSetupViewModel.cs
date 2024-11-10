@@ -211,7 +211,7 @@ namespace SpaceEngineersOreRedistribution
                     if (File.Exists(path))
                     {
                         var doc = XDocument.Load(path);
-                        if (doc.Root?.Name == "OreTierPrests")
+                        if (doc.Root?.Name == "OreTierPresets")
                         {
                             try
                             {
