@@ -251,6 +251,12 @@ namespace SpaceEngineersOreRedistribution
                 SelectedInfo.OreMappings[i].Start = items[i].Start;
                 SelectedInfo.OreMappings[i].Depth = items[i].Depth;
             }
+
+            // Causes redraw of diagram
+            var info = SelectedInfo;
+            SelectedInfo = null;
+            SelectedInfo = info;
+
         }, o => SelectedOreMappingPreset != null && SelectedInfo != null);
 
         public Window Parent;
