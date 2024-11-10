@@ -24,4 +24,16 @@
     <OreTierItem Start="146" Depth="34" />
     <OreTierItem Start="178" Depth="38" />
   </OreTierPreset>
+  <OreTierPreset Name="Deep Ore">
+    <OreTierItem Start="70" Depth="3" />
+    <OreTierItem Start="72" Depth="5" />
+    <OreTierItem Start="75" Depth="7" />
+    <OreTierItem Start="80" Depth="12" />
+    <OreTierItem Start="90" Depth="22" />
+    <OreTierItem Start="110" Depth="32" />
+    <OreTierItem Start="140" Depth="62" />
+    <OreTierItem Start="200" Depth="72" />
+    <OreTierItem Start="270" Depth="102" />
+    <OreTierItem Start="370" Depth="80" />
+  </OreTierPreset>
 </OreTierPresets>
