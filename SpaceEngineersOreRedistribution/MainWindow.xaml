@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SpaceEngineersOreRedistribution"
         mc:Ignorable="d"
-        Title="SE Ore Redistribution" Height="450" Width="1000">
+        Title="SE Ore Redistribution v1.7" Height="450" Width="1000">
     <Window.DataContext>
         <local:MainWindowViewModel x:Name="ViewModel"/>
     </Window.DataContext>
@@ -37,6 +37,7 @@
             </MenuItem>
             <MenuItem Header="Redistribute Ore" Command="{Binding RedistributeOreCommand}" />
             <MenuItem Header="Rewrite Biomes" Command="{Binding RewriteBiomesCommand}" />
+            <MenuItem Header="Create Occlusion Maps" Command="{Binding CreateOcclusionMapsCommand}" />
             <MenuItem x:Name="OreInspectorCb" Header="Ore Inspector" IsCheckable="True" IsChecked="True" VerticalAlignment="Center" />
             <TextBlock Text="Size:" IsHitTestVisible="False" IsEnabled="False"/>
             <TextBlock Text="{Binding OreInspectorSize}" IsHitTestVisible="False" IsEnabled="False"/>

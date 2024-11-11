@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:SpaceEngineersOreRedistribution"
         mc:Ignorable="d"
         Title="Redistribution Setup"
-        MaxHeight="960" Height="800" SizeToContent="WidthAndHeight" >
+        MaxHeight="960" Height="800" SizeToContent="WidthAndHeight" MaxWidth="765" >
     <Window.DataContext>
         <local:RedistributionSetupViewModel x:Name="ViewModel"/>
     </Window.DataContext>

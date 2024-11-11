@@ -1012,6 +1012,7 @@ namespace SpaceEngineersOreRedistribution
                 image.SaveMaterialMap(fileName);
             }
             MessageBox.Show("Finished!\r\nPlease copy the pngs to the 'PlanetDataFiles\\PlanetName' folder.\r\nThen open the planet definition SBC\r\nand copy the content of 'oremappings.xml' to the corresponding section.", "Ore Redistribution", MessageBoxButton.OK, MessageBoxImage.Information);
+            System.Diagnostics.Process.Start("explorer.exe", xmlFileName);
         },
         o => SelectedPlanetDefinition != null);
 
@@ -1088,9 +1089,38 @@ namespace SpaceEngineersOreRedistribution
             }
         }
 
+        public ICommand CreateOcclusionMapsCommand => new RelayCommand(o =>
+        {
+            var dir = Path.GetDirectoryName(_lastOpenedFile);
+            var imageDir = Path.Combine(dir, "PlanetDataFiles", SelectedPlanetDefinition.Name);
+            var msgRes = MessageBox.Show("This will create the '*_add.png' files.\r\nThey don't seem to have any effect, but whatever...\r\nContinue?", "Warning", MessageBoxButton.OKCancel);
+            if (msgRes != MessageBoxResult.OK) return;
+
+            // Write files
+
+            foreach (var face in Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>())
+            {
+                var faceName = face.ToString().ToLower();
+                dynamic material = SixLabors.ImageSharp.Image.Load(Path.Combine(imageDir, faceName + "_mat.png"));
+                var addImage = new SixLabors.ImageSharp.Image<Rgba32>(2048, 2048);
+                for (int x = 0; x < 2048; ++x)
+                    for (int y = 0; y < 2048; ++y)
+                    {
+                        // Spaced that have ore must have red value of 144. All other rgb values are 0.
+                        var blue = material[x, y].B;
+                        if (blue == 255)
+                            addImage[x, y] = new Rgba32(0, 0, 0);
+                        else
+                            addImage[x, y] = new Rgba32(144, 0, 0);
+                    }
+                addImage.SaveAsPng(Path.Combine(imageDir, faceName + "_add.png"));
+            }
+            MessageBox.Show("Finished");
+        }, o=> SelectedPlanetDefinition != null);
+
         public ICommand RewriteBiomesCommand => new RelayCommand(o =>
         {
-            var msgRes = MessageBox.Show("This will override the biomes of the currently selected planet.\r\nContinue?", "Warning", MessageBoxButton.OKCancel);
+            var msgRes = MessageBox.Show("This will override the biomes of the currently selected planet.\r\nOnly recommended for EarthLike and Alien\r\nContinue?", "Warning", MessageBoxButton.OKCancel);
             if (msgRes != MessageBoxResult.OK) return;
 
             var dir = Path.GetDirectoryName(_lastOpenedFile);
@@ -1114,7 +1144,7 @@ namespace SpaceEngineersOreRedistribution
             foreach (var face in Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>())
             {
                 var faceName = face.ToString().ToLower();
-                dynamic image = SixLabors.ImageSharp.Image.Load(faceName + "_mat.png");
+                dynamic image = SixLabors.ImageSharp.Image.Load(Path.Combine(imageDir, faceName + "_mat.png"));
                 for (int x = 0; x < 2048; ++x)
                     for (int y = 0; y < 2048; ++y)
                     {
@@ -1327,10 +1357,10 @@ namespace SpaceEngineersOreRedistribution
                         var surfaceVal = planetSurface[CoordinatesToPlanetSurface(face, x, y)];
                         image[x, y] = new Rgba32(surfaceVal /*source[x,y].R*/, surfaceVal, surfaceVal /*source[x,y].B*/);
                     }
-                image.SaveAsPng(faceName + "_mat2.png");
+                image.SaveAsPng(Path.Combine(imageDir, faceName + "_mat2.png"));
             }
 
-            MessageBox.Show("OK");
+            MessageBox.Show("Finished. Files were saved as '*_mat2.png' to preserve the original files.");
         }, o => SelectedPlanetDefinition != null);
 
         // Use a biome dictionary for a latitude.
