@@ -706,7 +706,10 @@ namespace SpaceEngineersOreRedistribution
                     foreach (var mapping in list)
                     {
                         if (mapping.Value > 0)
+                        {
+                            mapping.Type = info.Name;
                             node.Add(mapping.ToXElement());
+                        }
                     }
                 }
                 var doc = new XDocument(node);

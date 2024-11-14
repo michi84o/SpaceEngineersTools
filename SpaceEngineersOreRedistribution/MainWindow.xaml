@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SpaceEngineersOreRedistribution"
         mc:Ignorable="d"
-        Title="SE Ore Redistribution v1.7" Height="450" Width="1000">
+        Title="SE Ore Redistribution v1.7.1" Height="450" Width="1000">
     <Window.DataContext>
         <local:MainWindowViewModel x:Name="ViewModel"/>
     </Window.DataContext>
