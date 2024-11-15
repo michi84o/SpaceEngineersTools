@@ -9,6 +9,9 @@ Default ore distribution in SE follows a fixed pattern as seen here:
 This is nice for new players because they can find anything they need within 5km.
 I wanted to add more randomness and motivate exploration. This tool can generate new material maps with randomized ores and a XML file with the corresponding ore mappings. These files can be used to create a modded planet. Creating a mod is still a manual process.
 
+Here is a video tutorial:
+https://youtu.be/3Do1d0OU4Wg
+
 Screenshot of a modded planet:
 ![Screenshot of viewer modded](Screenshots/SE_Ore_Modded.png)
 
