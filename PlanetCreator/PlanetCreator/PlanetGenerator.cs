@@ -3,6 +3,7 @@ using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Runtime.ExceptionServices;
@@ -17,7 +18,7 @@ using System.Windows.Media.Media3D;
 
 namespace PlanetCreator
 {
-    class ProgressEventArgs : EventArgs
+    public class ProgressEventArgs : EventArgs
     {
         public int Progress { get; }
         public ProgressEventArgs(int progress)
@@ -26,7 +27,7 @@ namespace PlanetCreator
         }
     }
 
-    internal class PlanetGenerator
+    public class PlanetGenerator
     {
         const int _tileWidth = 2048;
 
@@ -46,6 +47,42 @@ namespace PlanetCreator
         {
             Init();
         }
+
+        /// <summary>
+        /// This function was added to fix an error in the Triton height map.
+        /// It allows to load an existing image into the generator.
+        /// The fix for Triton consists of changing the brightness for the glitched part in GIMP and then
+        /// smoothing it over with some erosion.
+        /// </summary>
+        /// <param name="face"></param>
+        /// <param name="folder"></param>
+        /// <returns></returns>
+        public bool LoadExistingHeightMap(CubeMapFace face, string folder)
+        {
+            if (!Directory.Exists(folder)) return false;
+            var file = Path.Combine(folder, (""+face).ToLower() + ".png");
+            if (!File.Exists(file)) return false;
+            try
+            {
+                var image = SixLabors.ImageSharp.Image.Load(file) as Image<L16>;
+                if (image == null) return false;
+
+                for (int x = 0; x < image.Height && x < _tileWidth; x++)
+                {
+                    for (int y = 0; y < image.Height && y < _tileWidth; y++)
+                    {
+                        _faces[face][x, y] = image[x, y].PackedValue * 1.0 / 65535.0;
+                    }
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine(ex.Message);
+                return false;
+            }
+        }
+
         void Init()
         {
             _faces = new()
@@ -1100,6 +1137,27 @@ namespace PlanetCreator
             public PointD Gradient;
         }
 
+        /// <summary>
+        /// This was added for fixing Triton. It does not stretch the values like the internal method!!!
+        /// </summary>
+        /// <param name="face"></param>
+        public void TileToImage(CubeMapFace face)
+        {
+            var image = new Image<L16>(_tileWidth, _tileWidth);
+            var tile = _faces[face];
+            Parallel.For(0, _tileWidth, x =>
+            {
+                Parallel.For(0, _tileWidth, y =>
+                {
+                    var val = (tile[x, y]*65535 + .5);
+                    if (val > 65535) val = 65535;
+                    if (val < 0) val = 0;
+                    image[x, y] = new L16((ushort)val);
+                });
+            });
+            image.SaveAsPng(face.ToString().ToLower() + ".png");
+        }
+
         // tiles must be normalized to 0...1 !!!
         void TileToImage(double[,] tile, CubeMapFace face)
         {
@@ -1213,7 +1271,7 @@ namespace PlanetCreator
         Down
     }
 
-    struct PointD
+    public struct PointD
     {
         public double X;
         public double Y;
@@ -1241,7 +1299,7 @@ namespace PlanetCreator
         public PointD IntegerOffset() => new PointD() { X = X - (int)X, Y = Y - (int)Y };
     }
 
-    struct PointI
+    public struct PointI
     {
         public int X;
         public int Y;

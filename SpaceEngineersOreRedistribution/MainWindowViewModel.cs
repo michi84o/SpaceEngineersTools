@@ -456,6 +456,7 @@ namespace SpaceEngineersOreRedistribution
                         ore.Depth = int.Parse(oreMapping.Attribute("Depth")?.Value);
                         // optional:
                         ore.TargetColor = oreMapping.Attribute("TargetColor")?.Value;
+                        if (ore.TargetColor != null && !ore.TargetColor.StartsWith("#")) ore.TargetColor = "#" + ore.TargetColor;
                         ore.ColorInfluence = oreMapping.Attribute("ColorInfluence")?.Value;
                         def.OreMappings.Add(ore);
                     }

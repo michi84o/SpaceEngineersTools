@@ -64,6 +64,7 @@ namespace SpaceEngineersOreRedistribution
             elem.Start = int.Parse(x.Attribute("Start").Value);
             elem.Depth = int.Parse(x.Attribute("Depth").Value);
             elem.TargetColor = x.Attribute("TargetColor").Value;
+            if (elem.TargetColor != null && !elem.TargetColor.StartsWith("#")) elem.TargetColor = "#" + elem.TargetColor;
             elem.ColorInfluence = x.Attribute("ColorInfluence").Value;
             return elem;
         }

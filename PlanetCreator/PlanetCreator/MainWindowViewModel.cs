@@ -17,7 +17,7 @@ using System.Windows.Media.Imaging;
 
 namespace PlanetCreator
 {
-    interface IDebugOverlay
+    public interface IDebugOverlay
     {
         void DebugDrawPixel(CubeMapFace face, int x, int y, byte a, byte r, byte g, byte b);
         void DebugClearPixels(CubeMapFace face);

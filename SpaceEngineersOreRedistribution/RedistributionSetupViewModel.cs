@@ -451,19 +451,19 @@ namespace SpaceEngineersOreRedistribution
                 OreMappings.Clear();
                 List<OreMapping> mList = new();
                 // Tier 1: Flat surface ore. Depth: 3m - 15m
-                OreMappings.Add(new OreMapping { Tier = 1, Value = 0, Type = Name, Start = 3, Depth = 3, ColorInfluence = "15", TargetColor = "616c83" });
-                OreMappings.Add(new OreMapping { Tier = 1, Value = 1, Type = Name, Start = 5, Depth = 5, ColorInfluence = "15", TargetColor = "616c83" });
-                OreMappings.Add(new OreMapping { Tier = 1, Value = 2, Type = Name, Start = 8, Depth = 7, ColorInfluence = "15", TargetColor = "616c83" });
+                OreMappings.Add(new OreMapping { Tier = 1, Value = 0, Type = Name, Start = 3, Depth = 3, ColorInfluence = "15", TargetColor = "#616c83" });
+                OreMappings.Add(new OreMapping { Tier = 1, Value = 1, Type = Name, Start = 5, Depth = 5, ColorInfluence = "15", TargetColor = "#616c83" });
+                OreMappings.Add(new OreMapping { Tier = 1, Value = 2, Type = Name, Start = 8, Depth = 7, ColorInfluence = "15", TargetColor = "#616c83" });
                 // Tier 2: Medium deep veins. Depth: 40m - 102m
-                OreMappings.Add(new OreMapping { Tier = 2, Value = 3, Type = Name, Start = 40, Depth = 12, ColorInfluence = "15", TargetColor = "616c83" });
-                OreMappings.Add(new OreMapping { Tier = 2, Value = 4, Type = Name, Start = 50, Depth = 22, ColorInfluence = "15", TargetColor = "616c83" });
-                OreMappings.Add(new OreMapping { Tier = 2, Value = 5, Type = Name, Start = 70, Depth = 32, ColorInfluence = "15", TargetColor = "616c83" });
+                OreMappings.Add(new OreMapping { Tier = 2, Value = 3, Type = Name, Start = 40, Depth = 12, ColorInfluence = "15", TargetColor = "#616c83" });
+                OreMappings.Add(new OreMapping { Tier = 2, Value = 4, Type = Name, Start = 50, Depth = 22, ColorInfluence = "15", TargetColor = "#616c83" });
+                OreMappings.Add(new OreMapping { Tier = 2, Value = 5, Type = Name, Start = 70, Depth = 32, ColorInfluence = "15", TargetColor = "#616c83" });
                 // Tier 3: Very deep veins. Depth: 140m - 372m
-                OreMappings.Add(new OreMapping { Tier = 3, Value = 6, Type = Name, Start = 140, Depth = 62, ColorInfluence = "15", TargetColor = "616c83" });
-                OreMappings.Add(new OreMapping { Tier = 3, Value = 7, Type = Name, Start = 200, Depth = 72, ColorInfluence = "15", TargetColor = "616c83" });
-                OreMappings.Add(new OreMapping { Tier = 3, Value = 8, Type = Name, Start = 270, Depth = 102, ColorInfluence = "15", TargetColor = "616c83" });
+                OreMappings.Add(new OreMapping { Tier = 3, Value = 6, Type = Name, Start = 140, Depth = 62, ColorInfluence = "15", TargetColor = "#616c83" });
+                OreMappings.Add(new OreMapping { Tier = 3, Value = 7, Type = Name, Start = 200, Depth = 72, ColorInfluence = "15", TargetColor = "#616c83" });
+                OreMappings.Add(new OreMapping { Tier = 3, Value = 8, Type = Name, Start = 270, Depth = 102, ColorInfluence = "15", TargetColor = "#616c83" });
                 // Bonus: Very deep ore. Depth: 370m - 450m
-                OreMappings.Add(new OreMapping { Tier = 4, Value = 9, Type = Name, Start = 370, Depth = 80, ColorInfluence = "15", TargetColor = "616c83" });
+                OreMappings.Add(new OreMapping { Tier = 4, Value = 9, Type = Name, Start = 370, Depth = 80, ColorInfluence = "15", TargetColor = "#616c83" });
             }
 
             public static OreInfo FromXElement(XElement node)
