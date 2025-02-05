@@ -835,9 +835,12 @@ namespace SpaceEngineersOreRedistribution
                         // Randomize if not set by user
                         if (spawnSize == 0) spawnSize = rnd.Next(5, 31);
                         // Gauss randomizer
-                        var stdDevPercentage = setup.ViewModel.StdDev / 100.0;
-                        spawnSize = (int)(normal.Next(spawnSize, spawnSize * stdDevPercentage) + 0.5);
-                        if (spawnSize < 1) spawnSize = 1; else if (spawnSize > 100) spawnSize = 100;
+                        if (setup.ViewModel.StdDev > 0)
+                        {
+                            var stdDevPercentage = setup.ViewModel.StdDev / 100.0;
+                            spawnSize = (int)(normal.Next(spawnSize, spawnSize * stdDevPercentage) + 0.5);
+                            if (spawnSize < 1) spawnSize = 1; else if (spawnSize > 500) spawnSize = 500;
+                        }
 
                         //int defaultTier = GetTier(depth);
                         int defaultDepthIndex = depth;
@@ -873,7 +876,7 @@ namespace SpaceEngineersOreRedistribution
                         // - While drawing
                         // - If last drawn height is not starting height give a 30% to jump back to starting height. 20% Chance of getting further away.
                         //   50% of staying at same height.
-                        for (int i=0;i<spawnSize;++i)
+                        for (int i=1;i<spawnSize;++i) // We already added one pixel at this point, so start with 1
                         {
                             var direction = rnd.Next(4);
                             var nextOreToDraw = new OreToDraw();

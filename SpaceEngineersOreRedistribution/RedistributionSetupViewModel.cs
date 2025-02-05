@@ -107,7 +107,7 @@ namespace SpaceEngineersOreRedistribution
             {
                 if (SetProp(ref _stdDev, value))
                 {
-                    if (value < 1) StdDev = 1;
+                    if (value < 0) StdDev = 0;
                     if (value > 50) StdDev = 50;
                 }
             }
@@ -367,7 +367,7 @@ namespace SpaceEngineersOreRedistribution
                 {
                     if (SetProp(ref _typicalSize, value))
                     {
-                        if (value > 100) _typicalSize = 100;
+                        if (value > 500) _typicalSize = 500;
                         else if (value < 0) _typicalSize = 0;
                     }
                 }
