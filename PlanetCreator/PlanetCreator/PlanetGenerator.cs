@@ -29,6 +29,10 @@ namespace PlanetCreator
 
     public class PlanetGenerator
     {
+        public bool DrawDebug { get; set; }
+        bool _drawLakeLines = false;
+        bool _drawErosionLines = false;
+
         const int _tileWidth = 2048;
 
         public event EventHandler<ProgressEventArgs> ProgressChanged;
@@ -143,6 +147,9 @@ namespace PlanetCreator
         public int Octaves { get; set; } = 4;
         public int ErosionIterations { get; set; } = 1000000;
 
+        public bool FlattenEquator { get; set; }
+        public int EquatorFlatSigma { get; set; }
+
         void UpdateProgress(int progress)
         {
             ProgressChanged?.Invoke(this, new ProgressEventArgs(progress));
@@ -233,9 +240,26 @@ namespace PlanetCreator
                     for (int y = 0; y < _tileWidth; ++y)
                     {
                         double value = tile[x, y];
+                        // This applies an S-Curve to to the histogram.
+                        // Low values are pressed down, high values are pressed up.
+                        // This results in flatter plains and mountain tops.
                         value = 0.5 * Math.Sin(Math.PI * (value - 0.5)) + 0.5;
                         // Use this line to modify further:
-                        value = Math.Pow(value, 2.5); // Lower=More mountains, Higher: more flat plains
+                        // Values > 1: Squish low values further down: More flat plains
+                        // Values < 1: Bump all values up (don't do this!)
+                        var stretch = 2.5;
+                        if (FlattenEquator)
+                        {
+                            // For more variety we apply it dependend on the y value
+                            if (kv.Key != CubeMapFace.Up && kv.Key != CubeMapFace.Down)
+                            {
+                                // Let's generate a Gauss curve that peaks at 5 around the equator and settles
+                                // at 2.5 top and bottom to allign with Up/Down tiles
+                                var sigma = EquatorFlatSigma; // Don't use larger values than 250! Smaller values will squeeze curve to equator
+                                stretch = 2.5 * Math.Exp(-0.5 * Math.Pow((y - 1023.5) / sigma, 2)) + 2.5;
+                            }
+                        }
+                        value = Math.Pow(value, stretch);
                         if (value < 0) value = 0;
                         if (value > 1) value = 1;
                         tile[x, y] = value;
@@ -297,6 +321,8 @@ namespace PlanetCreator
 
             // Fix glitches at border of cubemaps, again since erosion does not care about duplicate edge pixels
             EdgeFixer.MakeSeamless(_faces, token);
+
+            DebugOverlay.DebugDrawCollectedPixels();
 
             ProgressChanged?.Invoke(this, new ProgressEventArgs(95));
 
@@ -505,7 +531,8 @@ namespace PlanetCreator
                 if (_debug)
                 {
                     _debugTileG[posOldI.X, posOldI.Y] = waterModified;
-                    //DebugOverlay.DebugDrawPixel(_debugFace, posOldI.X, posOldI.Y, 1, (byte)(255*waterModified), 0,0);
+                    if (DebugMode && _drawErosionLines)
+                        DebugOverlay.DebugCollectPixel(_debugFace, posOldI.X, posOldI.Y, (byte)(255 * waterModified), 0, 255, 0);
                     //var sedimentFill = sediment / sedimentCapacity;
                     //if (sedimentFill > 1) sedimentFill = 1;
                     //_debugTileG[posOldI.X, posOldI.Y + 1] = sedimentFill;
@@ -704,7 +731,8 @@ namespace PlanetCreator
                                 if (_debugTileR[ipos.X, ipos.Y] > 50) _debugTileR[ipos.X, ipos.Y] = 50;
 
                                 // Bad performance!!!
-                                //DebugOverlay.DebugDrawPixel(_debugFace, posOldI.X, posOldI.Y, 128, 255, 0, 0);
+                                if (DebugMode && _drawLakeLines)
+                                    DebugOverlay.DebugCollectPixel(_debugFace, posOldI.X, posOldI.Y, 80, 255, 0, 0);
 
                             }
                             heightAndGradient = CalculateHeightAndGradient(pos, currentFace);
@@ -928,7 +956,8 @@ namespace PlanetCreator
                         {
                             foreach (var pt in lastFilledPoints)
                             {
-                                DebugOverlay.DebugDrawPixel(pt.Face, pt.X, pt.Y, 128, 255, 0, 0);
+                                // Draw final lake pixels
+                                DebugOverlay.DebugCollectPixel(pt.Face, pt.X, pt.Y, 128, 255, 0, 0);
                                 _faces[pt.Face][pt.X, pt.Y] = lastStopHeight;
                                 _lakes[pt.Face][pt.X, pt.Y] = 82;
                             }

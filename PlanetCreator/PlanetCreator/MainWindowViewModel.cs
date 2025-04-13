@@ -19,7 +19,8 @@ namespace PlanetCreator
 {
     public interface IDebugOverlay
     {
-        void DebugDrawPixel(CubeMapFace face, int x, int y, byte a, byte r, byte g, byte b);
+        void DebugCollectPixel(CubeMapFace face, int x, int y, byte a, byte r, byte g, byte b);
+        void DebugDrawCollectedPixels();
         void DebugClearPixels(CubeMapFace face);
     }
 
@@ -100,6 +101,73 @@ namespace PlanetCreator
             return bitmap;
         }
 
+        Dictionary<CubeMapFace, List<object[]>> _collectedPixels = new();
+        public void DebugCollectPixel(CubeMapFace face, int x, int y, byte a, byte r, byte g, byte b)
+        {
+            lock (_collectedPixels)
+            {
+                if (!_collectedPixels.ContainsKey(face))
+                    _collectedPixels.Add(face, new List<object[]>());
+                _collectedPixels[face].Add(new object[] { x, y, a, r, g, b });
+            }
+        }
+
+        public void DebugDrawCollectedPixels()
+        {
+            Application.Current.Dispatcher.BeginInvoke(() =>
+            {
+                lock (_collectedPixels)
+                {
+                    foreach (var face in _collectedPixels.Keys)
+                    {
+                        var bitmap = GetOverlay(face);
+                        if (bitmap == null) return;
+                        try
+                        {
+                            // Reserve the back buffer for updates.
+                            bitmap.Lock();
+
+                            foreach (var pix in _collectedPixels[face])
+                            {
+                                int x = (int)pix[0];
+                                int y = (int)pix[1];
+                                byte a = (byte)pix[2];
+                                byte r = (byte)pix[3];
+                                byte g = (byte)pix[4];
+                                byte b = (byte)pix[5];
+
+                                unsafe
+                                {
+                                    // Get a pointer to the back buffer.
+                                    IntPtr pBackBuffer = bitmap.BackBuffer;
+
+                                    // Find the address of the pixel to draw.
+                                    pBackBuffer += y * bitmap.BackBufferStride;
+                                    pBackBuffer += x * 4;
+
+                                    // Compute the pixel's color.
+                                    int color_data = b;    // B
+                                    color_data |= g << 8;  // G
+                                    color_data |= r << 16; // R
+                                    color_data |= a << 24; // A
+
+                                    // Assign the color data to the pixel.
+                                    *((int*)pBackBuffer) = color_data;
+                                }
+                                // Specify the area of the bitmap that changed.
+                                bitmap.AddDirtyRect(new Int32Rect(x, y, 1, 1));
+                            }
+                        }
+                        finally
+                        {
+                            // Release the back buffer and make it available for display.
+                            bitmap.Unlock();
+                        }
+                    }
+                }
+            });
+        }
+
         public void DebugDrawPixel(CubeMapFace face, int x, int y, byte a, byte r, byte g, byte b)
         {
             Application.Current.Dispatcher.BeginInvoke(() => _DebugDrawPixel(face, x, y, a, r, g, b));
@@ -107,6 +175,7 @@ namespace PlanetCreator
 
         public void DebugClearPixels(CubeMapFace face)
         {
+            _collectedPixels.Clear();
             Application.Current.Dispatcher.BeginInvoke(() => _DebugClearPixels(face));
         }
 
@@ -234,18 +303,45 @@ namespace PlanetCreator
             get => _seed;
             set => SetProp(ref _seed, value);
         }
-        int _noiseScale = 100;
+        int _noiseScale = 200;
         public int NoiseScale
         {
             get => _noiseScale;
             set => SetProp(ref _noiseScale, value);
         }
-        int _octaves = 4;
+        int _octaves = 5;
         public int Octaves
         {
             get => _octaves;
-            set => SetProp(ref _octaves, value);
+            set
+            {
+                if (SetProp(ref _octaves, value))
+                {
+                    if (value > 25) Octaves = 25;
+                }
+            }
         }
+
+        bool _flattenEquator;
+        public bool FlattenEquator
+        {
+            get => _flattenEquator;
+            set => SetProp(ref _flattenEquator, value);
+        }
+        int _equatorFlatSigma = 200;
+        public int EquatorFlatSigma
+        {
+            get => _equatorFlatSigma;
+            set
+            {
+                if (SetProp(ref _equatorFlatSigma, value))
+                {
+                    if (value > 250)
+                        EquatorFlatSigma = 250;
+                }
+            }
+        }
+
         int _erosionIterations = 2500000;
         public int ErosionIterations
         {
@@ -330,13 +426,12 @@ namespace PlanetCreator
             get => _lakeVolumeMultiplier;
             set => SetProp(ref _lakeVolumeMultiplier, value);
         }
-        string _materialSource = "C:\\Steam\\steamapps\\common\\SpaceEngineers\\Content\\Data\\PlanetDataFiles\\EarthLike";
+        string _materialSource = "G:\\Steam\\steamapps\\common\\SpaceEngineers\\Content\\Data\\PlanetDataFiles\\EarthLike";
         public string MaterialSource
         {
             get => _materialSource;
             set => SetProp(ref _materialSource, value);
         }
-
         public ICommand GenerateCommand => new RelayCommand(async o =>
         {
             var faceValues = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToArray();
@@ -351,8 +446,11 @@ namespace PlanetCreator
             generator.Seed = Seed;
             if (NoiseScale < 1 || NoiseScale > 65535) NoiseScale = 100;
             generator.NoiseScale = NoiseScale;
-            if (Octaves < 1 || Octaves > 64) Octaves = 4;
+            if (Octaves < 1 || Octaves > 25) Octaves = 5;
             generator.Octaves = Octaves;
+            generator.FlattenEquator = FlattenEquator;
+            if (EquatorFlatSigma < 1) EquatorFlatSigma = 250;
+            generator.EquatorFlatSigma = EquatorFlatSigma;
             generator.EnableErosion = EnableErosion;
             if (ErosionIterations < 1) { ErosionIterations = 1; }
             generator.ErosionIterations = ErosionIterations;
@@ -424,7 +522,7 @@ namespace PlanetCreator
                         try
                         {
                             if (token.IsCancellationRequested) return;
-                            var file = face.ToString().ToLower()+"_lakes.png";
+                            var file = face.ToString().ToLower() + "_lakes.png";
                             var path = System.IO.Path.Combine(MaterialSource, file);
                             if (File.Exists(path) && File.Exists(file))
                             {
@@ -454,13 +552,13 @@ namespace PlanetCreator
             }
 
             Progress = 0;
-        }, o=> !IsBusy);
+        }, o => !IsBusy);
         CancellationTokenSource _tcs;
 
         public ICommand AbortCommand => new RelayCommand(o =>
         {
             try { _tcs?.Cancel(); } catch { }
-        }, o=> IsBusy);
+        }, o => IsBusy);
 
         private void Generator_ProgressChanged(object sender, ProgressEventArgs e)
         {
@@ -615,6 +713,39 @@ namespace PlanetCreator
                 }
             }
             MessageBox.Show("Finished!");
+        });
+
+        public ICommand SetProfile1Command => new RelayCommand(o =>
+        {
+            Seed = 0;
+            NoiseScale = 200;
+            Octaves = 5;
+            FlattenEquator = true;
+            EquatorFlatSigma = 200;
+            ErosionIterations = 2500000;
+            ErosionMaxDropletLifeTime = 100;
+            ErosionInteria = 0.01;
+            ErosionSedimentCapacityFactor = 35;
+            ErosionDepositSpeed = 0.1;
+            ErosionErodeSpeed = .3;
+            ErosionDepositBrush = 2;
+            ErosionErodeBrush = 2;
+            EnableErosion = true;
+            Gravity = 10;
+            EvaporateSpeed = 0.01;
+            EnableLakeGeneration = true;
+            LakesPerTile = 40;
+            LakeVolumeMultiplier = 1;
+        });
+
+        public ICommand SetProfile2Command => new RelayCommand(o=>
+        {
+            SetProfile1Command.Execute(null);
+            // Default values this:
+            ErosionIterations = 5000000;
+            ErosionMaxDropletLifeTime = 50;
+            ErosionErodeSpeed = 0.03;
+            ErosionDepositSpeed = 0.01;
         });
 
     }

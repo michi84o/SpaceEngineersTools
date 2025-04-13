@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection.Emit;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -404,6 +405,7 @@ namespace PlanetCreator
             if (erodeCorners)
             {
                 var gen = new PlanetGenerator();
+                gen.DebugMode = false;
                 gen.Faces = faces;
                 gen.ErosionErodeBrush = 1.5;
                 gen.ErosionDepositBrush = 1.5;
