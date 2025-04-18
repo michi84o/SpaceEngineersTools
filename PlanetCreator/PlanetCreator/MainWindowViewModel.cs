@@ -322,6 +322,20 @@ namespace PlanetCreator
             }
         }
 
+        int _flattenFactor = 25;
+        public int FlattenFactor
+        {
+            get => _flattenFactor;
+            set
+            {
+                if (SetProp(ref _flattenFactor, value))
+                {
+                    if (value > 100)
+                        EquatorFlatSigma = 100;
+                }
+            }
+        }
+
         bool _flattenEquator;
         public bool FlattenEquator
         {
@@ -448,6 +462,8 @@ namespace PlanetCreator
             generator.NoiseScale = NoiseScale;
             if (Octaves < 1 || Octaves > 25) Octaves = 5;
             generator.Octaves = Octaves;
+            if (FlattenFactor < 0) FlattenFactor = 0;
+            generator.FlattenFactor = FlattenFactor;
             generator.FlattenEquator = FlattenEquator;
             if (EquatorFlatSigma < 1) EquatorFlatSigma = 250;
             generator.EquatorFlatSigma = EquatorFlatSigma;
@@ -523,14 +539,15 @@ namespace PlanetCreator
                         {
                             if (token.IsCancellationRequested) return;
                             var file = face.ToString().ToLower() + "_lakes.png";
-                            var path = System.IO.Path.Combine(MaterialSource, file);
-                            if (File.Exists(path) && File.Exists(file))
+                            var remoteFile = face.ToString().ToLower() + "_mat.png";
+                            var remotePath = System.IO.Path.Combine(MaterialSource, remoteFile);
+                            if (File.Exists(remotePath) && File.Exists(file))
                             {
                                 // TODO: dynamic is slow!
                                 dynamic localImg = Image.Load(file);
-                                dynamic img = Image.Load(path);
+                                dynamic remoteImg = Image.Load(remotePath);
                                 var image = new Image<Rgb24>(2048, 2048);
-                                if (img != null && localImg != null)
+                                if (remoteImg != null && localImg != null)
                                 {
                                     Parallel.For(0, 2048, generator.POptions(token), x =>
                                     {
@@ -538,7 +555,7 @@ namespace PlanetCreator
                                         {
                                             // Local image is lake only
                                             var localImgVal = localImg[x, y];
-                                            var imgVal = img[x, y];
+                                            var imgVal = remoteImg[x, y];
                                             image[x, y] = new Rgb24((byte)localImgVal.R, (byte)imgVal.G, (byte)imgVal.B);
                                         }
                                     });
@@ -720,6 +737,7 @@ namespace PlanetCreator
             Seed = 0;
             NoiseScale = 200;
             Octaves = 5;
+            FlattenFactor = 25;
             FlattenEquator = true;
             EquatorFlatSigma = 200;
             ErosionIterations = 2500000;

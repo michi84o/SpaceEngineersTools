@@ -147,6 +147,7 @@ namespace PlanetCreator
         public int Octaves { get; set; } = 4;
         public int ErosionIterations { get; set; } = 1000000;
 
+        public int FlattenFactor { get; set; } = 25;
         public bool FlattenEquator { get; set; }
         public int EquatorFlatSigma { get; set; }
 
@@ -243,7 +244,16 @@ namespace PlanetCreator
                         // This applies an S-Curve to to the histogram.
                         // Low values are pressed down, high values are pressed up.
                         // This results in flatter plains and mountain tops.
-                        value = 0.5 * Math.Sin(Math.PI * (value - 0.5)) + 0.5;
+                        if (FlattenFactor > 0)
+                        {
+                            var valueBackup = value;
+                            value = 0.5 * Math.Sin(Math.PI * (value - 0.5)) + 0.5;
+
+                            value = (value*FlattenFactor/10.0+valueBackup)/(1+FlattenFactor/10.0);
+                        }
+                        // Flatten factor can be reduced to reduce the sinus function.
+
+
                         // Use this line to modify further:
                         // Values > 1: Squish low values further down: More flat plains
                         // Values < 1: Bump all values up (don't do this!)
