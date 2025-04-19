@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PlanetCreator"
         mc:Ignorable="d"
-        Title="Planet Creator" Height="800" Width="800">
+        Title="Planet Creator" Height="900" Width="1024">
     <Window.DataContext>
         <local:MainWindowViewModel x:Name="ViewModel"/>
     </Window.DataContext>
@@ -35,6 +35,7 @@
             Header="Variables" Margin="3">
                 <Grid>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -196,55 +197,61 @@
                     Grid.Row="18" Grid.Column="1" Margin="5,5,5,5"
                     Text="{Binding ErosionErodeBrush}"/>
                     <TextBlock
-                    Grid.Row="19" Grid.Column="0" Margin="5,5,5,5"
+                    Grid.Row="19" Grid.Column="0" Margin="5,5,5,1"
                     Text="Deposit Brush Radius" />
                     <TextBox
-                    Grid.Row="19" Grid.Column="1" Margin="5,5,5,5"
+                    Grid.Row="19" Grid.Column="1" Margin="5,5,5,1"
                     Text="{Binding ErosionDepositBrush}"/>
                     <TextBlock
-                    Grid.Row="20" Grid.Column="0" Margin="5,5,5,5"
-                    Text="Gravity" />
+                        Grid.Row="20" Grid.Column="0" Margin="5,5,5,5"
+                        Text="Brush Pointiness" />
                     <TextBox
-                    Grid.Row="20" Grid.Column="1" Margin="5,5,5,5"
-                    Text="{Binding Gravity}"/>
+                        Grid.Row="20" Grid.Column="1" Margin="5,5,5,5"
+                        Text="{Binding BrushPointiness}"/>
                     <TextBlock
                     Grid.Row="21" Grid.Column="0" Margin="5,5,5,5"
-                    Text="Evaporate Speed" />
+                    Text="Gravity" />
                     <TextBox
                     Grid.Row="21" Grid.Column="1" Margin="5,5,5,5"
+                    Text="{Binding Gravity}"/>
+                    <TextBlock
+                    Grid.Row="22" Grid.Column="0" Margin="5,5,5,5"
+                    Text="Evaporate Speed" />
+                    <TextBox
+                    Grid.Row="22" Grid.Column="1" Margin="5,5,5,5"
                     Text="{Binding EvaporateSpeed}"/>
                     <Border
-                    Grid.Row="22" Grid.Column="0" Grid.ColumnSpan="2" Margin="5,5,5,5"
+                    Grid.Row="23" Grid.Column="0" Grid.ColumnSpan="2" Margin="5,5,5,5"
                     BorderBrush="Gray" BorderThickness="0,1,0,0"/>
                     <TextBlock
-                    Grid.Row="23" Grid.Column="0" Grid.ColumnSpan="2" Margin="5,5,5,5"
+                    Grid.Row="24" Grid.Column="0" Grid.ColumnSpan="2" Margin="5,5,5,5"
                     Text="Lake Generation" FontWeight="Bold" />
                     <CheckBox
-                    Grid.Row="23" Grid.Column="1" Margin="5,5,5,5" Content="Enable"
+                    Grid.Row="24" Grid.Column="1" Margin="5,5,5,5" Content="Enable"
                     IsChecked="{Binding EnableLakeGeneration}"/>
                     <TextBlock
-                    Grid.Row="24" Grid.Column="0" Margin="5,5,5,5"
+                    Grid.Row="25" Grid.Column="0" Margin="5,5,5,5"
                     Text="Lakes per Tile" />
                     <TextBox
-                    Grid.Row="24" Grid.Column="1" Margin="5,5,5,5"
+                    Grid.Row="25" Grid.Column="1" Margin="5,5,5,5"
                     Text="{Binding LakesPerTile, UpdateSourceTrigger=PropertyChanged}"/>
                     <TextBlock
-                    Grid.Row="25" Grid.Column="0" Margin="5,5,5,5"
+                    Grid.Row="26" Grid.Column="0" Margin="5,5,5,5"
                     Text="Lake Vol. Multiplier" />
                     <TextBox
-                    Grid.Row="25" Grid.Column="1" Margin="5,5,5,5"
+                    Grid.Row="26" Grid.Column="1" Margin="5,5,5,5"
                     Text="{Binding LakeVolumeMultiplier}"/>
                     <Border
-                    Grid.Row="26" Grid.Column="0" Grid.ColumnSpan="2" Margin="5,5,5,5"
+                    Grid.Row="27" Grid.Column="0" Grid.ColumnSpan="2" Margin="5,5,5,5"
                     BorderBrush="Gray" BorderThickness="0,1,0,0"/>
                     <TextBlock
-                    Grid.Row="27" Grid.Column="0" Grid.ColumnSpan="2" Margin="5,5,5,5"
+                    Grid.Row="28" Grid.Column="0" Grid.ColumnSpan="2" Margin="5,5,5,5"
                     Text="Material" FontWeight="Bold" />
                     <TextBlock
-                    Grid.Row="28" Grid.Column="0" Margin="5,5,5,5"
+                    Grid.Row="29" Grid.Column="0" Margin="5,5,5,5"
                     Text="Mat. Source" />
                     <TextBox
-                    Grid.Row="28" Grid.Column="1" Margin="5,5,5,5"
+                    Grid.Row="29" Grid.Column="1" Margin="5,5,5,5"
                     Text="{Binding MaterialSource}" Width="100"/>
                 </Grid>
             </GroupBox>

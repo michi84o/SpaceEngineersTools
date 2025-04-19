@@ -1,6 +1,7 @@
 ﻿using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -29,7 +30,7 @@ namespace PlanetCreator
 
     public class PlanetGenerator
     {
-        public bool DrawDebug { get; set; }
+        //public bool DrawDebug { get; set; }
         bool _drawLakeLines = false;
         bool _drawErosionLines = false;
 
@@ -135,9 +136,9 @@ namespace PlanetCreator
         //Dictionary<CubeMapFace, List<object>> _quadrants; // Use for multitasking water fill
         double _lakeDepth = 30.0 / 65535;
 
-        double[,] _debugTileR = new double[2048, 2048];
-        double[,] _debugTileG = new double[2048, 2048];
-        double[,] _debugTileB = new double[2048, 2048];
+        double[,] _debugTileR = new double[2048, 2048]; // Display lake
+        double[,] _debugTileG = new double[2048, 2048]; // Display erosion
+        double[,] _debugTileB = new double[2048, 2048]; // Display deposit
         bool _debug = false;
 
         CubeMapFace _debugFace = CubeMapFace.Back;
@@ -150,6 +151,8 @@ namespace PlanetCreator
         public int FlattenFactor { get; set; } = 25;
         public bool FlattenEquator { get; set; }
         public int EquatorFlatSigma { get; set; }
+
+        public double BrushPointiness { get; set; } = 0.25;
 
         void UpdateProgress(int progress)
         {
@@ -214,9 +217,9 @@ namespace PlanetCreator
                 {
                     for (int y = 0; y < _tileWidth; ++y)
                     {
-                        _debugTileR[x, y] = 0.5;
-                        _debugTileG[x, y] = 0.5;
-                        _debugTileB[x, y] = 0.5;
+                        _debugTileR[x, y] = 0;
+                        _debugTileG[x, y] = 0;
+                        _debugTileB[x, y] = 0;
                     };
                 });
             }
@@ -318,11 +321,12 @@ namespace PlanetCreator
 
             UpdateProgress(50);
 
-            // Normalize noise to 0....1
+            // Normalize noise
+            double maxHeight = 0.85;
             if (!_debug)
-                Normalize(_faces.Values.ToList(), token);
+                Normalize(_faces.Values.ToList(), token, maxHeight);
             else
-                Normalize(new List<double[,]> { _faces[_debugFace] }, token);
+                Normalize(new List<double[,]> { _faces[_debugFace] }, token, maxHeight);
 
             if (GenerateLakes)
             {
@@ -338,12 +342,10 @@ namespace PlanetCreator
 
             // WIP, TODO
             // Planet features:
-            // A: Flat planes close to equator.
-            // B: Mountains around 45°
-            // C: Flat poles
+            // A: Mountains around 45°
+            // B: Flat poles
             // - Weighten noise based on location
             // - Apply some erosion to generate canyons (rain by using gradients + east-west wind)
-            // - Add lakes
             if (!_debug)
             {
                 // Create pictures
@@ -372,7 +374,7 @@ namespace PlanetCreator
                 {
                     for (int y = 0; y < _tileWidth; ++y)
                     {
-                        image[x, y] = new Rgb48((ushort)(_debugTileR[x, y] * 65535), (ushort)(_debugTileG[x, y] * 65535), (ushort)(_debugTileB[x, y] * 65535));
+                        image[x, y] = new Rgb48((ushort)(_debugTileR[x, y] * 65535*0.2), (ushort)(_debugTileG[x, y] * 65535*0.6), (ushort)(_debugTileB[x, y] * 65535));
                     }
                 });
                 image.SaveAsPng("debug.png");
@@ -462,6 +464,8 @@ namespace PlanetCreator
                             pos.Y = rnd.NextDouble() * 2047;
                         }
                         face = _debugFace;
+                        //var p = pos.ToIntegerPoint();
+                        //DebugOverlay.DebugCollectPixel(_debugFace, p.X, p.Y, 255, 255, 0, 0);
                     }
                 }
             }
@@ -498,7 +502,10 @@ namespace PlanetCreator
                 pos += dir;
 
                 // Stop simulating droplet if it's not moving
-                if (dir.X == 0 && dir.Y == 0) break;
+                if (dir.X == 0 && dir.Y == 0)
+                {
+                    break;
+                }
 
                 var posI = pos.ToIntegerPoint();
                 var posOldI = posOld.ToIntegerPoint();
@@ -538,16 +545,15 @@ namespace PlanetCreator
                 double sedimentCapacity = Math.Max(-deltaHeight * speed * waterModified * sedimentCapacityFactor, minSedimentCapacity);
 
 
-                if (_debug)
+                if (_debug && (_drawErosionLines || !GenerateLakes))
                 {
-                    _debugTileG[posOldI.X, posOldI.Y] = waterModified;
-                    if (DebugMode && _drawErosionLines)
-                        DebugOverlay.DebugCollectPixel(_debugFace, posOldI.X, posOldI.Y, (byte)(255 * waterModified), 0, 255, 0);
+                    _debugTileR[posOldI.X, posOldI.Y] = waterModified;
+                    //if (_drawErosionLines)
+                    //    DebugOverlay.DebugCollectPixel(_debugFace, posOldI.X, posOldI.Y, (byte)(255 * waterModified), 0, 255, 0);
                     //var sedimentFill = sediment / sedimentCapacity;
                     //if (sedimentFill > 1) sedimentFill = 1;
                     //_debugTileG[posOldI.X, posOldI.Y + 1] = sedimentFill;
                 }
-
 
                 // If carrying more sediment than capacity, or if flowing uphill:
                 var oldPoint = new CubeMapPoint(_faces, posOldI.X, posOldI.Y, faceOld);
@@ -555,6 +561,9 @@ namespace PlanetCreator
                 {
                     // If moving uphill (deltaHeight > 0) try fill up to the current height, otherwise deposit a fraction of the excess sediment
                     double amountToDeposit = (deltaHeight > 0) ? Math.Min(deltaHeight, sediment) : (sediment - sedimentCapacity) * depositSpeed;
+
+                    if (_debug)
+                        _debugTileB[posOldI.X, posOldI.Y] = amountToDeposit;
 
                     ApplyBrush(depositBrush, oldPoint, posOld, amountToDeposit);
                     sediment -= amountToDeposit;
@@ -564,6 +573,9 @@ namespace PlanetCreator
                     // Erode a fraction of the droplet's current carry capacity.
                     // Clamp the erosion to the change in height so that it doesn't dig a hole in the terrain behind the droplet
                     double amountToErode = Math.Min((sedimentCapacity - sediment) * erodeSpeed, -deltaHeight);
+
+                    if (_debug)
+                        _debugTileG[posOldI.X, posOldI.Y] = amountToErode;
 
                     ApplyBrush(erodeBrush, oldPoint, posOld, -amountToErode);
                     sediment += amountToErode;
@@ -740,7 +752,6 @@ namespace PlanetCreator
                                 _debugTileR[ipos.X, ipos.Y] += 2;
                                 if (_debugTileR[ipos.X, ipos.Y] > 50) _debugTileR[ipos.X, ipos.Y] = 50;
 
-                                // Bad performance!!!
                                 if (DebugMode && _drawLakeLines)
                                     DebugOverlay.DebugCollectPixel(_debugFace, posOldI.X, posOldI.Y, 80, 255, 0, 0);
 
@@ -764,7 +775,7 @@ namespace PlanetCreator
                         lock (waterSpots[oldPoint.Face])
                         {
                             waterSpots[oldPoint.Face][oldPoint.PosX, oldPoint.PosY] += 1;
-                            _debugTileG[oldPoint.PosX, oldPoint.PosY] = 255;
+                            //_debugTileG[oldPoint.PosX, oldPoint.PosY] = 255;
                         }
                     }
                 });
@@ -1005,7 +1016,19 @@ namespace PlanetCreator
                             var distance = vector.Length;
                             if (distance <= brushRadius)
                             {
+                                // This is a linear function. I don't like it.
                                 double newWeight = 1 - distance / brushRadius;
+                                // Lets use good old Euler and make the brush more pointy:
+                                if (BrushPointiness > 0.0)
+                                {
+                                    newWeight *= Math.Exp(-BrushPointiness * distance);
+                                }
+                                else
+                                {
+                                    var fuck = 1;
+                                }
+                                //double newWeight = Math.Exp(-BrushPointiness * distance) * (1 - distance) / brushRadius;
+
                                 brushWeight += newWeight;
                                 brushWeightSum += newWeight;
                             }
@@ -1020,13 +1043,13 @@ namespace PlanetCreator
                 double brushpart = materialAmount * brushWeights[ii] / brushWeightSum;
                 brushPoints[ii].Value += brushpart;
 
-                if (_debug)
-                {
-                    if (brushpart > 0)
-                        _debugTileB[brushPoints[ii].PosX, brushPoints[ii].PosY] += brushpart;
-                    else
-                        _debugTileR[brushPoints[ii].PosX, brushPoints[ii].PosY] += -brushpart;
-                }
+                //if (_debug)
+                //{
+                //    if (brushpart > 0)
+                //        _debugTileB[brushPoints[ii].PosX, brushPoints[ii].PosY] += brushpart;
+                //    else
+                //        _debugTileR[brushPoints[ii].PosX, brushPoints[ii].PosY] += -brushpart;
+                //}
 
                 if (brushPoints[ii].Value > 1) brushPoints[ii].Value = 1;
                 else if (brushPoints[ii].Value < 0) brushPoints[ii].Value = 0;
@@ -1082,7 +1105,7 @@ namespace PlanetCreator
             }
         }
 
-        void Normalize(List<double[,]> images, CancellationToken token)
+        void Normalize(List<double[,]> images, CancellationToken token, double maxHeight = 1.0)
         {
             double max = images[0][0, 0];
             double min = images[0][0, 0];
@@ -1124,7 +1147,7 @@ namespace PlanetCreator
                         var value = image[x, y];
                         value += offset;
                         value /= stretch;
-                        image[x, y] = value;
+                        image[x, y] = value * maxHeight;
                     }
                 };
             });

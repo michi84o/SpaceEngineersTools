@@ -440,7 +440,15 @@ namespace PlanetCreator
             get => _lakeVolumeMultiplier;
             set => SetProp(ref _lakeVolumeMultiplier, value);
         }
-        string _materialSource = "G:\\Steam\\steamapps\\common\\SpaceEngineers\\Content\\Data\\PlanetDataFiles\\EarthLike";
+
+        double _brushPointiness = 0.25;
+        public double BrushPointiness
+        {
+            get => _brushPointiness;
+            set => SetProp(ref _brushPointiness, value);
+        }
+
+        string _materialSource = "Enter Source Material PNG Folder here";//"G:\\Steam\\steamapps\\common\\SpaceEngineers\\Content\\Data\\PlanetDataFiles\\EarthLike";
         public string MaterialSource
         {
             get => _materialSource;
@@ -485,6 +493,9 @@ namespace PlanetCreator
             if (ErosionDepositBrush < 0) ErosionDepositBrush = 0;
             generator.ErosionDepositBrush = ErosionDepositBrush;
             if (ErosionErodeBrush < 0) ErosionErodeBrush = 0;
+            if (BrushPointiness < 0) BrushPointiness = 0;
+            if (BrushPointiness > 1) BrushPointiness = 1;
+            generator.BrushPointiness = BrushPointiness;
             generator.ErosionErodeBrush = ErosionErodeBrush;
             if (Gravity < 0) Gravity = 0;
             generator.Gravity = Gravity;
@@ -739,18 +750,19 @@ namespace PlanetCreator
             Octaves = 5;
             FlattenFactor = 25;
             FlattenEquator = true;
-            EquatorFlatSigma = 200;
-            ErosionIterations = 2500000;
+            EquatorFlatSigma = 150;
+            ErosionIterations = 5000000;
             ErosionMaxDropletLifeTime = 100;
-            ErosionInteria = 0.01;
-            ErosionSedimentCapacityFactor = 35;
-            ErosionDepositSpeed = 0.1;
-            ErosionErodeSpeed = .3;
-            ErosionDepositBrush = 2;
-            ErosionErodeBrush = 2;
+            ErosionInteria = 0.005;
+            ErosionSedimentCapacityFactor = 10;
+            ErosionDepositSpeed = 0.01;
+            ErosionErodeSpeed = .03;
+            ErosionDepositBrush = 5;
+            ErosionErodeBrush = 5;
+            BrushPointiness = 0.5;
             EnableErosion = true;
             Gravity = 10;
-            EvaporateSpeed = 0.01;
+            EvaporateSpeed = 0.025;
             EnableLakeGeneration = true;
             LakesPerTile = 40;
             LakeVolumeMultiplier = 1;
@@ -758,12 +770,27 @@ namespace PlanetCreator
 
         public ICommand SetProfile2Command => new RelayCommand(o=>
         {
-            SetProfile1Command.Execute(null);
-            // Default values this:
-            ErosionIterations = 5000000;
-            ErosionMaxDropletLifeTime = 50;
-            ErosionErodeSpeed = 0.03;
+            Seed = 0;
+            NoiseScale = 200;
+            Octaves = 5;
+            FlattenFactor = 25;
+            FlattenEquator = true;
+            EquatorFlatSigma = 150;
+            ErosionIterations = 2500000;
+            ErosionMaxDropletLifeTime = 100;
+            ErosionInteria = 0.005;
+            ErosionSedimentCapacityFactor = 20;
             ErosionDepositSpeed = 0.01;
+            ErosionErodeSpeed = .03;
+            ErosionDepositBrush = 3;
+            ErosionErodeBrush = 3;
+            BrushPointiness = 0.1;
+            EnableErosion = true;
+            Gravity = 10;
+            EvaporateSpeed = 0.025;
+            EnableLakeGeneration = true;
+            LakesPerTile = 40;
+            LakeVolumeMultiplier = 1;
         });
 
     }
