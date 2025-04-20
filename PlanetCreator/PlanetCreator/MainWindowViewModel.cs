@@ -322,7 +322,14 @@ namespace PlanetCreator
             }
         }
 
-        int _flattenFactor = 25;
+        bool _applySCurve;
+        public bool ApplySCurve
+        {
+            get => _applySCurve;
+            set => SetProp(ref _applySCurve, value);
+        }
+
+        int _flattenFactor = 10;
         public int FlattenFactor
         {
             get => _flattenFactor;
@@ -470,6 +477,7 @@ namespace PlanetCreator
             generator.NoiseScale = NoiseScale;
             if (Octaves < 1 || Octaves > 25) Octaves = 5;
             generator.Octaves = Octaves;
+            generator.ApplySCurve = ApplySCurve;
             if (FlattenFactor < 0) FlattenFactor = 0;
             generator.FlattenFactor = FlattenFactor;
             generator.FlattenEquator = FlattenEquator;
@@ -748,7 +756,7 @@ namespace PlanetCreator
             Seed = 0;
             NoiseScale = 200;
             Octaves = 5;
-            FlattenFactor = 25;
+            FlattenFactor = 10;
             FlattenEquator = true;
             EquatorFlatSigma = 150;
             ErosionIterations = 5000000;
@@ -773,7 +781,7 @@ namespace PlanetCreator
             Seed = 0;
             NoiseScale = 200;
             Octaves = 5;
-            FlattenFactor = 25;
+            FlattenFactor = 10;
             FlattenEquator = true;
             EquatorFlatSigma = 150;
             ErosionIterations = 2500000;

@@ -404,17 +404,20 @@ namespace PlanetCreator
 
             if (erodeCorners)
             {
-                var gen = new PlanetGenerator();
-                gen.DebugMode = false;
-                gen.Faces = faces;
-                gen.ErosionErodeBrush = 1.5;
-                gen.ErosionDepositBrush = 1.5;
-
-                gen.ErosionErodeSpeed = 0.025;
-                gen.ErosionDepositSpeed = 0.0125;
-
-                gen.EvaporateSpeed = 0.05;
-                gen.ErosionSedimentCapacityFactor = 10;
+                var gen = new PlanetGenerator()
+                {
+                    DebugMode = false,
+                    Faces = faces,
+                    ErosionErodeBrush = 3,
+                    ErosionDepositBrush = 3,
+                    BrushPointiness = .1,
+                    ErosionErodeSpeed = 0.003,
+                    ErosionDepositSpeed = 0.001,
+                    EvaporateSpeed = 0.01,
+                    ErosionSedimentCapacityFactor = 35,
+                    ErosionInteria = 0.01,
+                    ErosionMaxDropletLifeTime = 50
+                };
 
                 var faceVals = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToArray();
                 List<PointD> points = new List<PointD>

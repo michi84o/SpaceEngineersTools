@@ -146,9 +146,11 @@ namespace PlanetCreator
         public int Seed { get; set; } = 0;
         public int NoiseScale { get; set; } = 100;
         public int Octaves { get; set; } = 4;
+
+        public bool ApplySCurve { get; set; } = false;
         public int ErosionIterations { get; set; } = 1000000;
 
-        public int FlattenFactor { get; set; } = 25;
+        public int FlattenFactor { get; set; } = 10;
         public bool FlattenEquator { get; set; }
         public int EquatorFlatSigma { get; set; }
 
@@ -247,11 +249,10 @@ namespace PlanetCreator
                         // This applies an S-Curve to to the histogram.
                         // Low values are pressed down, high values are pressed up.
                         // This results in flatter plains and mountain tops.
+                        var valueBackup = value;
                         if (FlattenFactor > 0)
                         {
-                            var valueBackup = value;
                             value = 0.5 * Math.Sin(Math.PI * (value - 0.5)) + 0.5;
-
                             value = (value*FlattenFactor/10.0+valueBackup)/(1+FlattenFactor/10.0);
                         }
                         // Flatten factor can be reduced to reduce the sinus function.
@@ -260,16 +261,16 @@ namespace PlanetCreator
                         // Use this line to modify further:
                         // Values > 1: Squish low values further down: More flat plains
                         // Values < 1: Bump all values up (don't do this!)
-                        var stretch = 2.5;
+                        var stretch = 1.1;
                         if (FlattenEquator)
                         {
                             // For more variety we apply it dependend on the y value
                             if (kv.Key != CubeMapFace.Up && kv.Key != CubeMapFace.Down)
                             {
-                                // Let's generate a Gauss curve that peaks at 5 around the equator and settles
-                                // at 2.5 top and bottom to allign with Up/Down tiles
+                                // Let's generate a Gauss curve that peaks at 2.5 around the equator
+                                // and goes back to 1.1 to allign with pole tiles.
                                 var sigma = EquatorFlatSigma; // Don't use larger values than 250! Smaller values will squeeze curve to equator
-                                stretch = 2.5 * Math.Exp(-0.5 * Math.Pow((y - 1023.5) / sigma, 2)) + 2.5;
+                                stretch = 1.4 * Math.Exp(-0.5 * Math.Pow((y - 1023.5) / sigma, 2)) + 1.1;
                             }
                         }
                         value = Math.Pow(value, stretch);
