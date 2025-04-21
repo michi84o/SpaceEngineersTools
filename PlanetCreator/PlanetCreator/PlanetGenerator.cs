@@ -4,10 +4,12 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.Metrics;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Runtime.ExceptionServices;
+using System.Runtime.Intrinsics.X86;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -209,6 +211,13 @@ namespace PlanetCreator
                 });
             }
 
+            // Normalize noise
+            double maxHeight = 1;
+            if (!_debug)
+                Normalize(_faces.Values.ToList(), token, maxHeight);
+            else
+                Normalize(new List<double[,]> { _faces[_debugFace] }, token, maxHeight);
+
             // Fix glitches at border of cubemaps
             EdgeFixer.MakeSeamless(_faces, token);
 
@@ -322,8 +331,8 @@ namespace PlanetCreator
 
             UpdateProgress(50);
 
-            // Normalize noise
-            double maxHeight = 0.85;
+            // Normalize values
+            maxHeight = 0.85;
             if (!_debug)
                 Normalize(_faces.Values.ToList(), token, maxHeight);
             else
@@ -385,7 +394,18 @@ namespace PlanetCreator
         }
 
         public bool EnableErosion { get; set; } = true;
-        public int ErosionMaxDropletLifeTime { get; set; } = 100;
+
+        int _erosionMaxDropletLifeTime = 100;
+        public int ErosionMaxDropletLifeTime
+        {
+            get => _erosionMaxDropletLifeTime;
+            set
+            {
+                _erosionMaxDropletLifeTime = value;
+                UpdateEvaporatePart();
+            }
+        }
+
         public double ErosionInteria { get; set; } = 0.01;
         public double ErosionSedimentCapacityFactor { get; set; } = 35;
         public double ErosionDepositSpeed { get; set; } = 0.1;
@@ -393,7 +413,23 @@ namespace PlanetCreator
         public double ErosionDepositBrush { get; set; } = 3;
         public double ErosionErodeBrush { get; set; } = 3;
         public double Gravity { get; set; } = 10;
-        public double EvaporateSpeed { get; set; } = 0.01;
+
+        double _evaporateSpeed = 0.01;
+        public double EvaporateSpeed
+        {
+            get => _evaporateSpeed;
+            set
+            {
+                _evaporateSpeed = value;
+                UpdateEvaporatePart();
+            }
+        }
+
+        void UpdateEvaporatePart()
+        {
+            EvaporatePart = Math.Pow(1 - EvaporateSpeed, ErosionMaxDropletLifeTime - 1);
+        }
+        double EvaporatePart { get; set; }
 
         /// <summary>
         /// TODO: Edges not seamless!!! The duplicate point rule is not applied!
@@ -429,13 +465,15 @@ namespace PlanetCreator
             // Make sure we have no water left at the end:
             // Modify this exponential curve to become 0 at the end:
             // water *= (1 - evaporateSpeed);
-            double waterX = water;
-            for (int i = 0; i < maxDropletLifetime - 1; ++i)
-            {
-                waterX *= (1 - evaporateSpeed);
-            }
-            double evaporatePart = waterX;
+            //double waterX = water;
+            //for (int i = 0; i < maxDropletLifetime - 1; ++i)
+            //{
+            //    waterX *= (1 - evaporateSpeed);
+            //}
+            //double evaporatePart = waterX;
             // => waterModified = water - evaporatePart*iteration
+            // Optimized for-loop, because Math!
+            double evaporatePart = EvaporatePart; //water * Math.Pow(1 - evaporateSpeed, maxDropletLifetime - 1);
 
             CubeMapFace face = CubeMapFace.Up;
             PointD pos = new();
@@ -1092,6 +1130,7 @@ namespace PlanetCreator
                     var n1 = pt.GetPointRelative(dx, 0);
                     var n2 = pt.GetPointRelative(0, dy);
                     var avg = (pt.Value + n1.Value + n2.Value) / 3;
+                    Debug.Assert(avg > 0);
                     pt.Value = avg;
                     n1.Value = avg;
                     n2.Value = avg;
@@ -1100,6 +1139,7 @@ namespace PlanetCreator
                 {
                     var n = pt.GetPointRelative(dx, dy);
                     var avg = (pt.Value + n.Value) / 2;
+                    Debug.Assert(avg > 0);
                     pt.Value = avg;
                     n.Value = avg;
                 }

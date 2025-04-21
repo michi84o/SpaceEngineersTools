@@ -408,21 +408,21 @@ namespace PlanetCreator
                 {
                     DebugMode = false,
                     Faces = faces,
-                    ErosionErodeBrush = 3,
-                    ErosionDepositBrush = 3,
-                    BrushPointiness = .1,
-                    ErosionErodeSpeed = 0.003,
-                    ErosionDepositSpeed = 0.001,
+                    ErosionErodeBrush = 2,
+                    ErosionDepositBrush = 2,
+                    BrushPointiness = 0,
+                    ErosionErodeSpeed = 0.03,
+                    ErosionDepositSpeed = 0.01,
                     EvaporateSpeed = 0.01,
                     ErosionSedimentCapacityFactor = 35,
                     ErosionInteria = 0.01,
-                    ErosionMaxDropletLifeTime = 50
+                    ErosionMaxDropletLifeTime = 30
                 };
 
                 var faceVals = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToArray();
                 List<PointD> points = new List<PointD>
                 {
-                    new PointD { X = 0.5, Y=0.5 },
+                    new PointD { X = 0.5, Y= 0.5 },
                     new PointD { X = 1.5, Y= 0.5 },
                     new PointD { X = 0.5, Y= 1.5 },
                 };
