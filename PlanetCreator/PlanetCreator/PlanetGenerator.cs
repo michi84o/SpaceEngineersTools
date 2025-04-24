@@ -1130,7 +1130,6 @@ namespace PlanetCreator
                     var n1 = pt.GetPointRelative(dx, 0);
                     var n2 = pt.GetPointRelative(0, dy);
                     var avg = (pt.Value + n1.Value + n2.Value) / 3;
-                    Debug.Assert(avg > 0);
                     pt.Value = avg;
                     n1.Value = avg;
                     n2.Value = avg;
@@ -1139,7 +1138,6 @@ namespace PlanetCreator
                 {
                     var n = pt.GetPointRelative(dx, dy);
                     var avg = (pt.Value + n.Value) / 2;
-                    Debug.Assert(avg > 0);
                     pt.Value = avg;
                     n.Value = avg;
                 }

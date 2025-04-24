@@ -16,6 +16,7 @@
         </Grid.RowDefinitions>
         <Menu>
             <MenuItem Header="Open SBC" Command="{Binding OpenSbcCommand}"/>
+            <MenuItem Header="Generate Climate Zones" Command="{Binding GenerateClimateZonesCommand}"/>
         </Menu>
         <Grid
             Grid.Row="1">
@@ -32,7 +33,9 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="0.5*"/>
                         <RowDefinition Height="Auto"/>
-                        <RowDefinition/>
+                        <RowDefinition Height=".5*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height=".5*"/>
                     </Grid.RowDefinitions>
                     <TextBlock
                         Text="Planets"
@@ -55,6 +58,12 @@
                         Grid.Row="5"
                         ItemsSource="{Binding SelectedMaterialGroup.Rules}"
                         SelectedItem="{Binding SelectedRule}"/>
+                    <TextBlock
+                        Text="Custom Materials"
+                        Grid.Row="6" />
+                    <ListBox
+                        Grid.Row="7"
+                        ItemsSource="{Binding SelectedDefinition.CustomMaterials}" />
                 </Grid>
             </GroupBox>
             <GroupBox
