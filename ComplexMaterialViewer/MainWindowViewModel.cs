@@ -292,25 +292,27 @@ namespace ComplexMaterialViewer
                             SelectedDefinition.Name,
                             face.ToString().ToLower() + ".png");
                     var heigthMap = SixLabors.ImageSharp.Image.Load<L16>(heightMapFilePath);
-                    double heightMapMin = heigthMap[0, 0].PackedValue;
-                    double heightMapMax = heightMapMin;
-                    for (int x = 0; x < 2048; ++x)
-                        for (int y = 0; y < 2048; ++y)
-                        {
-                            var val = heigthMap[x, y].PackedValue;
-                            if (heightMapMin > val) heightMapMin = val;
-                            if (heightMapMax < val) heightMapMax = val;
-                        }
+                    //double heightMapMin = heigthMap[0, 0].PackedValue;
+                    //double heightMapMax = heightMapMin;
+                    //for (int x = 0; x < 2048; ++x)
+                    //    for (int y = 0; y < 2048; ++y)
+                    //    {
+                    //        var val = heigthMap[x, y].PackedValue;
+                    //        if (heightMapMin > val) heightMapMin = val;
+                    //        if (heightMapMax < val) heightMapMax = val;
+                    //    }
                     // Scale 0...1
-                    heightMapMax = heightMapMax / 65535.0;
-                    heightMapMin = heightMapMin / 65535.0;
+                    //heightMapMax = heightMapMax / 65535.0;
+                    //heightMapMin = heightMapMin / 65535.0;
 
                     var image = new SixLabors.ImageSharp.Image<Rgb24>(2048, 2048);
                     for (int x = 0; x < 2048; ++x)
                     {
-                        //if (x > 100) break;
+                        //if (x > 300) break;
                         for (int y = 0; y < 2048; ++y)
                         {
+                            //if (y < 1024) continue;
+
                             // Step 1: Determine latitude of pixel
                             var point = CoordinateHelper.GetNormalizedSphereCoordinates(face, x, y);
                             var lolat = CoordinateHelper.ToLongitudeLatitude(point);
@@ -366,8 +368,8 @@ namespace ComplexMaterialViewer
                             {
                                 // Middle area stays the same
                                 var distanceFromMiddle = Math.Abs(latAbs - middle);
-                                if (distanceFromMiddle < (width / 4)) //<------ Width is 1/2 of area. Side areas are 1/4 each
-                                //if (distanceFromMiddle < (width / 8)) // <----- Width is 2/8 of area. Side areas are 3/8 each
+                                //if (distanceFromMiddle < (width / 4)) //<------ Middle width is 1/2 of area. Side areas are 1/4 each
+                                if (distanceFromMiddle < (width/8)) // <----- Middle width is 2/8 of area. Side areas are 3/8 each
                                 {
                                     image[x, y] = new Rgb24(myRed, 0, 0);
                                 }
@@ -379,19 +381,43 @@ namespace ComplexMaterialViewer
                                     double distancePercentage;
                                     double percentage;
                                     byte neighborRed;
+
+                                    // Use localized height map scaling
+                                    double heightMapMin = heigthMap[x, y].PackedValue;
+                                    double heightMapMax = heightMapMin;
+                                    int searchRange = 40;
+                                    var xStart = Math.Max(0, x - searchRange);
+                                    var yStart = Math.Max(0, y - searchRange);
+                                    var xEnd = Math.Min(image.Width - 1, x + searchRange);
+                                    var yEnd = Math.Min(image.Width - 1, y + searchRange);
+                                    Parallel.For(xStart, xEnd + 1, xx =>
+                                    {
+                                        for (int yy = yStart; yy <= yEnd; ++yy)
+                                        {
+                                            var val = heigthMap[xx, yy].PackedValue;
+                                            // TODO Might run into concurrency issues here...
+                                            if (heightMapMin > val) heightMapMin = val;
+                                            if (heightMapMax < val) heightMapMax = val;
+                                        }
+                                    });
+                                    // Scale 0...1
+                                    heightMapMax = heightMapMax / 65535.0;
+                                    heightMapMin = heightMapMin / 65535.0;
+
                                     var heightValue = heigthMap[x, y].PackedValue / 65535.0;
                                     // Scale with min max
                                     heightValue = (heightValue - heightMapMin) / (heightMapMax-heightMapMin);
 
                                     // Debug
-                                    //heightValue = 0;
+                                    //heightValue = 0.5;
 
                                     if (distanceToStart < distanceToEnd)
                                     {
                                         // We are below middle and closer to start
                                         // Calculate gradient probablity based on distance
                                         // At edge the propability is 50%, at the middle it is 100%
-                                        distancePercentage = distanceToStart / (width / 4);
+                                        //distancePercentage = distanceToStart / (width / 4); // <----- Middle width is 1/2 of area. Side areas are 1/4 each
+                                        distancePercentage = distanceToStart / (width*3/8d);   // <----- Middle width is 2/8 of area. Side areas are 3/8 each
                                         percentage = 0.5 * distancePercentage + .5;
                                         neighborRed = (byte)reds[latIndex > 0 ? latIndex - 1 : 0];
                                         //neighborIsColder = false;
@@ -401,7 +427,8 @@ namespace ComplexMaterialViewer
                                     else
                                     {
                                         // We are above middle and closer to end
-                                        distancePercentage = distanceToEnd / (width / 4);
+                                        //distancePercentage = distanceToEnd / (width / 4);
+                                        distancePercentage = distanceToEnd / (width*3/8d);
                                         percentage = 0.5 * distancePercentage + .5;
                                         neighborRed = (byte)reds[latIndex + 1 < reds.Count ? latIndex + 1 : latIndex];
                                         //neighborIsColder = true;
@@ -417,8 +444,45 @@ namespace ComplexMaterialViewer
                             }
                         }
                     }
-                    image.SaveAsPng(face.ToString().ToLower() + "_zones.png");
+
+                    // Apply median filter to reduce pixel clouds
+                    var imageFiltered = new SixLabors.ImageSharp.Image<Rgb24>(2048, 2048);
+                    int filterRadius = 3;
+                    int filterRadiusSquared = filterRadius * filterRadius;
+                    for (int x = 0; x < 2048; ++x)
+                    {
+                        //if (x > 300) break;
+                        for (int y = 0; y < 2048; ++y)
+                        {
+                            //if (y < 1024) continue;
+
+                            List<byte> pixels = new();
+                            var xStart = Math.Max(0, x - filterRadius);
+                            var yStart = Math.Max(0, y - filterRadius);
+                            var xEnd = Math.Min(image.Width - 1, x + filterRadius);
+                            var yEnd = Math.Min(image.Height - 1, y + filterRadius);
+                            for (int xx = xStart; xx <= xEnd; ++xx)
+                            {
+                                for (int yy = yStart; yy <= yEnd; ++yy)
+                                {
+                                    //pixels.Add(image[xx, yy].R);
+                                    // Check of current pixel within a circle
+                                    if ((xx - x) * (xx - x) + (yy - y) * (yy - y) <= filterRadiusSquared)
+                                    {
+                                        pixels.Add(image[xx, yy].R);
+                                    }
+                                }
+                            }
+                            if (pixels.Any())
+                            {
+                                pixels.Sort();
+                                imageFiltered[x, y] = new Rgb24(pixels[pixels.Count / 2], 0, 0);
+                            }
+                        }
+                    }
                     image.Dispose();
+                    imageFiltered.SaveAsPng(face.ToString().ToLower() + "_zones.png");
+                    imageFiltered.Dispose();
                 }
                 catch (Exception ex)
                 {
