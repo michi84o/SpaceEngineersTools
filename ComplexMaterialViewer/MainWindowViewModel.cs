@@ -366,7 +366,8 @@ namespace ComplexMaterialViewer
                             {
                                 // Middle area stays the same
                                 var distanceFromMiddle = Math.Abs(latAbs - middle);
-                                if (distanceFromMiddle < (width / 4))
+                                if (distanceFromMiddle < (width / 4)) //<------ Width is 1/2 of area. Side areas are 1/4 each
+                                //if (distanceFromMiddle < (width / 8)) // <----- Width is 2/8 of area. Side areas are 3/8 each
                                 {
                                     image[x, y] = new Rgb24(myRed, 0, 0);
                                 }
@@ -436,15 +437,27 @@ namespace ComplexMaterialViewer
             // Using 0..100 range here:
             distancePercentage *= 100;
 
-            // so some math magic here.
+            // Do some math magic here.
             // The idea is to start at 100% when we are at the edge of the middle area and 0% if we reach the middle area of our neighbor.
             // By default we have 50% propability at the border between climate zones.
             // This is shifted to 75% if the height is 0 and 25% if the height is 1 on the height map.
             // The resulting 2nd degree polynomial is symmentric if you mirror x and y at the edge of the climate zones.
-            double coeffA = 0.005 * height - 0.0025;
-            double coeffB = 0.5;
-            double coeffC = -50 * height + 75;
-            return (coeffA * (distancePercentage*distancePercentage) + coeffB * distancePercentage + coeffC)/100;
+            //double coeffA = 0.005 * height - 0.0025;
+            //double coeffB = 0.5;
+            //double coeffC = -50 * height + 75;
+            //return (coeffA * (distancePercentage*distancePercentage) + coeffB * distancePercentage + coeffC)/100;
+
+            // Version above was barely noticable. Using more extreme values:
+            double coeffA = 0.00006876 * (height*height) - 0.00006876 * height + 0.00001719;
+            double coeffB = 0.008 * height - 0.004;
+            double coeffC = -0.6875 * (height*height) + 0.6875 * height + 0.328125;
+            double coeffD = -80 * height + 90;
+
+            return
+                (coeffA * (distancePercentage * distancePercentage * distancePercentage) +
+                coeffB * (distancePercentage * distancePercentage) +
+                coeffC * distancePercentage +
+                coeffD)/100;
         }
     }
 
