@@ -107,7 +107,7 @@
                     <TextBlock
                         Grid.Row="1" Grid.Column="3" Text="By Height:" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     <ListBox
-                        Grid.Row="2" Grid.Column="3" ItemsSource="{Binding Heights}"/>
+                        Grid.Row="2" Grid.Column="3" ItemsSource="{Binding Heights}" SelectedItem="{Binding SelectedHeight}"/>
 
                     <Canvas
                         Grid.Row="2" Grid.Column="4" HorizontalAlignment="Center"
@@ -146,7 +146,7 @@
                 </Grid>
             </GroupBox>
         </Grid>
-        <Grid
+        <!--<Grid
           Grid.Row="0" Grid.Column="0" Background="#FFFFFF" Opacity=".5"
           Grid.RowSpan="5" Grid.ColumnSpan="3" Visibility="{Binding ProgressBarVisibility}">
         </Grid>
@@ -159,6 +159,6 @@
             <TextBlock
                 VerticalAlignment="Center" HorizontalAlignment="Center"
                 Text="{Binding Progress, StringFormat=0.0}" Visibility="{Binding ProgressBarVisibility}"/>
-        </Grid>
+        </Grid>-->
     </Grid>
 </Window>

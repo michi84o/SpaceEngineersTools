@@ -107,9 +107,22 @@ namespace ComplexMaterialViewer
         }
 
         public ObservableCollection<Rule> Heights { get; } = new();
+        Rule _selectedHeight;
+        public Rule SelectedHeight
+        {
+            get => _selectedHeight;
+            set
+            {
+                var backup = _selectedHeight;
+                if (!SetProp(ref _selectedHeight, value)) return;
+                if (backup != null) backup.IsHighlighted = false;
+                if (value != null) value.IsHighlighted = true;
+            }
+        }
 
         void UpdateSummary()
         {
+            SelectedHeight = null;
             CanvasRules.Clear();
             UpdateCanvasAction?.Invoke();
             Summary = "";
@@ -123,13 +136,18 @@ namespace ComplexMaterialViewer
             // 3  [..|........|....]
             // 4     | [..]   |
 
+            foreach (var rule in SelectedMaterialGroup.Rules)
+            {
+                rule.Actions.Clear();
+            }
+
             var rules = SelectedMaterialGroup.Rules.Where(x=>
                 x.Latitude.Min <= MinLatitude && x.Latitude.Max > MinLatitude ||  // 1 + 3
                 x.Latitude.Min < MaxLatitude && x.Latitude.Max >= MaxLatitude  ||  // 2 + 3
                 x.Latitude.Min >= MinLatitude && x.Latitude.Max <= MaxLatitude)   // 4
                 .ToList();
 
-            foreach ( var rule in rules )
+            foreach (var rule in rules)
             {
                 XDocument doc = XDocument.Parse(rule.Xml);
                 if (doc.Root != null)
@@ -373,19 +391,28 @@ namespace ComplexMaterialViewer
 
                     Progress += 5;
 
-                    var rnd = new Random(0);
-                    foreach (var face in Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>())
+                    var cubeMapFaces = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToArray();
+
+                    Dictionary<CubeMapFace,Image<L16>> heightMaps = new();
+                    foreach (var face in cubeMapFaces)
                     {
-                        // Each iteration should increase progress by 15 -> 6*15 = 90
-                        try
-                        {
-                            var heightMapFilePath =
+                        var heightMapFilePath =
                                 Path.Combine(
                                     Path.GetDirectoryName(_lastSbc) ?? ".",
                                     "PlanetDataFiles",
                                     SelectedDefinition.Name,
                                     face.ToString().ToLower() + ".png");
-                            var heigthMap = SixLabors.ImageSharp.Image.Load<L16>(heightMapFilePath);
+                        var heightMap = SixLabors.ImageSharp.Image.Load<L16>(heightMapFilePath);
+                        heightMaps[face] = heightMap;
+                    }
+
+                    var rnd = new Random(0);
+                    foreach (var face in cubeMapFaces)
+                    {
+                        // Each iteration should increase progress by 15 -> 6*15 = 90
+                        try
+                        {
+                            var heightMap = heightMaps[face];
 
                             var image = new SixLabors.ImageSharp.Image<Rgb24>(2048, 2048);
                             for (int x = 0; x < 2048; ++x)
@@ -442,31 +469,7 @@ namespace ComplexMaterialViewer
                                             double percentage;
                                             byte neighborRed;
 
-                                            // Use localized height map scaling
-                                            double heightMapMin = heigthMap[x, y].PackedValue;
-                                            double heightMapMax = heightMapMin;
-                                            int searchRange = 40;
-                                            var xStart = Math.Max(0, x - searchRange);
-                                            var yStart = Math.Max(0, y - searchRange);
-                                            var xEnd = Math.Min(image.Width - 1, x + searchRange);
-                                            var yEnd = Math.Min(image.Width - 1, y + searchRange);
-                                            Parallel.For(xStart, xEnd + 1, xx =>
-                                            {
-                                                for (int yy = yStart; yy <= yEnd; ++yy)
-                                                {
-                                                    var val = heigthMap[xx, yy].PackedValue;
-                                                    // TODO Might run into concurrency issues here...
-                                                    if (heightMapMin > val) heightMapMin = val;
-                                                    if (heightMapMax < val) heightMapMax = val;
-                                                }
-                                            });
-                                            // Scale 0...1
-                                            heightMapMax = heightMapMax / 65535.0;
-                                            heightMapMin = heightMapMin / 65535.0;
-
-                                            var heightValue = heigthMap[x, y].PackedValue / 65535.0;
-                                            // Scale with min max
-                                            heightValue = (heightValue - heightMapMin) / (heightMapMax - heightMapMin);
+                                            double heightValue = GetRelativeHeight(heightMaps, face, x, y, 40);
 
                                             // Debug
                                             //heightValue = 0.5;
@@ -600,6 +603,48 @@ namespace ComplexMaterialViewer
         SelectedDefinition != null && SelectedDefinition.ComplexMaterials?.Exists(x=>x.Name == "DefaultSetUp") == true &&
         !string.IsNullOrEmpty(_lastSbc) && !IsBusy);
 
+        double GetRelativeHeight(Dictionary<CubeMapFace, Image<L16>> heightMaps, CubeMapFace currentFace, int x, int y, int radius)
+        {
+            double heightValue = heightMaps[currentFace][x, y].PackedValue;
+            // Use localized height map scaling
+            double heightMapMin = heightValue;
+            double heightMapMax = heightValue;
+
+            var xStart = x - radius;
+            var yStart = y - radius;
+            var xEnd = x + radius;
+            var yEnd = y + radius;
+            var radiusSquared = radius * radius;
+
+            CubeMapPointLight origin = new CubeMapPointLight { X = x, Y = y, Face = currentFace };
+
+            Parallel.For(xStart, xEnd + 1, xx =>
+            {
+                for (int yy = yStart; yy <= yEnd; ++yy)
+                {
+                    // Check of current pixel within a circle
+                    if ((xx - x) * (xx - x) + (yy - y) * (yy - y) <= radiusSquared)
+                    {
+                        var pt = CubeMapPointLight.GetPointRelativeTo(origin, xx - x, yy - y);
+                        var val = heightMaps[pt.Face][pt.X, pt.Y].PackedValue;
+                        // Might run into concurrency issues here...
+                        // Can probably be ignored.
+                        if (heightMapMin > val) heightMapMin = val;
+                        if (heightMapMax < val) heightMapMax = val;
+                    }
+
+
+                }
+            });
+            // Scale 0...1
+            heightMapMax = heightMapMax / 65535;
+            heightMapMin = heightMapMin / 65535;
+            heightValue = heightValue / 65535;
+
+            // Scale with min max
+            return (heightValue - heightMapMin) / (heightMapMax - heightMapMin);
+        }
+
         double ModifyPercentage(double distancePercentage, double height)
         {
             // Using 0..100 range here:
@@ -662,6 +707,23 @@ namespace ComplexMaterialViewer
         public MinMax Latitude { get; set; }
         public MinMax Slope { get; set; }
         public string Xml { get; set; }
+
+        bool _isHighlighted;
+        public bool IsHighlighted
+        {
+            get => _isHighlighted;
+            set
+            {
+                if (_isHighlighted == value) return;
+                _isHighlighted = value;
+                foreach (var action in Actions)
+                {
+                    action.Invoke(this);
+                }
+            }
+        }
+        // Not using events to prevent memory leaks on reused rules
+        public List<Action<Rule>> Actions { get; } = new();
 
         public override string ToString()
         {

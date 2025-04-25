@@ -79,6 +79,27 @@ namespace ComplexMaterialViewer
                 MyCanvas.Children.Add(rect);
                 Canvas.SetLeft(rect, x);
                 Canvas.SetTop(rect, y);
+
+                rule.Actions.Add(r =>
+                {
+                    if (r.IsHighlighted)
+                    {
+                        foreach (var child in MyCanvas.Children)
+                            Canvas.SetZIndex((Border)child, 0);
+
+                        rect.BorderBrush = Brushes.Red;
+                        rect.BorderThickness = new Thickness(4);
+                        Canvas.SetZIndex(rect, 1);
+                        rect.Opacity = 1;
+                    }
+                    else
+                    {
+                        rect.BorderBrush = Brushes.Gray;
+                        rect.BorderThickness = new Thickness(.5);
+                        rect.Opacity = 0.5;
+                        Canvas.SetZIndex(rect, 0);
+                    }
+                });
             }
         }
     }
