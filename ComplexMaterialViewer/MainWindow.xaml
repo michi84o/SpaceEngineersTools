@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ComplexMaterialViewer"
         mc:Ignorable="d"
-        Title="Complex Material Viewer" Height="450" Width="800">
+        Title="Complex Material Viewer" MinHeight="500" Height="600" MinWidth="800" Width="1024">
     <Window.DataContext>
         <local:MainWindowViewModel x:Name="ViewModel"/>
     </Window.DataContext>
@@ -80,6 +80,7 @@
                         <ColumnDefinition/>
                         <ColumnDefinition Width="Auto" MinWidth="30"/>
                         <ColumnDefinition Width="Auto" MinWidth="80"/>
+                        <ColumnDefinition Width="450"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock
                         Grid.Row="0" Grid.Column="0"
@@ -107,8 +108,57 @@
                         Grid.Row="1" Grid.Column="3" Text="By Height:" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     <ListBox
                         Grid.Row="2" Grid.Column="3" ItemsSource="{Binding Heights}"/>
+
+                    <Canvas
+                        Grid.Row="2" Grid.Column="4" HorizontalAlignment="Center"
+                        Width="450" Height="450" >
+                        <Image
+                            RenderOptions.BitmapScalingMode="HighQuality"
+                            Source="scale.png" Width="450" Height="450"/>
+                        <Canvas
+                            Width="360" Height="360"
+                            x:Name="MyCanvas" Opacity=".5" Canvas.Left="80" Canvas.Top="80"/>
+                    </Canvas>
+                    <Grid
+                        Grid.Row="0" Grid.Column="4" Grid.RowSpan="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="Auto" MinWidth="30"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Min Height" VerticalAlignment="Center" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Max Height" VerticalAlignment="Center" />
+                        <Slider
+                             Grid.Row="0" Grid.Column="1"
+                             Minimum="0" Maximum="1" Value="{Binding MinHeight}" TickFrequency="0.01" TickPlacement="Both"
+                             IsSnapToTickEnabled="True"/>
+                        <Slider
+                             Grid.Row="1" Grid.Column="1"
+                             Minimum="0" Maximum="1" Value="{Binding MaxHeight}" TickFrequency="0.01" TickPlacement="Both"
+                             IsSnapToTickEnabled="True"/>
+                        <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding MinHeight, StringFormat=0.00}" VerticalAlignment="Center" />
+                        <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding MaxHeight, StringFormat=0.00}" VerticalAlignment="Center" />
+                    </Grid>
                 </Grid>
             </GroupBox>
+        </Grid>
+        <Grid
+          Grid.Row="0" Grid.Column="0" Background="#FFFFFF" Opacity=".5"
+          Grid.RowSpan="5" Grid.ColumnSpan="3" Visibility="{Binding ProgressBarVisibility}">
+        </Grid>
+        <Grid
+          Grid.Row="0" Grid.Column="0"
+          Grid.RowSpan="5" Grid.ColumnSpan="3">
+            <ProgressBar
+                VerticalAlignment="Center" HorizontalAlignment="Center"
+                Width="200" Height="30" Value="{Binding Progress}" Minimum="0" Maximum="100" Visibility="{Binding ProgressBarVisibility}"/>
+            <TextBlock
+                VerticalAlignment="Center" HorizontalAlignment="Center"
+                Text="{Binding Progress, StringFormat=0.0}" Visibility="{Binding ProgressBarVisibility}"/>
         </Grid>
     </Grid>
 </Window>

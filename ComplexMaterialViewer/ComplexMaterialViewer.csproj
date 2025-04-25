@@ -7,8 +7,16 @@
     <UseWPF>true</UseWPF>
   </PropertyGroup>
 
+  <ItemGroup>
+    <None Remove="scale.png" />
+  </ItemGroup>
+
 	<ItemGroup>
 		<PackageReference Include="SixLabors.ImageSharp" Version="2.1.9" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Resource Include="scale.png" />
 	</ItemGroup>
 
 </Project>

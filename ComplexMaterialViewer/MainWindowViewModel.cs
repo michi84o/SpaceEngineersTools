@@ -21,6 +21,9 @@ namespace ComplexMaterialViewer
 {
     class MainWindowViewModel : PropChangeNotifier
     {
+        public Action UpdateCanvasAction { get; set; }
+        public List<Rule> CanvasRules { get; } = new List<Rule>();
+
         ObservableCollection<Definition> _definitions = new();
         public ObservableCollection<Definition> Definitions => _definitions;
         Definition _selectedDefinition;
@@ -74,6 +77,28 @@ namespace ComplexMaterialViewer
             }
         }
 
+        double _minHeight = 0;
+        public double MinHeight
+        {
+            get => _minHeight;
+            set
+            {
+                if (SetProp(ref _minHeight, value))
+                    UpdateCanvasAction?.Invoke();
+            }
+        }
+
+        double _maxHeight = 1;
+        public double MaxHeight
+        {
+            get => _maxHeight;
+            set
+            {
+                if (SetProp(ref _maxHeight, value))
+                    UpdateCanvasAction?.Invoke();
+            }
+        }
+
         string _summary;
         public string Summary
         {
@@ -85,6 +110,8 @@ namespace ComplexMaterialViewer
 
         void UpdateSummary()
         {
+            CanvasRules.Clear();
+            UpdateCanvasAction?.Invoke();
             Summary = "";
             Heights.Clear();
             if (MaxLatitude < MinLatitude) return;
@@ -98,7 +125,7 @@ namespace ComplexMaterialViewer
 
             var rules = SelectedMaterialGroup.Rules.Where(x=>
                 x.Latitude.Min <= MinLatitude && x.Latitude.Max > MinLatitude ||  // 1 + 3
-                x.Latitude.Min < MaxLatitude && x.Latitude.Max > MaxLatitude  ||  // 2 + 3
+                x.Latitude.Min < MaxLatitude && x.Latitude.Max >= MaxLatitude  ||  // 2 + 3
                 x.Latitude.Min >= MinLatitude && x.Latitude.Max <= MaxLatitude)   // 4
                 .ToList();
 
@@ -107,6 +134,7 @@ namespace ComplexMaterialViewer
                 XDocument doc = XDocument.Parse(rule.Xml);
                 if (doc.Root != null)
                 {
+                    // Override required since our zones are shifted.
                     doc.Root.Element("Latitude").Attribute("Min").Value = "0";
                     doc.Root.Element("Latitude").Attribute("Max").Value = "90";
                     Summary += doc.Root.ToString() + "\r\n";
@@ -119,6 +147,8 @@ namespace ComplexMaterialViewer
                 Heights.Add(rule);
             }
 
+            CanvasRules.AddRange(rules);
+            UpdateCanvasAction?.Invoke();
         }
 
         string _lastSbc;
@@ -219,282 +249,356 @@ namespace ComplexMaterialViewer
             return true;
         }
 
+        double _progress;
+        public double Progress
+        {
+            get => _progress;
+            set => SetProp(ref _progress, value);
+        }
+
+        bool _isBusy;
+        bool IsBusy
+        {
+            get => _isBusy;
+            set
+            {
+                if (SetProp(ref _isBusy, value))
+                {
+                    Application.Current.Dispatcher.Invoke(new Action(() =>
+                    {
+                        ProgressBarVisibility = value ? Visibility.Visible : Visibility.Collapsed;
+                    }));
+                }
+            }
+        }
+        Visibility _progressBarVisibility = Visibility.Collapsed;
+        public Visibility ProgressBarVisibility
+        {
+            get => _progressBarVisibility;
+            set => SetProp(ref _progressBarVisibility, value);
+        }
+
         public ICommand GenerateClimateZonesCommand => new RelayCommand(o =>
         {
-            // Analyze rules from DefaultSetUp
-            var defaultSetup = SelectedDefinition.ComplexMaterials.FirstOrDefault(x => x.Name == "DefaultSetUp");
-            if (defaultSetup == null) return;
-
-            HashSet<double> latitudes = new();
-
-            foreach (var rule in defaultSetup.Rules)
-            {
-                latitudes.Add(rule.Latitude.Min);
-                latitudes.Add(rule.Latitude.Max);
-            }
-            List<double> sortedLatitudes = latitudes.OrderBy(x => x).ToList();
-            int numOfZones = sortedLatitudes.Count()-1;
-            if (numOfZones < 2)
-            {
-                MessageBox.Show("1 or less climate zones found. Aborting...");
-                return;
-            }
-
-            List<int> reds = new List<int>();
-            // create list of available red values
-            // Alternate colors so they are easier to see
-            int bottomRed = 50;
-            int topRed = 200;
-            for (int i=0; i<numOfZones;++i)
-            {
-                if (i%2 > 0)
-                {
-                    while(!IsRedValueAvailabe(bottomRed) && bottomRed < 200)
-                    {
-                        ++bottomRed;
-                    }
-                    if (bottomRed == 200)
-                    {
-                        MessageBox.Show("Not enough available red values!");
-                        return;
-                    }
-                    reds.Add(bottomRed++);
-                }
-                else
-                {
-                    while (!IsRedValueAvailabe(topRed) && topRed > 50)
-                    {
-                        --topRed;
-                    }
-                    if (topRed == 50)
-                    {
-                        MessageBox.Show("Not enough available red values!");
-                        return;
-                    }
-                    reds.Add(topRed--);
-                }
-            }
-
-            // Define one climate zone per increment of sorted latitudes
-            // Caution !!! There is a CustomMaterialTable section which override red material rules!
-
-            var rnd = new Random(0);
-            foreach (var face in Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>())
-            {
-                // Debug
-                if (face != CubeMapFace.Back) continue;
+            Progress = 0;
+            IsBusy = true;
+            Task.Run(() => {
                 try
                 {
-                    var heightMapFilePath =
-                        Path.Combine(
-                            Path.GetDirectoryName(_lastSbc) ?? ".",
-                            "PlanetDataFiles",
-                            SelectedDefinition.Name,
-                            face.ToString().ToLower() + ".png");
-                    var heigthMap = SixLabors.ImageSharp.Image.Load<L16>(heightMapFilePath);
-                    //double heightMapMin = heigthMap[0, 0].PackedValue;
-                    //double heightMapMax = heightMapMin;
-                    //for (int x = 0; x < 2048; ++x)
-                    //    for (int y = 0; y < 2048; ++y)
-                    //    {
-                    //        var val = heigthMap[x, y].PackedValue;
-                    //        if (heightMapMin > val) heightMapMin = val;
-                    //        if (heightMapMax < val) heightMapMax = val;
-                    //    }
-                    // Scale 0...1
-                    //heightMapMax = heightMapMax / 65535.0;
-                    //heightMapMin = heightMapMin / 65535.0;
+                    // Analyze rules from DefaultSetUp
+                    var defaultSetup = SelectedDefinition.ComplexMaterials.FirstOrDefault(x => x.Name == "DefaultSetUp");
+                    if (defaultSetup == null) return;
 
-                    var image = new SixLabors.ImageSharp.Image<Rgb24>(2048, 2048);
-                    for (int x = 0; x < 2048; ++x)
+                    HashSet<double> latitudes = new();
+
+                    foreach (var rule in defaultSetup.Rules)
                     {
-                        //if (x > 300) break;
-                        for (int y = 0; y < 2048; ++y)
+                        latitudes.Add(rule.Latitude.Min);
+                        latitudes.Add(rule.Latitude.Max);
+                    }
+                    List<double> sortedLatitudes = latitudes.OrderBy(x => x).ToList();
+                    int numOfZones = sortedLatitudes.Count() - 1;
+                    if (numOfZones < 2)
+                    {
+                        MessageBox.Show("1 or less climate zones found. Aborting...");
+                        return;
+                    }
+
+                    // Define one climate zone per increment of sorted latitudes
+                    // Caution !!! There is a CustomMaterialTable section which override red material rules!
+                    List<int> reds = new List<int>();
+                    // create list of available red values
+                    // Alternate colors so they are easier to see
+                    int bottomRed = 50;
+                    int topRed = 200;
+                    for (int i = 0; i < numOfZones; ++i)
+                    {
+                        if (i % 2 > 0)
                         {
-                            //if (y < 1024) continue;
-
-                            // Step 1: Determine latitude of pixel
-                            var point = CoordinateHelper.GetNormalizedSphereCoordinates(face, x, y);
-                            var lolat = CoordinateHelper.ToLongitudeLatitude(point);
-                            var latAbs = Math.Abs(lolat.latitude);
-
-                            // Latitude 0 is equator, +- 90 is pole
-
-                            // Strategy:
-                            // Area between two latitude lines is covered by its corresponding rules
-                            // At the edge we assign 75% propability of beeing the same rules as middle
-                            // and 25% propability of beeing neighboring ruleset.
-
-                            // Additional refinement:
-                            // Probability can change based on the height of a pixel
-                            // Higher pixels have more propability for colder climate zone.
-                            // Latitudes with higher numbers are considered colder.
-
-                            int latIndex = 0;
-                            bool foundLat = false;
-                            for (int i = 0; i < sortedLatitudes.Count - 1; ++i)
+                            while (!IsRedValueAvailabe(bottomRed) && bottomRed < 200)
                             {
-                                var curLat = sortedLatitudes[i];
-                                var nextLat = sortedLatitudes[i + 1];
-
-                                if (curLat <= latAbs && nextLat >= latAbs)
-                                {
-                                    latIndex = i;
-                                    foundLat = true;
-                                    break;
-                                }
+                                ++bottomRed;
                             }
-                            if (!foundLat) throw new Exception("Cound not determine latitude ranges. Please use different definitions.");
-
-                            var latMin = sortedLatitudes[latIndex];
-                            var latMax = sortedLatitudes[latIndex + 1];
-
-                            var ruleset = defaultSetup.Rules.Where(x =>
-                                x.Latitude.Min <= latMin && x.Latitude.Max > latMin ||  // 1 + 3
-                                x.Latitude.Min < latMax && x.Latitude.Max > latMax ||   // 2 + 3
-                                x.Latitude.Min >= latMin && x.Latitude.Max <= latMax)   // 4
-                                .ToList();
-
-                            // TODO: Write ruleset to file
-
-                            byte myRed = (byte)reds[latIndex];
-                            var middle = (latMin + latMax) / 2;
-                            var width = latMax - latMin;
-                            if (width < 1) // region is too small
+                            if (bottomRed == 200)
                             {
-                                image[x, y] = new Rgb24(myRed, 0, 0);
+                                MessageBox.Show("Not enough available red values!");
+                                return;
                             }
-                            else
+                            reds.Add(bottomRed++);
+                        }
+                        else
+                        {
+                            while (!IsRedValueAvailabe(topRed) && topRed > 50)
                             {
-                                // Middle area stays the same
-                                var distanceFromMiddle = Math.Abs(latAbs - middle);
-                                //if (distanceFromMiddle < (width / 4)) //<------ Middle width is 1/2 of area. Side areas are 1/4 each
-                                if (distanceFromMiddle < (width/8)) // <----- Middle width is 2/8 of area. Side areas are 3/8 each
-                                {
-                                    image[x, y] = new Rgb24(myRed, 0, 0);
-                                }
-                                else // We are outside of the middle area
-                                {
-                                    // Must determine if we are below middle or above middle
-                                    var distanceToStart = Math.Abs(latAbs - latMin);
-                                    var distanceToEnd = Math.Abs(latAbs - latMax);
-                                    double distancePercentage;
-                                    double percentage;
-                                    byte neighborRed;
+                                --topRed;
+                            }
+                            if (topRed == 50)
+                            {
+                                MessageBox.Show("Not enough available red values!");
+                                return;
+                            }
+                            reds.Add(topRed--);
+                        }
+                    }
 
-                                    // Use localized height map scaling
-                                    double heightMapMin = heigthMap[x, y].PackedValue;
-                                    double heightMapMax = heightMapMin;
-                                    int searchRange = 40;
-                                    var xStart = Math.Max(0, x - searchRange);
-                                    var yStart = Math.Max(0, y - searchRange);
-                                    var xEnd = Math.Min(image.Width - 1, x + searchRange);
-                                    var yEnd = Math.Min(image.Width - 1, y + searchRange);
-                                    Parallel.For(xStart, xEnd + 1, xx =>
+                    if (!Directory.Exists(".\\GeneratedClimateZones"))
+                    {
+                        Directory.CreateDirectory(".\\GeneratedClimateZones");
+                    }
+
+                    // Create rulesets
+                    XElement documentRoot = new XElement("ComplexMaterials", new XComment("Copy these MaterialGroup definitions into the 'ComplexMaterials' node of the Planet Definition"));
+                    for (int i = 0; i < sortedLatitudes.Count - 1; ++i)
+                    {
+                        double latMin = sortedLatitudes[i];
+                        double latMax = sortedLatitudes[i + 1];
+                        var ruleset = defaultSetup.Rules.Where(x =>
+                            x.Latitude.Min <= latMin && x.Latitude.Max > latMin ||
+                            x.Latitude.Min < latMax && x.Latitude.Max >= latMax ||
+                            x.Latitude.Min >= latMin && x.Latitude.Max <= latMax)
+                            .ToList();
+                        var matGroup = new XElement("MaterialGroup", new XAttribute("Name", "ClimateZone_" + latMin + "_" + latMax + "_" + reds[i]), new XAttribute("Value", reds[i]));
+                        foreach (var rule in ruleset)
+                        {
+                            //var nMin = rule.Latitude.Min;
+                            //var nMax = rule.Latitude.Max;
+                            //if (nMin < latMin) nMin = latMin;
+                            //if (nMax > latMax) nMax = latMax;
+                            matGroup.Add(rule.ToXElement(0, 90)); // 0..90 overide required since our zones are shifted in latitude
+                        }
+                        documentRoot.Add(matGroup);
+                    }
+                    XDocument ruleSetDocument = new XDocument(documentRoot);
+                    ruleSetDocument.Save(".\\GeneratedClimateZones\\rules.xml");
+
+                    Progress += 5;
+
+                    var rnd = new Random(0);
+                    foreach (var face in Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>())
+                    {
+                        // Each iteration should increase progress by 15 -> 6*15 = 90
+                        try
+                        {
+                            var heightMapFilePath =
+                                Path.Combine(
+                                    Path.GetDirectoryName(_lastSbc) ?? ".",
+                                    "PlanetDataFiles",
+                                    SelectedDefinition.Name,
+                                    face.ToString().ToLower() + ".png");
+                            var heigthMap = SixLabors.ImageSharp.Image.Load<L16>(heightMapFilePath);
+
+                            var image = new SixLabors.ImageSharp.Image<Rgb24>(2048, 2048);
+                            for (int x = 0; x < 2048; ++x)
+                            {
+                                Progress += 10 / 2048d;
+                                for (int y = 0; y < 2048; ++y)
+                                {
+                                    // Determine latitude of pixel
+                                    var point = CoordinateHelper.GetNormalizedSphereCoordinates(face, x, y);
+                                    var lolat = CoordinateHelper.ToLongitudeLatitude(point);
+                                    var latAbs = Math.Abs(lolat.latitude);
+                                    // Latitude 0 is equator, +- 90 is pole
+
+                                    int latIndex = 0;
+                                    bool foundLat = false;
+                                    for (int i = 0; i < sortedLatitudes.Count - 1; ++i)
                                     {
-                                        for (int yy = yStart; yy <= yEnd; ++yy)
+                                        var curLat = sortedLatitudes[i];
+                                        var nextLat = sortedLatitudes[i + 1];
+
+                                        if (curLat <= latAbs && nextLat >= latAbs)
                                         {
-                                            var val = heigthMap[xx, yy].PackedValue;
-                                            // TODO Might run into concurrency issues here...
-                                            if (heightMapMin > val) heightMapMin = val;
-                                            if (heightMapMax < val) heightMapMax = val;
+                                            latIndex = i;
+                                            foundLat = true;
+                                            break;
                                         }
-                                    });
-                                    // Scale 0...1
-                                    heightMapMax = heightMapMax / 65535.0;
-                                    heightMapMin = heightMapMin / 65535.0;
+                                    }
+                                    if (!foundLat) throw new Exception("Cound not determine latitude ranges. Please use different definitions.");
 
-                                    var heightValue = heigthMap[x, y].PackedValue / 65535.0;
-                                    // Scale with min max
-                                    heightValue = (heightValue - heightMapMin) / (heightMapMax-heightMapMin);
-
-                                    // Debug
-                                    //heightValue = 0.5;
-
-                                    if (distanceToStart < distanceToEnd)
+                                    var latMin = sortedLatitudes[latIndex];
+                                    var latMax = sortedLatitudes[latIndex + 1];
+                                    byte myRed = (byte)reds[latIndex];
+                                    var middle = (latMin + latMax) / 2;
+                                    var width = latMax - latMin;
+                                    if (width < 1) // region is too small
                                     {
-                                        // We are below middle and closer to start
-                                        // Calculate gradient probablity based on distance
-                                        // At edge the propability is 50%, at the middle it is 100%
-                                        //distancePercentage = distanceToStart / (width / 4); // <----- Middle width is 1/2 of area. Side areas are 1/4 each
-                                        distancePercentage = distanceToStart / (width*3/8d);   // <----- Middle width is 2/8 of area. Side areas are 3/8 each
-                                        percentage = 0.5 * distancePercentage + .5;
-                                        neighborRed = (byte)reds[latIndex > 0 ? latIndex - 1 : 0];
-                                        //neighborIsColder = false;
-
-                                        percentage = ModifyPercentage(distancePercentage, -1*heightValue + 1);
+                                        image[x, y] = new Rgb24(myRed, 0, 0);
                                     }
                                     else
                                     {
-                                        // We are above middle and closer to end
-                                        //distancePercentage = distanceToEnd / (width / 4);
-                                        distancePercentage = distanceToEnd / (width*3/8d);
-                                        percentage = 0.5 * distancePercentage + .5;
-                                        neighborRed = (byte)reds[latIndex + 1 < reds.Count ? latIndex + 1 : latIndex];
-                                        //neighborIsColder = true;
+                                        // Middle area stays the same
+                                        var distanceFromMiddle = Math.Abs(latAbs - middle);
+                                        //if (distanceFromMiddle < (width / 4)) //<------ Middle width is 1/2 of area. Side areas are 1/4 each
+                                        if (distanceFromMiddle < (width / 8)) // <----- Middle width is 2/8 of area. Side areas are 3/8 each
+                                        {
+                                            image[x, y] = new Rgb24(myRed, 0, 0);
+                                        }
+                                        else // We are outside of the middle area
+                                        {
+                                            // Must determine if we are below middle or above middle
+                                            var distanceToStart = Math.Abs(latAbs - latMin);
+                                            var distanceToEnd = Math.Abs(latAbs - latMax);
+                                            double distancePercentage;
+                                            double percentage;
+                                            byte neighborRed;
 
-                                        percentage = ModifyPercentage(distancePercentage, heightValue);
+                                            // Use localized height map scaling
+                                            double heightMapMin = heigthMap[x, y].PackedValue;
+                                            double heightMapMax = heightMapMin;
+                                            int searchRange = 40;
+                                            var xStart = Math.Max(0, x - searchRange);
+                                            var yStart = Math.Max(0, y - searchRange);
+                                            var xEnd = Math.Min(image.Width - 1, x + searchRange);
+                                            var yEnd = Math.Min(image.Width - 1, y + searchRange);
+                                            Parallel.For(xStart, xEnd + 1, xx =>
+                                            {
+                                                for (int yy = yStart; yy <= yEnd; ++yy)
+                                                {
+                                                    var val = heigthMap[xx, yy].PackedValue;
+                                                    // TODO Might run into concurrency issues here...
+                                                    if (heightMapMin > val) heightMapMin = val;
+                                                    if (heightMapMax < val) heightMapMax = val;
+                                                }
+                                            });
+                                            // Scale 0...1
+                                            heightMapMax = heightMapMax / 65535.0;
+                                            heightMapMin = heightMapMin / 65535.0;
+
+                                            var heightValue = heigthMap[x, y].PackedValue / 65535.0;
+                                            // Scale with min max
+                                            heightValue = (heightValue - heightMapMin) / (heightMapMax - heightMapMin);
+
+                                            // Debug
+                                            //heightValue = 0.5;
+
+                                            if (distanceToStart < distanceToEnd)
+                                            {
+                                                // We are below middle and closer to start
+                                                // Calculate gradient probablity based on distance
+                                                // At edge the propability is 50%, at the middle it is 100%
+                                                //distancePercentage = distanceToStart / (width / 4); // <----- Middle width is 1/2 of area. Side areas are 1/4 each
+                                                distancePercentage = distanceToStart / (width * 3 / 8d);   // <----- Middle width is 2/8 of area. Side areas are 3/8 each
+                                                percentage = 0.5 * distancePercentage + .5;
+                                                neighborRed = (byte)reds[latIndex > 0 ? latIndex - 1 : 0];
+                                                //neighborIsColder = false;
+
+                                                percentage = ModifyPercentage(distancePercentage, -1 * heightValue + 1);
+                                            }
+                                            else
+                                            {
+                                                // We are above middle and closer to end
+                                                //distancePercentage = distanceToEnd / (width / 4);
+                                                distancePercentage = distanceToEnd / (width * 3 / 8d);
+                                                percentage = 0.5 * distancePercentage + .5;
+                                                neighborRed = (byte)reds[latIndex + 1 < reds.Count ? latIndex + 1 : latIndex];
+                                                //neighborIsColder = true;
+
+                                                percentage = ModifyPercentage(distancePercentage, heightValue);
+                                            }
+
+                                            var dd = rnd.NextDouble();
+                                            var targetRed = dd < percentage ? myRed : neighborRed;
+                                            image[x, y] = new Rgb24(targetRed, 0, 0);
+                                            //image[x, y] = new Rgb24((byte)(255 * percentage), 0, 0);
+                                        }
                                     }
-
-                                    var dd = rnd.NextDouble();
-                                    var targetRed = dd < percentage ? myRed : neighborRed;
-                                    image[x, y] = new Rgb24(targetRed, 0, 0);
-                                    //image[x, y] = new Rgb24((byte)(255 * percentage), 0, 0);
                                 }
                             }
-                        }
-                    }
 
-                    // Apply median filter to reduce pixel clouds
-                    var imageFiltered = new SixLabors.ImageSharp.Image<Rgb24>(2048, 2048);
-                    int filterRadius = 3;
-                    int filterRadiusSquared = filterRadius * filterRadius;
-                    for (int x = 0; x < 2048; ++x)
-                    {
-                        //if (x > 300) break;
-                        for (int y = 0; y < 2048; ++y)
-                        {
-                            //if (y < 1024) continue;
-
-                            List<byte> pixels = new();
-                            var xStart = Math.Max(0, x - filterRadius);
-                            var yStart = Math.Max(0, y - filterRadius);
-                            var xEnd = Math.Min(image.Width - 1, x + filterRadius);
-                            var yEnd = Math.Min(image.Height - 1, y + filterRadius);
-                            for (int xx = xStart; xx <= xEnd; ++xx)
+                            // Apply median filter to reduce pixel clouds
+                            var imageFiltered = new SixLabors.ImageSharp.Image<Rgb24>(2048, 2048);
+                            int filterRadius = 3;
+                            int filterRadiusSquared = filterRadius * filterRadius;
+                            for (int x = 0; x < 2048; ++x)
                             {
-                                for (int yy = yStart; yy <= yEnd; ++yy)
+                                Progress += 5 / 2048d;
+                                for (int y = 0; y < 2048; ++y)
                                 {
-                                    //pixels.Add(image[xx, yy].R);
-                                    // Check of current pixel within a circle
-                                    if ((xx - x) * (xx - x) + (yy - y) * (yy - y) <= filterRadiusSquared)
+                                    List<byte> pixels = new();
+                                    var xStart = Math.Max(0, x - filterRadius);
+                                    var yStart = Math.Max(0, y - filterRadius);
+                                    var xEnd = Math.Min(image.Width - 1, x + filterRadius);
+                                    var yEnd = Math.Min(image.Height - 1, y + filterRadius);
+                                    for (int xx = xStart; xx <= xEnd; ++xx)
                                     {
-                                        pixels.Add(image[xx, yy].R);
+                                        for (int yy = yStart; yy <= yEnd; ++yy)
+                                        {
+                                            // Check of current pixel within a circle
+                                            if ((xx - x) * (xx - x) + (yy - y) * (yy - y) <= filterRadiusSquared)
+                                            {
+                                                pixels.Add(image[xx, yy].R);
+                                            }
+                                        }
+                                    }
+                                    if (pixels.Any())
+                                    {
+                                        pixels.Sort();
+                                        imageFiltered[x, y] = new Rgb24(pixels[pixels.Count / 2], 0, 0);
                                     }
                                 }
                             }
-                            if (pixels.Any())
-                            {
-                                pixels.Sort();
-                                imageFiltered[x, y] = new Rgb24(pixels[pixels.Count / 2], 0, 0);
-                            }
+                            image.Dispose();
+                            imageFiltered.SaveAsPng(".\\GeneratedClimateZones\\" + face.ToString().ToLower() + "_zones.png");
+                            imageFiltered.Dispose();
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                            return;
                         }
                     }
-                    image.Dispose();
-                    imageFiltered.SaveAsPng(face.ToString().ToLower() + "_zones.png");
-                    imageFiltered.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
-            }
-            MessageBox.Show("Finished");
 
+                    var choice = MessageBox.Show("Finished!\r\nPlease copy the content from the 'rules.xml'\r\nto the corresponding 'ComplexMaterials' node in your planet SBC.\r\nDo you want me to include the new zones into existing material maps?\r\nValue 82 will not be changed to conserve lakes.", "", MessageBoxButton.YesNo);
+                    if (choice != MessageBoxResult.Yes) return;
+                    choice = MessageBox.Show("Please use the next dialog to select one file in the target folder where the material maps should be loaded from", "", MessageBoxButton.OKCancel);
+                    if (choice != MessageBoxResult.OK) return;
+                    var dlg = new OpenFileDialog();
+                    dlg.FileName = "back_mat.png";
+                    dlg.Filter = "PNG|*.png";
+                    if (dlg.ShowDialog() != true) return;
+                    var folder = Path.GetDirectoryName(dlg.FileName);
+
+                    // Last 5% progress
+                    try
+                    {
+                        foreach (var face in Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>())
+                        {
+                            var fileName = Path.Combine(folder, face + "_mat.png");
+                            if (!File.Exists(fileName))
+                            {
+                                MessageBox.Show("File not found! Skipping file:\r\n" + fileName);
+                                Progress += 5 / 6d;
+                                continue;
+                            }
+                            dynamic matFile = SixLabors.ImageSharp.Image.Load(fileName);
+                            var zoneFile = SixLabors.ImageSharp.Image.Load<Rgb24>(".\\GeneratedClimateZones\\" + face.ToString().ToLower() + "_zones.png");
+                            var targetMatFile = new Image<Rgb24>(2048, 2048);
+                            Parallel.For(0, 2048, x =>
+                            {
+                                for (int y = 0; y < 2048; ++y)
+                                {
+                                    var pixel = matFile[x, y];
+                                    targetMatFile[x, y] = new Rgb24(pixel.R == 82 ? (byte)pixel.R : zoneFile[x, y].R, pixel.G, pixel.B);
+                                }
+                            });
+                            matFile.Dispose();
+                            zoneFile.Dispose();
+                            targetMatFile.SaveAsPng(".\\GeneratedClimateZones\\" + face.ToString().ToLower() + "_mat.png");
+                            targetMatFile.Dispose();
+                            Progress += 5 / 6d;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+                }
+                finally { IsBusy = false; }
+            });
         }, o =>
         SelectedDefinition != null && SelectedDefinition.ComplexMaterials?.Exists(x=>x.Name == "DefaultSetUp") == true &&
-        !string.IsNullOrEmpty(_lastSbc));
+        !string.IsNullOrEmpty(_lastSbc) && !IsBusy);
 
         double ModifyPercentage(double distancePercentage, double height)
         {
@@ -577,12 +681,46 @@ namespace ComplexMaterialViewer
                 Slope.Max.ToString(CultureInfo.InvariantCulture) + "]";
             return str;
         }
+
+        // We could also just parse the Xml string property.
+        // It contains a copy of the original XML this object was parsed from.
+        public XElement ToXElement(double? latitudeMinOverride = null, double? latitudeMaxOverride = null)
+        {
+            var xElem = new XElement("Rule");
+            var layers = new XElement("Layers");
+            foreach (var layer in Layers)
+            {
+                layers.Add(layer.ToXElement());
+            }
+            xElem.Add(layers);
+            if (Height != null)
+            {
+                var hElem = new XElement("Height", new XAttribute("Min", Height.Min), new XAttribute("Max", Height.Max));
+                xElem.Add(hElem);
+            }
+            if (Latitude != null)
+            {
+                var hElem = new XElement("Latitude", new XAttribute("Min", latitudeMinOverride ?? Latitude.Min), new XAttribute("Max", latitudeMaxOverride ?? Latitude.Max));
+                xElem.Add(hElem);
+            }
+            if (Slope != null)
+            {
+                var hElem = new XElement("Slope", new XAttribute("Min", Slope.Min), new XAttribute("Max", Slope.Max));
+                xElem.Add(hElem);
+            }
+            return xElem;
+        }
     }
 
     class Layer
     {
         public string Material { get; set; }
         public int Depth { get; set; }
+
+        public XElement ToXElement()
+        {
+            return new XElement("Layer", new XAttribute("Material", Material), new XAttribute("Depth", Depth));
+        }
     }
     class MinMax
     {
@@ -682,4 +820,6 @@ namespace ComplexMaterialViewer
             return (longitude, latitude - 90);
         }
     }
+
+
 }
