@@ -67,6 +67,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
@@ -250,10 +251,16 @@
                     Text="Material" FontWeight="Bold" />-->
                     <TextBlock
                     Grid.Row="29" Grid.Column="0" Margin="5,5,5,5"
-                    Text="Mat. Source" Grid.RowSpan="2" />
+                    Text="Mat. Source"  />
                     <TextBox
                     Grid.Row="29" Grid.Column="1" Margin="5,5,5,5"
-                    Text="{Binding MaterialSource}" Width="100" Grid.RowSpan="2"/>
+                    Text="{Binding MaterialSource}" Width="100"/>
+                    <TextBlock
+                        Grid.Row="30" Grid.Column="0" Margin="5,5,5,5"
+                        Text="Stamp Depth"  />
+                    <TextBox
+                        Grid.Row="30" Grid.Column="1" Margin="5,5,5,5"
+                        Text="{Binding LakeStampDepth}" Width="100" ToolTip="Height units to lower the lake height. Makes lake edges more distinct." />
                 </Grid>
             </GroupBox>
             <GroupBox

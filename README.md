@@ -39,15 +39,14 @@ Tools restarting and stopping an Space Engineers server.
 For more info read the README of that project.
 
 ## PlanetCreator
-This is an attempt in generating procedural height maps for new planets. It's still work in progress.
+This is an attempt in generating procedural height maps for new planets.
 The map is generated using simplex noise. After that hydraulic erosion is performed.
 
 Area with hydralic erosion:
 
 ![Screenshot of planet creator](Screenshots/PlanetGen.png)
 
-In a separate step, droplets are simulated to find the locally lowest points and use them to generate lakes:
-This feature is not finished yet, WIP.
+In a separate step, droplets are simulated to find the locally lowest points and use them to generate lakes. These lakes can be automatically added to existing material map files if the PNG folder path is supplied.
 ![Screenshot of planet creator](Screenshots/LakeBedFinder.jpg)
 
 ## HeightMapEdgeFixer

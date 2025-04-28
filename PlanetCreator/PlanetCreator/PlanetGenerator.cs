@@ -646,6 +646,8 @@ namespace PlanetCreator
         public ushort LakesPerTile { get; set; } = 40;
         public double LakeVolumeMultiplier { get; set; } = 1.0;
 
+        public int LakeStampDepth { get; set; } = 100;
+
         public IDebugOverlay DebugOverlay;
 
         void CheckFillLake(CubeMapPoint point, double stopHeight, double maxVolume, int maxFilledPixels, CancellationToken token, out int filledPixelCount, out HashSet<CubeMapPointLight> filledPoints , out double filledVolume)
@@ -1014,11 +1016,13 @@ namespace PlanetCreator
                     {
                         lock (_faces)
                         {
+                            // Stamp out the lake bed for more visible transition
+                            double stampedStopHeight = Math.Max(lastStopHeight - (LakeStampDepth / 65535d), 0);
                             foreach (var pt in lastFilledPoints)
                             {
                                 // Draw final lake pixels
                                 DebugOverlay.DebugCollectPixel(pt.Face, pt.X, pt.Y, 128, 255, 0, 0);
-                                _faces[pt.Face][pt.X, pt.Y] = lastStopHeight;
+                                _faces[pt.Face][pt.X, pt.Y] = stampedStopHeight;
                                 _lakes[pt.Face][pt.X, pt.Y] = 82;
                             }
                             ++drawnLakeCount;

@@ -461,6 +461,14 @@ namespace PlanetCreator
             get => _materialSource;
             set => SetProp(ref _materialSource, value);
         }
+
+        int _lakeStampDepth = 100;
+        public int LakeStampDepth
+        {
+            get => _lakeStampDepth;
+            set => SetProp(ref _lakeStampDepth, value);
+        }
+
         public ICommand GenerateCommand => new RelayCommand(async o =>
         {
             var faceValues = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToArray();
@@ -511,6 +519,8 @@ namespace PlanetCreator
             if (EvaporateSpeed > 1) EvaporateSpeed = 1;
             generator.EvaporateSpeed = EvaporateSpeed;
             generator.LakesPerTile = LakesPerTile;
+            if (LakeStampDepth < 0) LakeStampDepth = 0;
+            generator.LakeStampDepth = LakeStampDepth;
 
             generator.GenerateLakes = EnableLakeGeneration;
             if (LakeVolumeMultiplier <= 0)
