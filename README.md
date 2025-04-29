@@ -60,4 +60,7 @@ Shows the complex material rules. Possibility to filter by latitude. I used this
 New since Release 1.8:
 Auto generate climate zones via the menu. Open a planet, select the "DefaultSetUp" in the material groups list, then click "Generate Climate Zones." A new folder will be created, containing the new rulesets for the "ComplexMaterials" node in the planet SBC. It also generates PNGs with the corresponding red channels.
 
+Tutorial:
+https://youtu.be/nS_ERI_GFhw
+
 ![Screenshot of Complex Material Viewer](Screenshots/CpmplexMatView.png)
