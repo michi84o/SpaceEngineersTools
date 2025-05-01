@@ -1,4 +1,5 @@
-﻿using SixLabors.ImageSharp;
+﻿using MathNet.Numerics.Random;
+using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Concurrent;
@@ -18,6 +19,7 @@ using System.Windows.Controls;
 using System.Windows.Input.Manipulations;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Media3D;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace PlanetCreator
 {
@@ -150,6 +152,11 @@ namespace PlanetCreator
         public int Octaves { get; set; } = 4;
 
         public bool ApplySCurve { get; set; } = false;
+
+        public bool AddWorleyFreckles { get; set; }
+        public int WorleyFrecklesPerTile { get; set; } = 6;
+        public int WorleyFreckleRadius { get; set; } = 35;
+
         public int ErosionIterations { get; set; } = 1000000;
 
         public int FlattenFactor { get; set; } = 10;
@@ -208,8 +215,152 @@ namespace PlanetCreator
                 });
             }
 
-            // Normalize noise
             double maxHeight = 1;
+            // Add patches of worley noise
+            if (AddWorleyFreckles && WorleyFrecklesPerTile > 0)
+            {
+                // Normalize noise
+                if (!_debug)
+                    Normalize(_faces.Values.ToList(), token, maxHeight);
+                else
+                    Normalize(new List<double[,]> { _faces[_debugFace] }, token, maxHeight);
+
+                int worleyNumCells = 55;
+                double worleyBlendStart = 0.5;
+                double worleyLayerMaxHeight = .12; // .1 to flat, .15 too high
+                int worleyMaxAreaSegments = 7;
+                var worley = new SphericalWorleyNoise(Seed, sphereRadius, worleyNumCells);
+                var rnd = new Random(Seed);
+
+                // Only equator regions
+                List<CubeMapFace> faces = new List<CubeMapFace> { CubeMapFace.Back, CubeMapFace.Front, CubeMapFace.Right, CubeMapFace.Left };
+                if (_debug) faces = new List<CubeMapFace> { _debugFace };
+                Parallel.ForEach(faces, face =>
+                {
+                    var faceValues = _faces[face];
+                    var image = new Image<Rgb24>(_tileWidth, _tileWidth);
+
+                    // Pick 5 random points per cubemap
+                    for (int i = 0; i < WorleyFrecklesPerTile; ++i)
+                    {
+                        double worleyMin = double.NaN;
+                        double worleyMax = double.NaN;
+                        var worleySubLayer = new double[_tileWidth, _tileWidth];
+                        var worleyBlendLayer = new double[_tileWidth, _tileWidth];
+
+                        List<int[]> patchPoints = new List<int[]>();
+                        // Get Start points. Put them in the middle so we don't have to deal with edge cases
+                        var x = (int)(rnd.NextInt64((int)(_tileWidth * .8)) + _tileWidth * .1);
+                        var y = (int)(rnd.NextInt64((int)(_tileWidth * .8)) + _tileWidth * .1);
+                        patchPoints.Add(new int[] { x, y });
+                        // Extend area from start point
+                        int numSteps = (int)rnd.NextInt64(1, worleyMaxAreaSegments);
+                        for (int j = 0; j < numSteps; ++j)
+                        {
+                            var dx = (int)rnd.NextInt64(WorleyFreckleRadius * 2) - WorleyFreckleRadius;
+                            var dy = (int)rnd.NextInt64(WorleyFreckleRadius * 2) - WorleyFreckleRadius;
+                            patchPoints.Add(new int[]
+                            {
+                                patchPoints[patchPoints.Count - 1][0] + dx,
+                                patchPoints[patchPoints.Count - 1][1] + dy
+                            });
+                        }
+                        // Draw worley patches
+                        // -------------------
+                        double maxDistance = (WorleyFreckleRadius + 1); // Outside the radius
+                                                                        // We compare without calculating the square root, so calculate the square
+                        maxDistance *= maxDistance;
+                        // We have x and y parts, so we need to of these.
+                        maxDistance *= 2;
+
+                        // For each patch point...
+                        foreach (var patchPoint in patchPoints)
+                        {
+                            // ... get the surrounding points within the radius (using square for simplicity).
+                            for (x = patchPoint[0] - WorleyFreckleRadius; x < patchPoint[0] + WorleyFreckleRadius; ++x)
+                            {
+                                for (y = patchPoint[1] - WorleyFreckleRadius; y < patchPoint[1] + WorleyFreckleRadius; ++y)
+                                {
+                                    // For each surrounding pount,
+                                    // get the minimum distance to any of the patch points.
+
+                                    // Skip if already calculated
+                                    if (x > 2047 || y > 2047 || x < 0 || y < 0 || worleySubLayer[x, y] > 0) continue;
+
+                                    var minDistance = maxDistance;
+
+                                    foreach (var patchPoint2 in patchPoints)
+                                    {
+                                        // Calculate the squared distance of (x,y) to each patch point
+                                        var dx = x - patchPoint2[0];
+                                        dx *= dx;
+                                        var dy = y - patchPoint2[1];
+                                        dy *= dy;
+                                        minDistance = Math.Min(minDistance, dx + dy);
+                                    }
+
+                                    var distance = Math.Sqrt(minDistance);
+                                    if (distance >= WorleyFreckleRadius) continue;
+
+                                    var pt = GetNormalizedSphereCoordinates(face, x, y);
+                                    var value = worley.GetValue3D(pt.X, pt.Y, pt.Z); //rnd.NextDouble()*.5; //
+
+                                    if (double.IsNaN(worleyMax) || worleyMax < value)
+                                        worleyMax = value;
+                                    if (double.IsNaN(worleyMin) || worleyMin > value)
+                                        worleyMin = value;
+
+                                    if (distance > (WorleyFreckleRadius * worleyBlendStart))
+                                    {
+                                        // Apply linear blend at the edge of the area
+                                        worleyBlendLayer[x, y] = 1 - (
+                                            (distance - WorleyFreckleRadius * worleyBlendStart) /
+                                            (WorleyFreckleRadius - WorleyFreckleRadius * worleyBlendStart));
+                                    }
+                                    else worleyBlendLayer[x, y] = 1;
+                                    worleySubLayer[x, y] = value;
+                                }
+                            }
+                        }
+                        // Invert and normalize the worley pattern
+                        var offset = -1 * worleyMin;
+                        var stretch = Math.Abs(worleyMax - worleyMin);
+                        for (x = 0; x < _tileWidth; ++x)
+                        {
+                            for (y = 0; y < _tileWidth; ++y)
+                            {
+                                var value = worleySubLayer[x, y];
+                                if (value == 0) continue;
+                                // Normalize
+                                value += offset;
+                                value /= stretch;
+                                // Invert
+                                value = 1 - value; // TODO: Randomly decide if a formation gets inverted?
+                                // Flatten peaks
+                                // Limits values from 0.0 to 0.52
+                                value = -2.56410256 * value * value * value * value + 4.03651904 * value * value * value - 1.05011655 * value * value + 0.10637141 * value;
+                                // Limit and blend
+                                worleySubLayer[x, y] = value * worleyLayerMaxHeight * worleyBlendLayer[x, y];
+                            }
+                        }
+                        Parallel.For(0, _tileWidth, POptions(token), x =>
+                        {
+                            for (int y = 0; y < _tileWidth; ++y)
+                            {
+                                faceValues[x, y] += worleySubLayer[x, y];
+                                if (worleySubLayer[x, y] > 0)
+                                    image[x, y] = new Rgb24(76, 0, 0);
+                            }
+                        });
+                    }
+                    // Save worley areas in file so modder can define them as their own climate zone
+                    image.SaveAsPng(face.ToString() + "_worley.png");
+                    image.Dispose();
+                });
+
+            }
+
+            // Normalize noise
             if (!_debug)
                 Normalize(_faces.Values.ToList(), token, maxHeight);
             else

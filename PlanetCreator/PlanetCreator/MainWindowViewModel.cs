@@ -309,7 +309,7 @@ namespace PlanetCreator
             get => _noiseScale;
             set => SetProp(ref _noiseScale, value);
         }
-        int _octaves = 5;
+        int _octaves = 8;
         public int Octaves
         {
             get => _octaves;
@@ -350,6 +350,27 @@ namespace PlanetCreator
             set => SetProp(ref _flattenEquator, value);
         }
         int _equatorFlatSigma = 200;
+
+        bool _addFreckles;
+        public bool AddFreckles
+        {
+            get => _addFreckles;
+            set => SetProp(ref _addFreckles, value);
+        }
+        int _frecklesPerTile = 6;
+        public int FrecklesPerTile
+        {
+            get => _frecklesPerTile;
+            set => SetProp(ref _frecklesPerTile, value);
+        }
+        int _freckleRadius = 40;
+        public int FreckleRadius
+        {
+            get => _freckleRadius;
+            set => SetProp(ref _freckleRadius, value);
+        }
+
+
         public int EquatorFlatSigma
         {
             get => _equatorFlatSigma;
@@ -483,7 +504,7 @@ namespace PlanetCreator
             generator.Seed = Seed;
             if (NoiseScale < 1 || NoiseScale > 65535) NoiseScale = 100;
             generator.NoiseScale = NoiseScale;
-            if (Octaves < 1 || Octaves > 25) Octaves = 5;
+            if (Octaves < 1 || Octaves > 25) Octaves = 8;
             generator.Octaves = Octaves;
             generator.ApplySCurve = ApplySCurve;
             if (FlattenFactor < 0) FlattenFactor = 0;
@@ -532,6 +553,14 @@ namespace PlanetCreator
                 LakeVolumeMultiplier = 100000;
             }
             generator.LakeVolumeMultiplier = LakeVolumeMultiplier;
+
+            generator.AddWorleyFreckles = AddFreckles;
+            if (FreckleRadius > 200) FreckleRadius = 200;
+            if (FreckleRadius < 10) FreckleRadius = 10;
+            generator.WorleyFreckleRadius = FreckleRadius;
+            if (FrecklesPerTile > 32) FrecklesPerTile = 32;
+            if (FrecklesPerTile < 0) FrecklesPerTile = 0;
+            generator.WorleyFrecklesPerTile = FrecklesPerTile;
 
             Progress = 1;
             generator.ProgressChanged += Generator_ProgressChanged;
@@ -765,50 +794,56 @@ namespace PlanetCreator
         {
             Seed = 0;
             NoiseScale = 200;
-            Octaves = 5;
+            Octaves = 8;
             FlattenFactor = 10;
             FlattenEquator = true;
-            EquatorFlatSigma = 150;
-            ErosionIterations = 5000000;
+            EquatorFlatSigma = 200;
+            ErosionIterations = 2500000;
             ErosionMaxDropletLifeTime = 100;
-            ErosionInteria = 0.005;
-            ErosionSedimentCapacityFactor = 10;
-            ErosionDepositSpeed = 0.01;
-            ErosionErodeSpeed = .03;
-            ErosionDepositBrush = 5;
-            ErosionErodeBrush = 5;
-            BrushPointiness = 0.5;
+            ErosionInteria = 0.01;
+            ErosionSedimentCapacityFactor = 35;
+            ErosionDepositSpeed = 0.1;
+            ErosionErodeSpeed = .3;
+            ErosionDepositBrush = 2;
+            ErosionErodeBrush = 2;
+            BrushPointiness = 0.25;
             EnableErosion = true;
             Gravity = 10;
-            EvaporateSpeed = 0.025;
+            EvaporateSpeed = 0.01;
             EnableLakeGeneration = true;
             LakesPerTile = 40;
             LakeVolumeMultiplier = 1;
+            AddFreckles = false;
+            FrecklesPerTile = 6;
+            FreckleRadius = 35;
         });
 
         public ICommand SetProfile2Command => new RelayCommand(o=>
         {
-            Seed = 0;
-            NoiseScale = 200;
-            Octaves = 5;
+            Seed = 42;
+            NoiseScale = 150;
+            Octaves = 8;
             FlattenFactor = 10;
             FlattenEquator = true;
-            EquatorFlatSigma = 150;
-            ErosionIterations = 2500000;
-            ErosionMaxDropletLifeTime = 100;
+            EquatorFlatSigma = 200;
+            ErosionIterations = 10000000;
+            ErosionMaxDropletLifeTime = 75;
             ErosionInteria = 0.005;
-            ErosionSedimentCapacityFactor = 20;
-            ErosionDepositSpeed = 0.01;
-            ErosionErodeSpeed = .03;
+            ErosionSedimentCapacityFactor = 10;
+            ErosionErodeSpeed = .015;
+            ErosionDepositSpeed = 0.008;
             ErosionDepositBrush = 3;
             ErosionErodeBrush = 3;
-            BrushPointiness = 0.1;
+            BrushPointiness = 0.6;
             EnableErosion = true;
             Gravity = 10;
             EvaporateSpeed = 0.025;
             EnableLakeGeneration = true;
             LakesPerTile = 40;
-            LakeVolumeMultiplier = 1;
+            LakeVolumeMultiplier = 1.5;
+            AddFreckles = true;
+            FrecklesPerTile = 8;
+            FreckleRadius = 40;
         });
 
     }
