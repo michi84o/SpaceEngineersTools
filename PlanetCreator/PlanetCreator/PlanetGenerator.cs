@@ -175,12 +175,6 @@ namespace PlanetCreator
         {
             // Layers of diferent noise frequencies
             List<NoiseMaker> list = new();
-            //{
-            //    new(Seed + 0, 1.0 / NoiseScale, 1),
-            //    new(Seed + 1, 2.0 / NoiseScale, .5),
-            //    new(Seed + 2, 4.0 / NoiseScale, 0.25),
-            //    new(Seed + 3, 8.0 / NoiseScale, 0.125),
-            //};
             var octave = 1;
             for (int i = 0; i < Octaves; ++i)
             {
@@ -188,6 +182,8 @@ namespace PlanetCreator
                 octave *= 2;
             }
             double sphereRadius = 1000;
+
+            //var worleyNoise = new SphericalWorleyNoise(0, sphereRadius, 25);
 
             // Apply noise
             foreach (var kv in _faces)
@@ -206,6 +202,7 @@ namespace PlanetCreator
                         {
                             value += nm.GetValue3D(point.X * sphereRadius, point.Y * sphereRadius, point.Z * sphereRadius);
                         }
+                        //value = worleyNoise.GetValue3D(point.X, point.Y, point.Z);
                         tile[x, y] = value;
                     }
                 });
