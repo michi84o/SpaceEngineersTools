@@ -840,7 +840,7 @@ namespace PlanetCreator
             EvaporateSpeed = 0.025;
             EnableLakeGeneration = true;
             LakesPerTile = 40;
-            LakeVolumeMultiplier = 1.5;
+            LakeVolumeMultiplier = 5;
             AddFreckles = true;
             FrecklesPerTile = 8;
             FreckleRadius = 40;

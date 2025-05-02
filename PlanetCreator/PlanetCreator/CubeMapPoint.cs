@@ -13,6 +13,13 @@ namespace PlanetCreator
         public int Y;
         public CubeMapFace Face;
 
+        public CubeMapPointLight(CubeMapFace face, int x, int y)
+        {
+            Face = face;
+            X = x;
+            Y = y;
+        }
+
         public static double GetValue(CubeMapPointLight point, Dictionary<CubeMapFace, double[,]> faces)
         {
             return faces[point.Face][point.X, point.Y];
@@ -57,7 +64,7 @@ namespace PlanetCreator
                                Face = CubeMapFace.Right,
                                 X = currentX,
                                 Y = currentY,
-                            }, -dy, 0);
+                            }, (ushort)-dy, 0);
                     case CubeMapFace.Left:
                         // West of 'Left' is 'Back'
                         currentX += 2048;
@@ -225,6 +232,16 @@ namespace PlanetCreator
                 X = currentX,
                 Y = currentY
             };
+        }
+
+        public List<CubeMapPointLight> GetNeighbors()
+        {
+            List<CubeMapPointLight> neighbors = new();
+            neighbors.Add(GetPointRelativeTo(this, -1, 0));
+            neighbors.Add(GetPointRelativeTo(this,  1, 0));
+            neighbors.Add(GetPointRelativeTo(this,  0, -1));
+            neighbors.Add(GetPointRelativeTo(this,  0,  1));
+            return neighbors;
         }
     }
 

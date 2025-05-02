@@ -465,6 +465,8 @@ namespace PlanetCreator
                     }
                 });
                 if (token.IsCancellationRequested) return;
+                if (_rockLayersEnabled)
+                    GenerateRockLayers(Seed, token);
                 try
                 {
                     Parallel.For(0, iterations, POptions(token), pit =>
@@ -571,6 +573,136 @@ namespace PlanetCreator
                 _evaporateSpeed = value;
                 UpdateEvaporatePart();
             }
+        }
+
+
+        // WIP: Rock Layer System
+        // Rock layers can have heights in the range
+        // of a few centimeters up to tens of meters or more
+        // Our height map covers 65535 layers at most.
+        // If we pre-generate rock layer infos that would amount
+        // to 274,873,712,640 layer infos per tile.
+        // If we only used a ushort value for defining the hardnes of the layer,
+        // we would have to store 512GB of data per tile !!!
+        // We can either reduce the data or procedurally generate the layer infos.
+        // If we split each tile into 64 polygons, each containing the same layers,
+        // we need only 8MB of data. One area would be 256x256 pixels on average.
+
+        // Store the index of a rock layer definition
+        // There are 64 different layer definitions this index refers to.
+        Dictionary<CubeMapFace, byte[,]> _rockLayerIndexes = new();
+        List<ushort[]> _rockLayers = new();
+        bool _rockLayersEnabled = false;
+
+        // Takes around 5 Minutes for one Tile!
+        // TODO: Use pregenerated layers -> Save as PNG
+        void GenerateRockLayers(int seed, CancellationToken token)
+        {
+            // Step 1: Generate the 64 rock layers
+            // Assign random hardness value to each depth
+            // We want some layers of soft sandstone sediment and
+            // some layers of hard granite stone.
+            // Hardness 0: Very soft -> Sandstone
+            // Hardness 32768: Average hardness -> Something else? I'm not a geologist.
+            // Hardness 65535: Very hard -> Granite
+            // Lets use a Gauss Distribution for hardness
+            var urnd = new UShortNormalDistributedRandom(seed);
+            var rnd = new Random(seed);
+            // TODO: Not sure if full randomness is a good idea.
+            for (int i=0;i<64;++i)
+            {
+                if (i==0) // Lets make index 0 special by beeing the default value
+                {
+                    _rockLayers.Add(Enumerable.Repeat<ushort>(32768, 65535).ToArray());
+                    continue;
+                }
+
+                ushort[] layers = new ushort[65535];
+                for (int j = 0; j<65535; ++j)
+                {
+                    if (token.IsCancellationRequested) return;
+                    layers[j] = urnd.GetNextValue();
+                }
+                _rockLayers.Add(layers);
+            }
+
+            // Prepare list of all points that are unset, initialize _rockLayerIndexes.
+            List<CubeMapPointLight> unsetPoints = new();
+            int unsetCount = 0;
+            List<CubeMapPointLight> setPointsWithUnsetNeighbors = new();
+            var faces = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToList();
+            if (_debug) faces = new List<CubeMapFace> { CubeMapFace.Back };
+            foreach (var face in faces)
+            {
+                _rockLayerIndexes[face] = new byte[_tileWidth, _tileWidth];
+                for (ushort x = 0; x < _tileWidth; ++x)
+                    for (ushort y = 0; y < _tileWidth; ++y)
+                    {
+                        unsetPoints.Add(new(face, x, y));
+                        ++unsetCount;
+                        _rockLayerIndexes[face][x, y] = 0;
+                    }
+            }
+
+            // Place 768 random seeds
+            for (int i = 0; i < 768; ++i)
+            {
+                var index = (int)rnd.NextInt64(unsetPoints.Count);
+                var item = unsetPoints[index];
+                var seedValue = (byte)(rnd.NextInt64(63) + 1); // Don't use 0
+                _rockLayerIndexes[item.Face][item.X, item.Y] = seedValue;
+                unsetPoints.RemoveAt(index);
+                --unsetCount;
+                setPointsWithUnsetNeighbors.Add(item);
+            }
+            unsetPoints.Clear();
+            unsetPoints = null;
+            // Loop on all
+            while (unsetCount > 0 && setPointsWithUnsetNeighbors.Count > 0)
+            {
+                var index = (int)rnd.NextInt64(setPointsWithUnsetNeighbors.Count);
+                var setPoint = setPointsWithUnsetNeighbors[index];
+
+                var neighbors = setPoint.GetNeighbors();
+                if (neighbors.Count == 0)
+                {
+                    setPointsWithUnsetNeighbors.RemoveAt(index);
+                    continue;
+                }
+                neighbors.RemoveAll(neighbor => _debug && neighbor.Face != CubeMapFace.Back || _rockLayerIndexes[neighbor.Face][neighbor.X, neighbor.Y] != 0);
+                if (neighbors.Count == 0)
+                {
+                    setPointsWithUnsetNeighbors.RemoveAt(index);
+                    continue;
+                }
+                CubeMapPointLight neighbor;
+                if (neighbors.Count == 1)
+                {
+                    neighbor = neighbors[0];
+                    setPointsWithUnsetNeighbors.RemoveAt(index);
+                }
+                else
+                {
+                    neighbor = neighbors[(int)rnd.NextInt64(neighbors.Count)];
+                }
+                _rockLayerIndexes[neighbor.Face][neighbor.X, neighbor.Y] = _rockLayerIndexes[setPoint.Face][setPoint.X, setPoint.Y];
+                setPointsWithUnsetNeighbors.Add(neighbor);
+                --unsetCount;
+                if (unsetCount % 5000 == 0)
+                    Debug.WriteLine("Unset: " + unsetCount);
+            }
+
+            var image = new Image<Rgb24>(_tileWidth, _tileWidth);
+            Parallel.For(0, _tileWidth, POptions(token), x =>
+            {
+                for (int y = 0; y < _tileWidth; ++y)
+                {
+                    var value = (byte)_rockLayerIndexes[CubeMapFace.Back][x, y];
+                    image[x, y] = new Rgb24(value, value, value);
+                }
+            });
+            image.SaveAsPng("debugRockLayer.png");
+
         }
 
         void UpdateEvaporatePart()
@@ -1232,7 +1364,23 @@ namespace PlanetCreator
             for (int ii = 0; ii < brushWeights.Count; ++ii)
             {
                 double brushpart = materialAmount * brushWeights[ii] / brushWeightSum;
-                brushPoints[ii].Value += brushpart;
+
+                var brushPoint = brushPoints[ii];
+                if (_rockLayersEnabled)
+                {
+                    var index = _rockLayerIndexes[brushPoint.Face][brushPoint.PosX, brushPoint.PosY];
+                    var val = (ushort)Math.Min(65535, Math.Max(0, brushPoint.Value * 65535));
+                    var hardness = _rockLayers[index][val];
+                    // 32768 ist default
+                    // 0 is soft, 65535 is hard
+                    // Use linear function:
+                    // y = mx+b with b=2 and y(65535) = 0
+                    var factor = -2.0 * hardness / 65535 + 2;
+                    if (brushpart < 0) brushpart *= (2 - factor);
+                    else brushpart *= factor;
+                }
+
+                brushPoint.Value += brushpart;
 
                 //if (_debug)
                 //{
@@ -1242,8 +1390,8 @@ namespace PlanetCreator
                 //        _debugTileR[brushPoints[ii].PosX, brushPoints[ii].PosY] += -brushpart;
                 //}
 
-                if (brushPoints[ii].Value > 1) brushPoints[ii].Value = 1;
-                else if (brushPoints[ii].Value < 0) brushPoints[ii].Value = 0;
+                if (brushPoint.Value > 1) brushPoint.Value = 1;
+                else if (brushPoint.Value < 0) brushPoint.Value = 0;
             }
 
             // Try to make map seamless by equalizing neighboring points between faces.
@@ -1591,4 +1739,42 @@ namespace PlanetCreator
             Weight = weight;
         }
     }
+
+    public class UShortNormalDistributedRandom
+    {
+        private readonly Random _random;
+        // Target Values
+        const ushort targetMin = 0;
+        const ushort targetMax = 65535;
+        const double targetMean = (targetMin + targetMax) / 2.0;
+
+        public UShortNormalDistributedRandom(int seed)
+        {
+            _random = new Random(seed);
+        }
+
+        double NextNormalDistributed(double mean, double stdDev)
+        {
+            // Box-Muller-Algo with Standard-Random
+            double u1 = 1.0 - _random.NextDouble(); // [0.0, 1.0) -> (0.0, 1.0]
+            double u2 = 1.0 - _random.NextDouble();
+            double z0 = Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Cos(2.0 * Math.PI * u2);
+            return mean + stdDev * z0;
+        }
+
+        public ushort GetNextValue()
+        {
+            // Assume 0 and 65535 have a 5% chance of spawning
+            double approximateStdDev = (targetMax - targetMin) / 4.0;
+
+            int value;
+            do
+            {
+                value = (int)Math.Round(NextNormalDistributed(targetMean, approximateStdDev));
+            } while (value < targetMin || value > targetMax);
+
+            return (ushort)value;
+        }
+    }
+
 }
