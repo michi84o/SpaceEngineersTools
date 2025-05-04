@@ -1,9 +1,13 @@
 ﻿using Microsoft.Win32;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+using SpaceEngineersToolsShared;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Data.Common;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -26,6 +30,307 @@ namespace PlanetCreator
 
     public class MainWindowViewModel : PropChangeNotifier, IDebugOverlay
     {
+        public List<int> TileWidths { get; } = new List<int> { 2048, 4096 };
+
+        int _tileWidth = 2048;
+        public int TileWidth
+        {
+            get => _tileWidth;
+            set => SetProp(ref _tileWidth, value);
+        }
+
+        bool _sessionLocked;
+        public bool SessionLocked
+        {
+            get => _sessionLocked;
+            set
+            {
+                if (SetProp(ref _sessionLocked, value))
+                    OnPropertyChanged(nameof(SessionLockString));
+            }
+        }
+
+        string _workingDir;
+        public string WorkingDir
+        {
+            get => _workingDir;
+            set => SetProp(ref _workingDir, value);
+        }
+
+        public string SessionLockString => SessionLocked ? "Unlock Session" : "Lock Session";
+
+        public ICommand WorkingDirCommand => new RelayCommand(o =>
+        {
+            var dlg = new SaveFileDialog();
+            dlg.FileName = "output.png";
+            if (dlg.ShowDialog() == true)
+            {
+                WorkingDir = Path.GetDirectoryName(dlg.FileName);
+            }
+        }, o=> !SessionLocked);
+
+        public ICommand LockSessionCommand => new RelayCommand(o =>
+        {
+            if (!Directory.Exists(WorkingDir))
+            {
+                var res = MessageBox.Show("Working Directory doesn't exist. Try to create it?", "Questing", MessageBoxButton.YesNo);
+                if (res != MessageBoxResult.Yes) return;
+                try
+                {
+                    Directory.CreateDirectory(WorkingDir);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+            }
+            OnPropertyChanged(nameof(SessionLockString));
+            SessionLocked = !SessionLocked;
+
+            SelectedBackup = null;
+            Backups.Clear();
+            if (SessionLocked)
+            {
+                // Update Backups List
+                var dirs = Directory.GetDirectories(WorkingDir);
+                foreach (var dir in dirs)
+                {
+                    if (dir.StartsWith("Backup_"))
+                    {
+                        Backups.Add(dir.Substring("Backup_".Length));
+                    }
+                }
+
+                if (OverlayBitmapUp == null || OverlayBitmapUp.Width != TileWidth)
+                {
+                    OverlayBitmapUp = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
+                    OnPropertyChanged(nameof(OverlayBitmapUp));
+                }
+                if (OverlayBitmapDown == null || OverlayBitmapDown.Width != TileWidth)
+                {
+                    OverlayBitmapDown = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
+                    OnPropertyChanged(nameof(OverlayBitmapDown));
+                }
+                if (OverlayBitmapLeft == null || OverlayBitmapLeft.Width != TileWidth)
+                {
+                    OverlayBitmapLeft = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
+                    OnPropertyChanged(nameof(OverlayBitmapLeft));
+                }
+                if (OverlayBitmapRight == null || OverlayBitmapRight.Width != TileWidth)
+                {
+                    OverlayBitmapRight = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
+                    OnPropertyChanged(nameof(OverlayBitmapRight));
+                }
+                if (OverlayBitmapFront == null || OverlayBitmapFront.Width != TileWidth)
+                {
+                    OverlayBitmapFront = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
+                    OnPropertyChanged(nameof(OverlayBitmapFront));
+                }
+                if (OverlayBitmapBack == null || OverlayBitmapBack.Width != TileWidth)
+                {
+                    OverlayBitmapBack = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
+                    OnPropertyChanged(nameof(OverlayBitmapBack));
+                }
+            }
+        }, o => !IsBusy);
+
+        public ObservableCollection<string> Backups { get; } = new();
+
+        string _selectedBackup;
+        public string SelectedBackup
+        {
+            get => _selectedBackup;
+            set => SetProp(ref _selectedBackup, value);
+        }
+
+        string _newBackupName;
+        public string NewBackupName
+        {
+            get => _newBackupName;
+            set => SetProp(ref _newBackupName, value);
+        }
+
+        public ICommand LoadBackupCommand => new RelayCommand(o =>
+        {
+            IsBusy = true;
+            Task.Run(() =>
+            {
+                try
+                {
+                    var dir = Path.Combine(WorkingDir, "Backup_" + SelectedBackup);
+                    if (!Directory.Exists(dir))
+                    {
+                        MessageBox.Show("This backup does not exist anymore!");
+                        Backups.Remove(SelectedBackup);
+                        SelectedBackup = null;
+                        return;
+                    }
+                    var faces = Enum.GetValues<CubeMapFace>().ToList();
+                    foreach (var face in faces)
+                    {
+                        if (IsCancellationRequested) return;
+                        try
+                        {
+                            var source = Path.Combine(dir, (face + ".png").ToLower());
+                            var destination = Path.Combine(WorkingDir, (face + ".png").ToLower());
+                            if (File.Exists(source))
+                                File.Copy(source, destination, true);
+
+                            source = Path.Combine(dir, (face + "_mat.png").ToLower());
+                            destination = Path.Combine(WorkingDir, (face + "_mat.png").ToLower());
+                            if (File.Exists(source))
+                                File.Copy(source, destination, true);
+
+                            source = Path.Combine(dir, (face + "_lakes.png").ToLower());
+                            destination = Path.Combine(WorkingDir, (face + "_lakes.png").ToLower());
+                            if (File.Exists(source))
+                                File.Copy(source, destination, true);
+
+                            source = Path.Combine(dir, (face + "_worley.png").ToLower());
+                            destination = Path.Combine(WorkingDir, (face + "_worley.png").ToLower());
+                            if (File.Exists(source))
+                                File.Copy(source, destination, true);
+
+                            source = Path.Combine(dir, (face + "_sediments.png").ToLower());
+                            destination = Path.Combine(WorkingDir, (face + "_sediments.png").ToLower());
+                            if (File.Exists(source))
+                                File.Copy(source, destination, true);
+
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                            return;
+                        }
+                    }
+                    Application.Current.Dispatcher.Invoke(new Action(() =>
+                    {
+                        LoadPictures(WorkingDir, faces);
+                    }));
+                    try
+                    {
+                        var sedimentTxt = Path.Combine(dir, "sediments.txt");
+                        if (File.Exists(sedimentTxt))
+                            File.Copy(sedimentTxt, Path.Combine(WorkingDir, "sediments.txt"), true);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+                }
+                finally { IsBusy = false; }
+            });
+        }, o => SelectedBackup != null);
+
+        public ICommand SaveBackupCommand => new RelayCommand(o =>
+        {
+            IsBusy = true;
+            Task.Run(() =>
+            {
+                try
+                {
+                    var dir = Path.Combine(WorkingDir, "Backup_" + NewBackupName);
+                    Directory.CreateDirectory(dir);
+                    var faces = Enum.GetValues<CubeMapFace>().ToList();
+                    int hMapCount = 0;
+                    foreach (var face in faces)
+                    {
+                        var destination = Path.Combine(dir, (face + ".png").ToLower());
+                        var source = Path.Combine(WorkingDir, face + ".png");
+                        if (File.Exists(source))
+                        {
+                            File.Copy(source, destination, true);
+                            ++hMapCount;
+                        }
+
+                        destination = Path.Combine(dir, (face + "_mat.png").ToLower());
+                        source = Path.Combine(WorkingDir, face + "_mat.png");
+                        if (File.Exists(source))
+                            File.Copy(source, destination, true);
+
+                        destination = Path.Combine(dir, (face + "_lakes.png").ToLower());
+                        source = Path.Combine(WorkingDir, face + "_lakes.png");
+                        if (File.Exists(source))
+                            File.Copy(source, destination, true);
+
+                        destination = Path.Combine(dir, (face + "_worley.png").ToLower());
+                        source = Path.Combine(WorkingDir, face + "_worley.png");
+                        if (File.Exists(source))
+                            File.Copy(source, destination, true);
+
+                        destination = Path.Combine(dir, (face + "_sediments.png").ToLower());
+                        source = Path.Combine(WorkingDir, face + "_sediments.png");
+                        if (File.Exists(source))
+                            File.Copy(source, destination, true);
+                    }
+
+                    var sedimentTxt = Path.Combine(WorkingDir, "sediments.txt");
+                    if (File.Exists(sedimentTxt))
+                        File.Copy(sedimentTxt, Path.Combine(dir, "sediments.txt"), true);
+
+                    if (hMapCount > 0)
+                    {
+                        Backups.Add(NewBackupName);
+                    }
+                    if (Directory.GetFiles(dir).Length == 0)
+                        Directory.Delete(dir);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+                finally { IsBusy = false; }
+            });
+        }, o=> SessionLocked && !string.IsNullOrEmpty(NewBackupName) &&
+        !Directory.Exists(Path.Combine(WorkingDir, NewBackupName)) );
+
+        public void LoadPictures()
+        {
+            if (!Application.Current.Dispatcher.CheckAccess())
+            {
+                Application.Current.Dispatcher.Invoke(new Action(() =>
+                {
+                    LoadPictures(WorkingDir, Enum.GetValues<CubeMapFace>().ToList());
+                }));
+            }
+            else
+                LoadPictures(WorkingDir, Enum.GetValues<CubeMapFace>().ToList());
+        }
+
+        void LoadPictures(string dir, List<CubeMapFace> faces)
+        {
+            foreach (var face in faces)
+            {
+                if (_cts.Token.IsCancellationRequested) return;
+                var tilePath = Path.Combine(dir, face + ".png");
+                switch (face)
+                {
+                    case CubeMapFace.Up:
+                        try { TileUp = GetImage(tilePath); } catch { }
+                        break;
+                    case CubeMapFace.Down:
+                        try { TileDown = GetImage(tilePath); } catch { }
+                        break;
+                    case CubeMapFace.Left:
+                        try { TileLeft = GetImage(tilePath); } catch { }
+                        break;
+                    case CubeMapFace.Right:
+                        try { TileRight = GetImage(tilePath); } catch { }
+                        break;
+                    case CubeMapFace.Front:
+                        try { TileFront = GetImage(tilePath); } catch { }
+                        break;
+                    case CubeMapFace.Back:
+                        try { TileBack = GetImage(tilePath); } catch { }
+                        break;
+                }
+
+            }
+        }
+
         BitmapImage _tileUp;
         public BitmapImage TileUp
         {
@@ -65,12 +370,17 @@ namespace PlanetCreator
             set => SetProp(ref _tileDown, value);
         }
 
-        public WriteableBitmap OverlayBitmapUp { get; } = new WriteableBitmap(2048, 2048, 96, 96, PixelFormats.Bgra32, null);
-        public WriteableBitmap OverlayBitmapFront { get; } = new WriteableBitmap(2048, 2048, 96, 96, PixelFormats.Bgra32, null);
-        public WriteableBitmap OverlayBitmapRight { get; } = new WriteableBitmap(2048, 2048, 96, 96, PixelFormats.Bgra32, null);
-        public WriteableBitmap OverlayBitmapBack { get; } = new WriteableBitmap(2048, 2048, 96, 96, PixelFormats.Bgra32, null);
-        public WriteableBitmap OverlayBitmapLeft { get; } = new WriteableBitmap(2048, 2048, 96, 96, PixelFormats.Bgra32, null);
-        public WriteableBitmap OverlayBitmapDown { get; } = new WriteableBitmap(2048, 2048, 96, 96, PixelFormats.Bgra32, null);
+        public WriteableBitmap OverlayBitmapUp { get; set; }
+        public WriteableBitmap OverlayBitmapFront { get; set; }
+        public WriteableBitmap OverlayBitmapRight { get; set; }
+        public WriteableBitmap OverlayBitmapBack { get; set; }
+        public WriteableBitmap OverlayBitmapLeft { get; set; }
+        public WriteableBitmap OverlayBitmapDown { get; set; }
+
+        public MainWindowViewModel()
+        {
+            WorkingDir = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "Output");
+        }
 
         WriteableBitmap GetOverlay(CubeMapFace face)
         {
@@ -176,7 +486,7 @@ namespace PlanetCreator
         public void DebugClearPixels(CubeMapFace face)
         {
             _collectedPixels.Clear();
-            Application.Current.Dispatcher.BeginInvoke(() => _DebugClearPixels(face));
+            _DebugClearPixels(face);
         }
 
         void _DebugClearPixels(CubeMapFace face)
@@ -210,7 +520,7 @@ namespace PlanetCreator
                 }
 
                 // Specify the area of the bitmap that changed.
-                bitmap.AddDirtyRect(new Int32Rect(0, 0, 2048, 2048));
+                bitmap.AddDirtyRect(new Int32Rect(0, 0, TileWidth, TileWidth));
             }
             finally
             {
@@ -263,24 +573,28 @@ namespace PlanetCreator
             set => SetProp(ref _progress, value);
         }
 
+        public List<CubeMapFace> CubeMapFaces => Enum.GetValues<CubeMapFace>().ToList();
+        CubeMapFace _previewTile = CubeMapFace.Back;
+        public CubeMapFace PreviewTile
+        {
+            get => _previewTile;
+            set => SetProp(ref _previewTile, value);
+        }
+
         bool _previewMode;
         public bool PreviewMode
         {
             get => _previewMode;
-            set
-            {
-                if (!SetProp(ref _previewMode, value)) return;
-                if (!value) ExtendedPreview = false;
-            }
+            set => SetProp(ref _previewMode, value);
         }
 
-        bool _extendedPreview;
-        public bool ExtendedPreview
+        bool _limitedPreview;
+        public bool LimitedPreview
         {
-            get => _extendedPreview;
+            get => _limitedPreview;
             set
             {
-                if (!SetProp(ref _extendedPreview, value)) return;
+                if (!SetProp(ref _limitedPreview, value)) return;
                 PreviewMode = true;
             }
         }
@@ -292,7 +606,14 @@ namespace PlanetCreator
             set
             {
                 if (SetProp(ref _isBusy, value))
+                {
+                    if (value)
+                    {
+                        _cts = new CancellationTokenSource();
+                        Progress = 0;
+                    }
                     OnPropertyChanged(nameof(NotBusy));
+                }
             }
         }
         public bool NotBusy => !IsBusy;
@@ -303,7 +624,7 @@ namespace PlanetCreator
             get => _seed;
             set => SetProp(ref _seed, value);
         }
-        int _noiseScale = 200;
+        int _noiseScale = 150;
         public int NoiseScale
         {
             get => _noiseScale;
@@ -329,19 +650,19 @@ namespace PlanetCreator
             set => SetProp(ref _applySCurve, value);
         }
 
-        int _flattenFactor = 10;
-        public int FlattenFactor
-        {
-            get => _flattenFactor;
-            set
-            {
-                if (SetProp(ref _flattenFactor, value))
-                {
-                    if (value > 100)
-                        EquatorFlatSigma = 100;
-                }
-            }
-        }
+        //int _flattenFactor = 10;
+        //public int FlattenFactor
+        //{
+        //    get => _flattenFactor;
+        //    set
+        //    {
+        //        if (SetProp(ref _flattenFactor, value))
+        //        {
+        //            if (value > 100)
+        //                EquatorFlatSigma = 100;
+        //        }
+        //    }
+        //}
 
         bool _flattenEquator;
         public bool FlattenEquator
@@ -349,14 +670,15 @@ namespace PlanetCreator
             get => _flattenEquator;
             set => SetProp(ref _flattenEquator, value);
         }
-        int _equatorFlatSigma = 200;
 
-        bool _addFreckles;
-        public bool AddFreckles
+
+        double _exponentialFlattenStrength = 1.4;
+        public double ExponentialFlattenStrength
         {
-            get => _addFreckles;
-            set => SetProp(ref _addFreckles, value);
+            get => _exponentialFlattenStrength;
+            set => SetProp(ref _exponentialFlattenStrength, value);
         }
+
         int _frecklesPerTile = 6;
         public int FrecklesPerTile
         {
@@ -369,19 +691,17 @@ namespace PlanetCreator
             get => _freckleRadius;
             set => SetProp(ref _freckleRadius, value);
         }
-
-
-        public int EquatorFlatSigma
+        int _freckleSegments = 6;
+        public int FreckleSegments
         {
-            get => _equatorFlatSigma;
-            set
-            {
-                if (SetProp(ref _equatorFlatSigma, value))
-                {
-                    if (value > 250)
-                        EquatorFlatSigma = 250;
-                }
-            }
+            get => _freckleSegments;
+            set => SetProp(ref _freckleSegments, value);
+        }
+        int _equatorFlatWidth = 10; // 5-50%
+        public int EquatorFlatWidth
+        {
+            get => _equatorFlatWidth;
+            set => SetProp(ref _equatorFlatWidth, value);
         }
 
         int _erosionIterations = 2500000;
@@ -476,7 +796,8 @@ namespace PlanetCreator
             set => SetProp(ref _brushPointiness, value);
         }
 
-        string _materialSource = "Enter Source Material PNG Folder here";//"G:\\Steam\\steamapps\\common\\SpaceEngineers\\Content\\Data\\PlanetDataFiles\\EarthLike";
+        //"G:\\Steam\\steamapps\\common\\SpaceEngineers\\Content\\Data\\PlanetDataFiles\\EarthLike";
+        string _materialSource = "Enter Source PNG Folder";
         public string MaterialSource
         {
             get => _materialSource;
@@ -490,149 +811,291 @@ namespace PlanetCreator
             set => SetProp(ref _lakeStampDepth, value);
         }
 
-        public ICommand GenerateCommand => new RelayCommand(async o =>
+        int _worleyCells = 55;
+        public int WorleyCells
         {
-            var faceValues = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToArray();
-            foreach (var face in faceValues)
-                DebugClearPixels(face);
+            get => _worleyCells;
+            set => SetProp(ref _worleyCells, value);
+        }
+        bool _invertWorley;
+        public bool InvertWorley
+        {
+            get => _invertWorley;
+            set => SetProp(ref _invertWorley, value);
+        }
 
-            TileUp = TileDown = TileRight = TileLeft = TileFront = TileBack = TileDown = null;
+        int _flattenLowsAmount = 100;
+        public int FlattenLowsAmount
+        {
+            get => _flattenLowsAmount;
+            set => SetProp(ref _flattenLowsAmount, value);
+        }
+
+        int _flattenPeaksAmount = 100;
+        public int FlattenPeaksAmount
+        {
+            get => _flattenPeaksAmount;
+            set => SetProp(ref _flattenPeaksAmount, value);
+        }
+
+        double _stretchHistogramMin = 0d;
+        public double StretchHistogramMin
+        {
+            get => _stretchHistogramMin;
+            set
+            {
+                if (SetProp(ref _stretchHistogramMin, value))
+                {
+                    if (StretchHistogramMax <= value)
+                        StretchHistogramMax = value + 0.1;
+                }
+            }
+        }
+
+        int _freckleSeed = 0;
+        public int FreckleSeed
+        {
+            get => _freckleSeed;
+            set => SetProp(ref _freckleSeed, value);
+        }
+
+        double _stretchHistogramMax = 1d;
+        public double StretchHistogramMax
+        {
+            get => _stretchHistogramMax;
+            set
+            {
+                if (SetProp(ref _stretchHistogramMax, value))
+                {
+                    if (StretchHistogramMin >= value)
+                        StretchHistogramMin = value - 0.1;
+                }
+            }
+        }
+
+        int _sedimentPlateCount = 768;
+        public int SedimentPlateCount
+        {
+            get => _sedimentPlateCount;
+            set => SetProp(ref _sedimentPlateCount, value);
+        }
+
+        int _sedimentTypes = 64;
+        public int SedimentTypes
+        {
+            get => _sedimentTypes;
+            set => SetProp(ref _sedimentTypes, value);
+        }
+
+        bool _useSedimentLayers = false;
+        public bool UseSedimentLayers
+        {
+            get => _useSedimentLayers;
+            set => SetProp(ref _useSedimentLayers, value);
+        }
+
+        PlanetGenerator GetGenerator()
+        {
             var generator = new PlanetGenerator();
             generator.DebugOverlay = this;
             generator.DebugMode = PreviewMode;
-            generator.ExtendedDebugMode = ExtendedPreview;
-            generator.Seed = Seed;
-            if (NoiseScale < 1 || NoiseScale > 65535) NoiseScale = 100;
-            generator.NoiseScale = NoiseScale;
+            generator.LimitedDebugMode = LimitedPreview;
+            if (NoiseScale < 1 || NoiseScale > 65535) NoiseScale = 150;
             if (Octaves < 1 || Octaves > 25) Octaves = 8;
-            generator.Octaves = Octaves;
-            generator.ApplySCurve = ApplySCurve;
-            if (FlattenFactor < 0) FlattenFactor = 0;
-            generator.FlattenFactor = FlattenFactor;
-            generator.FlattenEquator = FlattenEquator;
-            if (EquatorFlatSigma < 1) EquatorFlatSigma = 250;
-            generator.EquatorFlatSigma = EquatorFlatSigma;
-            generator.EnableErosion = EnableErosion;
             if (ErosionIterations < 1) { ErosionIterations = 1; }
-            generator.ErosionIterations = ErosionIterations;
             if (ErosionMaxDropletLifeTime < 1) { ErosionMaxDropletLifeTime = 1; }
-            generator.ErosionMaxDropletLifeTime = ErosionMaxDropletLifeTime;
             if (ErosionInteria < 0) ErosionInteria = 0;
-            generator.ErosionInteria = ErosionInteria;
             if (ErosionSedimentCapacityFactor < 0) ErosionSedimentCapacityFactor = 0;
-            generator.ErosionSedimentCapacityFactor = ErosionSedimentCapacityFactor;
             if (ErosionDepositSpeed < 0) ErosionDepositSpeed = 0;
             if (ErosionDepositSpeed > 1) ErosionDepositSpeed = 1;
-            generator.ErosionDepositSpeed = ErosionDepositSpeed;
             if (ErosionErodeSpeed < 0) ErosionErodeSpeed = 0;
             if (ErosionErodeSpeed > 1) ErosionErodeSpeed = 1;
-            generator.ErosionErodeSpeed = ErosionErodeSpeed;
             if (ErosionDepositBrush < 0) ErosionDepositBrush = 0;
-            generator.ErosionDepositBrush = ErosionDepositBrush;
             if (ErosionErodeBrush < 0) ErosionErodeBrush = 0;
             if (BrushPointiness < 0) BrushPointiness = 0;
             if (BrushPointiness > 1) BrushPointiness = 1;
-            generator.BrushPointiness = BrushPointiness;
-            generator.ErosionErodeBrush = ErosionErodeBrush;
             if (Gravity < 0) Gravity = 0;
-            generator.Gravity = Gravity;
             if (EvaporateSpeed < 0) EvaporateSpeed = 0;
             if (EvaporateSpeed > 1) EvaporateSpeed = 1;
-            generator.EvaporateSpeed = EvaporateSpeed;
-            generator.LakesPerTile = LakesPerTile;
             if (LakeStampDepth < 0) LakeStampDepth = 0;
-            generator.LakeStampDepth = LakeStampDepth;
-
-            generator.GenerateLakes = EnableLakeGeneration;
-            if (LakeVolumeMultiplier <= 0)
-            {
-                generator.GenerateLakes = false;
-            }
-            if (LakeVolumeMultiplier > 100000)
-            {
-                LakeVolumeMultiplier = 100000;
-            }
-            generator.LakeVolumeMultiplier = LakeVolumeMultiplier;
-
-            generator.AddWorleyFreckles = AddFreckles;
+            if (LakeVolumeMultiplier > 100000) LakeVolumeMultiplier = 100000;
             if (FreckleRadius > 200) FreckleRadius = 200;
             if (FreckleRadius < 10) FreckleRadius = 10;
-            generator.WorleyFreckleRadius = FreckleRadius;
             if (FrecklesPerTile > 32) FrecklesPerTile = 32;
-            if (FrecklesPerTile < 0) FrecklesPerTile = 0;
-            generator.WorleyFrecklesPerTile = FrecklesPerTile;
+            if (FrecklesPerTile < 1) FrecklesPerTile = 1;
+            generator.TileWidth = TileWidth;
+            generator.WorkingDirectory = WorkingDir;
+            generator.PreviewFace = PreviewTile;
 
-            Progress = 1;
-            generator.ProgressChanged += Generator_ProgressChanged;
+            generator.ProgressChanged += (s, a) => { Progress = a.Progress; };
+
+            return generator;
+        }
+
+        public ICommand SimplexNoiseFillMapCommand => new RelayCommand(o =>
+        {
             IsBusy = true;
-            try { _tcs?.Cancel(); } catch { }
-            var tcs = new CancellationTokenSource();
-            var token = tcs.Token;
-            _tcs = tcs;
-            try
+            Task.Run(() =>
             {
-                await Task.Run(() =>
+                foreach (var face in CubeMapFaces)
                 {
-                    generator.GeneratePlanet(token);
-                });
-            }
-            catch { } // TaskCancelledException
-            finally
-            {
-                IsBusy = false;
-                generator.ProgressChanged -= Generator_ProgressChanged;
-                _tcs.Dispose();
-            }
-            if (token.IsCancellationRequested) return;
-
-            LoadPictures();
-
-            if (MaterialSource != null)
-            {
-                if (Directory.Exists(MaterialSource))
-                {
-                    foreach (var face in faceValues)
-                    {
-                        try
-                        {
-                            if (token.IsCancellationRequested) return;
-                            var file = face.ToString().ToLower() + "_lakes.png";
-                            var remoteFile = face.ToString().ToLower() + "_mat.png";
-                            var remotePath = System.IO.Path.Combine(MaterialSource, remoteFile);
-                            if (File.Exists(remotePath) && File.Exists(file))
-                            {
-                                // TODO: dynamic is slow!
-                                dynamic localImg = Image.Load(file);
-                                dynamic remoteImg = Image.Load(remotePath);
-                                var image = new Image<Rgb24>(2048, 2048);
-                                if (remoteImg != null && localImg != null)
-                                {
-                                    Parallel.For(0, 2048, generator.POptions(token), x =>
-                                    {
-                                        for (int y = 0; y < 2048; ++y)
-                                        {
-                                            // Local image is lake only
-                                            var localImgVal = localImg[x, y];
-                                            var imgVal = remoteImg[x, y];
-                                            image[x, y] = new Rgb24((byte)localImgVal.R, (byte)imgVal.G, (byte)imgVal.B);
-                                        }
-                                    });
-                                    image.Save(face.ToString().ToLower() + "_mat.png");
-                                }
-                            }
-                        }
-                        catch { }
-                    }
+                    Application.Current.Dispatcher.Invoke(() =>
+                    { DebugClearPixels(face); });
                 }
-            }
+                try
+                {
+                    var gen = GetGenerator();
+                    gen.GenerateSimplexHeightMaps(Seed, Octaves, NoiseScale, _cts.Token);
+                    LoadPictures();
+                }
+                finally { IsBusy = false; }
+            });
 
-            Progress = 0;
-        }, o => !IsBusy);
-        CancellationTokenSource _tcs;
+        });
 
+        public ICommand WorleyNoiseFillMapCommand => new RelayCommand(o =>
+        {
+            IsBusy = true;
+            foreach (var face in CubeMapFaces)
+                DebugClearPixels(face);
+            Task.Run(() =>
+            {
+                try
+                {
+                    var gen = GetGenerator();
+                    gen.GenerateWorleyHeightMaps(Seed, WorleyCells, InvertWorley, _cts.Token);
+                    LoadPictures();
+                }
+                finally
+                { IsBusy = false; }
+            });
+        });
+
+        public ICommand WorleyAddFrecklesCommand => new RelayCommand(o =>
+        {
+            IsBusy = true;
+            Task.Run(() =>
+            {
+                try
+                {
+                    var gen = GetGenerator();
+                    gen.AddWorleyFreckles(FreckleSeed, FrecklesPerTile, WorleyCells, FreckleSegments, FreckleRadius, _cts.Token);
+                    LoadPictures();
+                }
+                finally
+                { IsBusy = false; }
+            });
+        });
+
+        public ICommand HistomgramFlattenCommand => new RelayCommand(o =>
+        {
+            IsBusy = true;
+            Task.Run(() =>
+            {
+                try
+                {
+                    var gen = GetGenerator();
+                    gen.FlattenHistogram(FlattenLowsAmount, FlattenPeaksAmount, _cts.Token);
+                    LoadPictures();
+                }
+                finally
+                { IsBusy = false; }
+            });
+        });
+
+        public ICommand EquatorFlattenCommand => new RelayCommand(o =>
+        {
+            IsBusy = true;
+            Task.Run(() =>
+            {
+                try
+                {
+                    var gen = GetGenerator();
+                    gen.ExponentialStretch(ExponentialFlattenStrength,
+                        FlattenEquator ? EquatorFlatWidth : -1, _cts.Token);
+                    LoadPictures();
+                }
+                finally
+                { IsBusy = false; }
+            });
+        });
+
+        public ICommand HistomgramStretchCommand => new RelayCommand(o =>
+        {
+            IsBusy = true;
+            Task.Run(() =>
+            {
+                try
+                {
+                    var gen = GetGenerator();
+                    gen.FlattenHistogram(FlattenLowsAmount, FlattenPeaksAmount, _cts.Token);
+                    LoadPictures();
+                }
+                finally
+                { IsBusy = false; }
+            });
+        });
+
+        public ICommand GenerateSedimentLayersCommand => new RelayCommand(o =>
+        {
+            IsBusy = true;
+            Task.Run(() =>
+            {
+                try
+                {
+                    var gen = GetGenerator();
+                    gen.GenerateSedimentLayers(Seed, SedimentTypes, _cts.Token);
+                }
+                finally
+                { IsBusy = false; }
+            });
+
+        });
+
+        public ICommand ErodeHydraulicCommand => new RelayCommand(o =>
+        {
+            var gen = GetGenerator();
+            IsBusy = true;
+            Task.Run(() =>
+            {
+
+                try
+                {
+                    gen.InitErosion(UseSedimentLayers, CancellationToken.None);
+                    Parallel.For(0, ErosionIterations, pit =>
+                    {
+                        gen.Erode(_cts.Token);
+                    });
+                    gen.FinishErode(_cts.Token);
+                }
+                catch { return; } // Cancelled
+                finally
+                { IsBusy = false; }
+            });
+        });
+
+        public ICommand AddLakesCommand => new RelayCommand(o =>
+        {
+            IsBusy = true;
+            Task.Run(() =>
+            {
+                try
+                {
+                    var gen = GetGenerator();
+                    gen.AddLakes(LakesPerTile, LakeVolumeMultiplier, LakeStampDepth, _cts.Token);
+                }
+                catch { }
+                finally
+                { IsBusy = false; }
+            });
+        });
+
+
+        bool IsCancellationRequested => _cts.IsCancellationRequested == true;
+        CancellationTokenSource _cts = new CancellationTokenSource();
         public ICommand AbortCommand => new RelayCommand(o =>
         {
-            try { _tcs?.Cancel(); } catch { }
+            try { _cts?.Cancel(); } catch { }
         }, o => IsBusy);
 
         private void Generator_ProgressChanged(object sender, ProgressEventArgs e)
@@ -640,34 +1103,16 @@ namespace PlanetCreator
             Progress = e.Progress;
         }
 
-        public void LoadPictures()
-        {
-            try { TileUp = GetImage("up.png"); } catch { }
-            try { TileDown = GetImage("down.png"); } catch { }
-            try { TileLeft = GetImage("left.png"); } catch { }
-            try { TileRight = GetImage("right.png"); } catch { }
-            try { TileFront = GetImage("front.png"); } catch { }
-            try { TileBack = GetImage("back.png"); } catch { }
-        }
-
-        string GetCurrentDir()
-        {
-            var loc = Assembly.GetExecutingAssembly().Location;
-            return System.IO.Path.GetDirectoryName(loc);
-        }
-        string GetLocalFileName(string filename)
-        {
-            return System.IO.Path.Combine(GetCurrentDir(), filename);
-        }
         BitmapImage GetImage(string filename)
         {
             try
             {
-                var imageBytes = System.IO.File.ReadAllBytes(GetLocalFileName(filename));
+                if (!File.Exists(filename))
+                    return null;
 
+                var imageBytes = System.IO.File.ReadAllBytes(filename);
                 var stream = new MemoryStream(imageBytes);
                 var img = new System.Windows.Media.Imaging.BitmapImage();
-
                 img.BeginInit();
                 img.StreamSource = stream;
                 img.EndInit();
@@ -731,9 +1176,9 @@ namespace PlanetCreator
                     var fileName = Path.Combine(folder, files[i]);
                     var face = faces[i];
                     var image = SixLabors.ImageSharp.Image.Load(fileName) as Image<L16>;
-                    double[,] imageData = new double[2048, 2048];
-                    for (int x = 0; x < 2048; ++x)
-                        for (int y = 0; y < 2048; ++y)
+                    double[,] imageData = new double[image.Width, image.Width];
+                    for (int x = 0; x < image.Width; ++x)
+                        for (int y = 0; y < image.Width; ++y)
                         {
                             imageData[x, y] = image[x, y].PackedValue / 65535.0;
                         }
@@ -750,8 +1195,6 @@ namespace PlanetCreator
             {
                 if (o is string s && s == "triplet")
                 {
-                    //EdgeFixer.MakeSeamless(images, CancellationToken.None, true);
-                    //EdgeFixer.MakeSeamless(images, CancellationToken.None, true);
                     EdgeFixer.MakeSeamless(images, CancellationToken.None, true, true);
                 }
                 else
@@ -769,10 +1212,11 @@ namespace PlanetCreator
                 {
                     var fileName = Path.Combine(folder, files[i]);
                     var face = faces[i];
-                    var image = new SixLabors.ImageSharp.Image<L16>(2048, 2048);
                     var imageData = images[face];
-                    for (int x = 0; x < 2048; ++x)
-                        for (int y = 0; y < 2048; ++y)
+                    var width = imageData.GetLength(0);
+                    var image = new SixLabors.ImageSharp.Image<L16>(width, width);
+                    for (int x = 0; x < width; ++x)
+                        for (int y = 0; y < width; ++y)
                         {
                             var val = imageData[x, y] * 65535;
                             if (val < 0) val = 0;
@@ -788,62 +1232,6 @@ namespace PlanetCreator
                 }
             }
             MessageBox.Show("Finished!");
-        });
-
-        public ICommand SetProfile1Command => new RelayCommand(o =>
-        {
-            Seed = 0;
-            NoiseScale = 200;
-            Octaves = 8;
-            FlattenFactor = 10;
-            FlattenEquator = true;
-            EquatorFlatSigma = 200;
-            ErosionIterations = 2500000;
-            ErosionMaxDropletLifeTime = 100;
-            ErosionInteria = 0.01;
-            ErosionSedimentCapacityFactor = 35;
-            ErosionDepositSpeed = 0.1;
-            ErosionErodeSpeed = .3;
-            ErosionDepositBrush = 2;
-            ErosionErodeBrush = 2;
-            BrushPointiness = 0.25;
-            EnableErosion = true;
-            Gravity = 10;
-            EvaporateSpeed = 0.01;
-            EnableLakeGeneration = true;
-            LakesPerTile = 40;
-            LakeVolumeMultiplier = 1;
-            AddFreckles = false;
-            FrecklesPerTile = 6;
-            FreckleRadius = 35;
-        });
-
-        public ICommand SetProfile2Command => new RelayCommand(o=>
-        {
-            Seed = 42;
-            NoiseScale = 150;
-            Octaves = 8;
-            FlattenFactor = 10;
-            FlattenEquator = true;
-            EquatorFlatSigma = 200;
-            ErosionIterations = 10000000;
-            ErosionMaxDropletLifeTime = 75;
-            ErosionInteria = 0.005;
-            ErosionSedimentCapacityFactor = 10;
-            ErosionErodeSpeed = .015;
-            ErosionDepositSpeed = 0.008;
-            ErosionDepositBrush = 3;
-            ErosionErodeBrush = 3;
-            BrushPointiness = 0.6;
-            EnableErosion = true;
-            Gravity = 10;
-            EvaporateSpeed = 0.025;
-            EnableLakeGeneration = true;
-            LakesPerTile = 40;
-            LakeVolumeMultiplier = 5;
-            AddFreckles = true;
-            FrecklesPerTile = 8;
-            FreckleRadius = 40;
         });
 
     }

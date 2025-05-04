@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
-namespace PlanetCreator
+namespace SpaceEngineersToolsShared
 {
     public class RelayCommand : ICommand
     {

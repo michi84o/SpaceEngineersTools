@@ -1,11 +1,14 @@
 ﻿using MathNet.Numerics.Random;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+using SpaceEngineersToolsShared;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -15,11 +18,13 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
+using System.Windows.Automation;
+using System.Windows.Documents;
 using System.Windows.Input.Manipulations;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Media3D;
-using static System.Net.Mime.MediaTypeNames;
+using System.Xaml.Schema;
 
 namespace PlanetCreator
 {
@@ -34,141 +39,23 @@ namespace PlanetCreator
 
     public class PlanetGenerator
     {
-        //public bool DrawDebug { get; set; }
-        bool _drawLakeLines = false;
-        bool _drawErosionLines = false;
-
-        const int _tileWidth = 2048;
-
         public event EventHandler<ProgressEventArgs> ProgressChanged;
-
-        public bool DebugMode
+        void OnProgress(int progress)
         {
-            get => _debug;
-            set => _debug = value;
-        }
-        public bool ExtendedDebugMode
-        {
-            get; set;
+            ProgressChanged?.Invoke(this, new ProgressEventArgs(progress));
         }
 
-        public PlanetGenerator()
-        {
-            Init();
-        }
-
-        /// <summary>
-        /// This function was added to fix an error in the Triton height map.
-        /// It allows to load an existing image into the generator.
-        /// The fix for Triton consists of changing the brightness for the glitched part in GIMP and then
-        /// smoothing it over with some erosion.
-        /// </summary>
-        /// <param name="face"></param>
-        /// <param name="folder"></param>
-        /// <returns></returns>
-        public bool LoadExistingHeightMap(CubeMapFace face, string folder)
-        {
-            if (!Directory.Exists(folder)) return false;
-            var file = Path.Combine(folder, (""+face).ToLower() + ".png");
-            if (!File.Exists(file)) return false;
-            try
-            {
-                var image = SixLabors.ImageSharp.Image.Load(file) as Image<L16>;
-                if (image == null) return false;
-
-                for (int x = 0; x < image.Height && x < _tileWidth; x++)
-                {
-                    for (int y = 0; y < image.Height && y < _tileWidth; y++)
-                    {
-                        _faces[face][x, y] = image[x, y].PackedValue * 1.0 / 65535.0;
-                    }
-                }
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Trace.WriteLine(ex.Message);
-                return false;
-            }
-        }
-
-        void Init()
-        {
-            _faces = new()
-            {
-                { CubeMapFace.Up, new double[_tileWidth, _tileWidth] },
-                { CubeMapFace.Down, new double[_tileWidth, _tileWidth] },
-                { CubeMapFace.Front, new double[_tileWidth, _tileWidth] },
-                { CubeMapFace.Right, new double[_tileWidth, _tileWidth] },
-                { CubeMapFace.Left, new double[_tileWidth, _tileWidth] },
-                { CubeMapFace.Back, new double[_tileWidth, _tileWidth] },
-            };
-            _lakes = new()
-            {
-                { CubeMapFace.Up, new byte[_tileWidth, _tileWidth] },
-                { CubeMapFace.Down, new byte[_tileWidth, _tileWidth] },
-                { CubeMapFace.Front, new byte[_tileWidth, _tileWidth] },
-                { CubeMapFace.Right, new byte[_tileWidth, _tileWidth] },
-                { CubeMapFace.Left, new byte[_tileWidth, _tileWidth] },
-                { CubeMapFace.Back, new byte[_tileWidth, _tileWidth] },
-            };
-            //_quadrants = new()
-            //{
-            //    { CubeMapFace.Up, new List<object> { new object(), new object(), new object(), new object(), } },
-            //    { CubeMapFace.Down, new List<object> { new object(), new object(), new object(), new object(), } },
-            //    { CubeMapFace.Front, new List<object> { new object(), new object(), new object(), new object(), } },
-            //    { CubeMapFace.Right, new List<object> { new object(), new object(), new object(), new object(), } },
-            //    { CubeMapFace.Left, new List<object> { new object(), new object(), new object(), new object(), } },
-            //    { CubeMapFace.Back, new List<object> { new object(), new object(), new object(), new object(), } }
-            //};
-        }
+        public int TileWidth { get; set; } = 2048;
+        public bool DebugMode { get; set; }
+        public bool LimitedDebugMode { get; set; }
+        public CubeMapFace PreviewFace { get; set; } = CubeMapFace.Back;
+        public string WorkingDirectory { get; set; }
 
         /* Cube Map: Folds into a cube
         [UP]
         [FRONT][RIGHT][BACK][LEFT]
                       [DOWN]
         */
-
-        Dictionary<CubeMapFace, double[,]> _faces;
-        public Dictionary<CubeMapFace, double[,]> Faces
-        {
-            get => _faces;
-            set => _faces = value;
-        }
-
-        Dictionary<CubeMapFace, byte[,]> _lakes;
-        //Dictionary<CubeMapFace, List<object>> _quadrants; // Use for multitasking water fill
-        double _lakeDepth = 30.0 / 65535;
-
-        double[,] _debugTileR = new double[2048, 2048]; // Display lake
-        double[,] _debugTileG = new double[2048, 2048]; // Display erosion
-        double[,] _debugTileB = new double[2048, 2048]; // Display deposit
-        bool _debug = false;
-
-        CubeMapFace _debugFace = CubeMapFace.Back;
-
-        public int Seed { get; set; } = 0;
-        public int NoiseScale { get; set; } = 100;
-        public int Octaves { get; set; } = 4;
-
-        public bool ApplySCurve { get; set; } = false;
-
-        public bool AddWorleyFreckles { get; set; }
-        public int WorleyFrecklesPerTile { get; set; } = 6;
-        public int WorleyFreckleRadius { get; set; } = 35;
-
-        public int ErosionIterations { get; set; } = 1000000;
-
-        public int FlattenFactor { get; set; } = 10;
-        public bool FlattenEquator { get; set; }
-        public int EquatorFlatSigma { get; set; }
-
-        public double BrushPointiness { get; set; } = 0.25;
-
-        void UpdateProgress(int progress)
-        {
-            ProgressChanged?.Invoke(this, new ProgressEventArgs(progress));
-        }
 
         public ParallelOptions POptions(CancellationToken token)
         {
@@ -177,31 +64,118 @@ namespace PlanetCreator
             return new ParallelOptions { MaxDegreeOfParallelism = processors * 2, CancellationToken = token };
         }
 
-
-        public void GeneratePlanet(CancellationToken token)
+        void GetPixelRange(out int cStart, out int cEnd)
         {
+            cStart = 0;
+            cEnd = TileWidth;
+            if (LimitedDebugMode)
+            {
+                cStart = TileWidth / 4;
+                cEnd = cStart * 2;
+            }
+        }
+
+        Dictionary<CubeMapFace, double[,]> GetFaces()
+        {
+            Dictionary<CubeMapFace, double[,]> faces;
+
+            if (DebugMode)
+            {
+                faces = new() { { PreviewFace, new double[TileWidth, TileWidth] } };
+            }
+            else faces = new()
+            {
+                { CubeMapFace.Up, new double[TileWidth, TileWidth] },
+                { CubeMapFace.Down, new double[TileWidth, TileWidth] },
+                { CubeMapFace.Front, new double[TileWidth, TileWidth] },
+                { CubeMapFace.Right, new double[TileWidth, TileWidth] },
+                { CubeMapFace.Left, new double[TileWidth, TileWidth] },
+                { CubeMapFace.Back, new double[TileWidth, TileWidth] },
+            };
+
+            return faces;
+        }
+
+        void SaveFaces(Dictionary<CubeMapFace, double[,]> faces, CancellationToken token)
+        {
+            GetPixelRange(out var cStart, out var cEnd);
+            // Save output
+            foreach (var kv in faces)
+            {
+                var image = new Image<L16>(TileWidth, TileWidth);
+                Parallel.For(cStart, cEnd, x =>
+                {
+                    Parallel.For(cStart, cEnd, y =>
+                    {
+                        ushort value = (ushort)(kv.Value[x, y] * 65535);
+                        image[x, y] = new L16(value);
+                    });
+                });
+                try
+                {
+                    image.SaveAsPng(Path.Combine(WorkingDirectory, (kv.Key + ".png").ToLower()));
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        Dictionary<CubeMapFace, double[,]> LoadHeightMaps(CancellationToken token)
+        {
+            var faces = GetFaces();
+            Parallel.ForEach(faces, kv =>
+            {
+                var sourceFile = Path.Combine(WorkingDirectory, (kv.Key + ".png")).ToLower();
+                if (File.Exists(sourceFile))
+                {
+                    try
+                    {
+                        var img = Image.Load(sourceFile) as Image<L16>;
+                        if (img != null)
+                        {
+                            Parallel.For(0, TileWidth, x =>
+                            {
+                                for (int y = 0; y < TileWidth; ++y)
+                                {
+                                    kv.Value[x, y] = img[x, y].PackedValue / 65535d;
+                                };
+                            });
+                        }
+                    }
+                    catch { }
+                }
+            });
+            return faces;
+        }
+
+        public void GenerateSimplexHeightMaps(int seed, int octaves, int noiseScale, CancellationToken token)
+        {
+            var faces = GetFaces();
+            GetPixelRange(out var cStart, out var cEnd);
+
             // Layers of diferent noise frequencies
             List<NoiseMaker> list = new();
             var octave = 1;
-            for (int i = 0; i < Octaves; ++i)
+            for (int i = 0; i < octaves; ++i)
             {
-                list.Add(new(Seed + 0, 1.0 * octave / NoiseScale, 1.0 / (octave)));
+                list.Add(new(seed + 0, 1.0 * octave / noiseScale, 1.0 / (octave)));
                 octave *= 2;
             }
             double sphereRadius = 1000;
 
-            //var worleyNoise = new SphericalWorleyNoise(0, sphereRadius, 25);
-
             // Apply noise
-            foreach (var kv in _faces)
+            int progress = 0;
+            foreach (var kv in faces)
             {
+                ++progress;
                 if (token.IsCancellationRequested) return;
                 var face = kv.Key;
                 var tile = kv.Value;
-                if (_debug && face != _debugFace) continue;
-                Parallel.For(0, _tileWidth, POptions(token), x =>
+                Parallel.For(cStart, cEnd, POptions(token), x =>
                 {
-                    for (int y = 0; y < _tileWidth; ++y)
+                    for (int y = cStart; y < cEnd; ++y)
                     {
                         var point = GetNormalizedSphereCoordinates(face, x, y);
                         double value = 0;
@@ -209,438 +183,372 @@ namespace PlanetCreator
                         {
                             value += nm.GetValue3D(point.X * sphereRadius, point.Y * sphereRadius, point.Z * sphereRadius);
                         }
-                        //value = worleyNoise.GetValue3D(point.X, point.Y, point.Z);
                         tile[x, y] = value;
                     }
                 });
+                OnProgress((int)(progress*90.0/faces.Count));
+            }
+            Normalize(faces.Values.ToList(), token);
+            if (!DebugMode)
+                EdgeFixer.MakeSeamless(faces, token);
+            OnProgress(95);
+            Normalize(faces.Values.ToList(), token);
+            OnProgress(99);
+            SaveFaces(faces, token);
+            OnProgress(100);
+        }
+
+        public void GenerateWorleyHeightMaps(int seed, int cells, bool invert, CancellationToken token)
+        {
+            var faces = GetFaces();
+
+            double sphereRadius = 1000;
+            SphericalWorleyNoise noise = new(seed, sphereRadius, cells);
+
+            int cStart = 0;
+            int cEnd = TileWidth;
+            if (LimitedDebugMode)
+            {
+                cStart = TileWidth/4;
+                cEnd = cStart*2;
             }
 
-            double maxHeight = 1;
-            // Add patches of worley noise
-            if (AddWorleyFreckles && WorleyFrecklesPerTile > 0)
+            // Apply noise
+            int progress = 0;
+            foreach (var kv in faces)
             {
-                // Normalize noise
-                if (!_debug)
-                    Normalize(_faces.Values.ToList(), token, maxHeight);
-                else
-                    Normalize(new List<double[,]> { _faces[_debugFace] }, token, maxHeight);
-
-                int worleyNumCells = 55;
-                double worleyBlendStart = 0.5;
-                double worleyLayerMaxHeight = .12; // .1 to flat, .15 too high
-                int worleyMaxAreaSegments = 7;
-                var worley = new SphericalWorleyNoise(Seed, sphereRadius, worleyNumCells);
-                var rnd = new Random(Seed);
-
-                // Only equator regions
-                List<CubeMapFace> faces = new List<CubeMapFace> { CubeMapFace.Back, CubeMapFace.Front, CubeMapFace.Right, CubeMapFace.Left };
-                if (_debug) faces = new List<CubeMapFace> { _debugFace };
-                Parallel.ForEach(faces, face =>
-                {
-                    var faceValues = _faces[face];
-                    var image = new Image<Rgb24>(_tileWidth, _tileWidth);
-
-                    // Pick 5 random points per cubemap
-                    for (int i = 0; i < WorleyFrecklesPerTile; ++i)
-                    {
-                        double worleyMin = double.NaN;
-                        double worleyMax = double.NaN;
-                        var worleySubLayer = new double[_tileWidth, _tileWidth];
-                        var worleyBlendLayer = new double[_tileWidth, _tileWidth];
-
-                        List<int[]> patchPoints = new List<int[]>();
-                        // Get Start points. Put them in the middle so we don't have to deal with edge cases
-                        var x = (int)(rnd.NextInt64((int)(_tileWidth * .8)) + _tileWidth * .1);
-                        var y = (int)(rnd.NextInt64((int)(_tileWidth * .8)) + _tileWidth * .1);
-                        patchPoints.Add(new int[] { x, y });
-                        // Extend area from start point
-                        int numSteps = (int)rnd.NextInt64(1, worleyMaxAreaSegments);
-                        for (int j = 0; j < numSteps; ++j)
-                        {
-                            var dx = (int)rnd.NextInt64(WorleyFreckleRadius * 2) - WorleyFreckleRadius;
-                            var dy = (int)rnd.NextInt64(WorleyFreckleRadius * 2) - WorleyFreckleRadius;
-                            patchPoints.Add(new int[]
-                            {
-                                patchPoints[patchPoints.Count - 1][0] + dx,
-                                patchPoints[patchPoints.Count - 1][1] + dy
-                            });
-                        }
-                        // Draw worley patches
-                        // -------------------
-                        double maxDistance = (WorleyFreckleRadius + 1); // Outside the radius
-                                                                        // We compare without calculating the square root, so calculate the square
-                        maxDistance *= maxDistance;
-                        // We have x and y parts, so we need to of these.
-                        maxDistance *= 2;
-
-                        // For each patch point...
-                        foreach (var patchPoint in patchPoints)
-                        {
-                            // ... get the surrounding points within the radius (using square for simplicity).
-                            for (x = patchPoint[0] - WorleyFreckleRadius; x < patchPoint[0] + WorleyFreckleRadius; ++x)
-                            {
-                                for (y = patchPoint[1] - WorleyFreckleRadius; y < patchPoint[1] + WorleyFreckleRadius; ++y)
-                                {
-                                    // For each surrounding pount,
-                                    // get the minimum distance to any of the patch points.
-
-                                    // Skip if already calculated
-                                    if (x > 2047 || y > 2047 || x < 0 || y < 0 || worleySubLayer[x, y] > 0) continue;
-
-                                    var minDistance = maxDistance;
-
-                                    foreach (var patchPoint2 in patchPoints)
-                                    {
-                                        // Calculate the squared distance of (x,y) to each patch point
-                                        var dx = x - patchPoint2[0];
-                                        dx *= dx;
-                                        var dy = y - patchPoint2[1];
-                                        dy *= dy;
-                                        minDistance = Math.Min(minDistance, dx + dy);
-                                    }
-
-                                    var distance = Math.Sqrt(minDistance);
-                                    if (distance >= WorleyFreckleRadius) continue;
-
-                                    var pt = GetNormalizedSphereCoordinates(face, x, y);
-                                    var value = worley.GetValue3D(pt.X, pt.Y, pt.Z); //rnd.NextDouble()*.5; //
-
-                                    if (double.IsNaN(worleyMax) || worleyMax < value)
-                                        worleyMax = value;
-                                    if (double.IsNaN(worleyMin) || worleyMin > value)
-                                        worleyMin = value;
-
-                                    if (distance > (WorleyFreckleRadius * worleyBlendStart))
-                                    {
-                                        // Apply linear blend at the edge of the area
-                                        worleyBlendLayer[x, y] = 1 - (
-                                            (distance - WorleyFreckleRadius * worleyBlendStart) /
-                                            (WorleyFreckleRadius - WorleyFreckleRadius * worleyBlendStart));
-                                    }
-                                    else worleyBlendLayer[x, y] = 1;
-                                    worleySubLayer[x, y] = value;
-                                }
-                            }
-                        }
-                        // Invert and normalize the worley pattern
-                        var offset = -1 * worleyMin;
-                        var stretch = Math.Abs(worleyMax - worleyMin);
-                        for (x = 0; x < _tileWidth; ++x)
-                        {
-                            for (y = 0; y < _tileWidth; ++y)
-                            {
-                                var value = worleySubLayer[x, y];
-                                if (value == 0) continue;
-                                // Normalize
-                                value += offset;
-                                value /= stretch;
-                                // Invert
-                                value = 1 - value; // TODO: Randomly decide if a formation gets inverted?
-                                // Flatten peaks
-                                // Limits values from 0.0 to 0.52
-                                value = -2.56410256 * value * value * value * value + 4.03651904 * value * value * value - 1.05011655 * value * value + 0.10637141 * value;
-                                // Limit and blend
-                                worleySubLayer[x, y] = value * worleyLayerMaxHeight * worleyBlendLayer[x, y];
-                            }
-                        }
-                        Parallel.For(0, _tileWidth, POptions(token), x =>
-                        {
-                            for (int y = 0; y < _tileWidth; ++y)
-                            {
-                                faceValues[x, y] += worleySubLayer[x, y];
-                                if (worleySubLayer[x, y] > 0)
-                                    image[x, y] = new Rgb24(76, 0, 0);
-                            }
-                        });
-                    }
-                    // Save worley areas in file so modder can define them as their own climate zone
-                    image.SaveAsPng(face.ToString() + "_worley.png");
-                    image.Dispose();
-                });
-
-            }
-
-            // Normalize noise
-            if (!_debug)
-                Normalize(_faces.Values.ToList(), token, maxHeight);
-            else
-                Normalize(new List<double[,]> { _faces[_debugFace] }, token, maxHeight);
-
-            // Fix glitches at border of cubemaps
-            EdgeFixer.MakeSeamless(_faces, token);
-
-            if (token.IsCancellationRequested) return;
-            if (_debug)
-            {
-                Parallel.For(0, _tileWidth, POptions(token), x =>
-                {
-                    for (int y = 0; y < _tileWidth; ++y)
-                    {
-                        _debugTileR[x, y] = 0;
-                        _debugTileG[x, y] = 0;
-                        _debugTileB[x, y] = 0;
-                    };
-                });
-            }
-
-            if (token.IsCancellationRequested) return;
-            // Normalize noise to 0....1
-            if (!_debug)
-                Normalize(_faces.Values.ToList(), token);
-            else
-                Normalize(new List<double[,]> { _faces[_debugFace] }, token);
-
-            // TODO: Tweak these:
-            // Apply an S-Curve for flatter plains and mountain tops
-            foreach (var kv in _faces)
-            {
+                ++progress;
                 if (token.IsCancellationRequested) return;
                 var face = kv.Key;
                 var tile = kv.Value;
-                if (_debug && face != _debugFace) continue;
-                Parallel.For(0, _tileWidth, POptions(token), x =>
+                Parallel.For(cStart, cEnd, POptions(token), x =>
                 {
-                    for (int y = 0; y < _tileWidth; ++y)
-                    {
-                        double value = tile[x, y];
-                        // This applies an S-Curve to to the histogram.
-                        // Low values are pressed down, high values are pressed up.
-                        // This results in flatter plains and mountain tops.
-                        var valueBackup = value;
-                        if (FlattenFactor > 0)
-                        {
-                            value = 0.5 * Math.Sin(Math.PI * (value - 0.5)) + 0.5;
-                            value = (value*FlattenFactor/10.0+valueBackup)/(1+FlattenFactor/10.0);
-                        }
-                        // Flatten factor can be reduced to reduce the sinus function.
-
-
-                        // Use this line to modify further:
-                        // Values > 1: Squish low values further down: More flat plains
-                        // Values < 1: Bump all values up (don't do this!)
-                        var stretch = 1.1;
-                        if (FlattenEquator)
-                        {
-                            // For more variety we apply it dependend on the y value
-                            if (kv.Key != CubeMapFace.Up && kv.Key != CubeMapFace.Down)
-                            {
-                                // Let's generate a Gauss curve that peaks at 2.5 around the equator
-                                // and goes back to 1.1 to allign with pole tiles.
-                                var sigma = EquatorFlatSigma; // Don't use larger values than 250! Smaller values will squeeze curve to equator
-                                stretch = 1.4 * Math.Exp(-0.5 * Math.Pow((y - 1023.5) / sigma, 2)) + 1.1;
-                            }
-                        }
-                        value = Math.Pow(value, stretch);
-                        if (value < 0) value = 0;
-                        if (value > 1) value = 1;
-                        tile[x, y] = value;
-                    };
-                });
-            }
-
-            ProgressChanged?.Invoke(this, new ProgressEventArgs(5));
-
-            // Apply erosion
-            // Place a water droplet on each pixel. Let droplet move 'down' (determined by gradient).
-            // When droplet moves, it will take 1/65535 of height with it. When it reaches the lowest point, add 1/65536 to terrain height.
-            if (EnableErosion)
-            {
-                int iterations = ErosionIterations;
-                if (_debug)
-                {
-                    // 1 instead of 6 faces -> 1/6
-                    // 1/16 of area of normal face
-                    iterations /= (6 * (ExtendedDebugMode ? 1 : 16));
-                    if (iterations == 0) iterations = 1;
-                }
-                var rnd = new Random(Seed);
-                int progress = 0;
-                Task.Run(async () =>
-                {
-                    while (progress < iterations - 1)
+                    for (int y = cStart; y < cEnd; ++y)
                     {
                         if (token.IsCancellationRequested) return;
-                        await Task.Delay(1000);
-                        UpdateProgress((int)(5 + progress * 45.0 / iterations));
+                        var point = GetNormalizedSphereCoordinates(face, x, y);
+                        double value = noise.GetValue3D(point.X * sphereRadius, point.Y * sphereRadius, point.Z * sphereRadius);
+                        tile[x, y] = value;
                     }
                 });
-                if (token.IsCancellationRequested) return;
-                if (_rockLayersEnabled)
-                    GenerateRockLayers(Seed, token);
-                try
+                OnProgress((int)(progress * 90.0 / faces.Count));
+            }
+            Normalize(faces.Values.ToList(), token, invert:invert);
+            if (!DebugMode)
+                EdgeFixer.MakeSeamless(faces, token);
+            Normalize(faces.Values.ToList(), token);
+            OnProgress(99);
+            SaveFaces(faces, token);
+            OnProgress(100);
+        }
+
+        public void AddWorleyFreckles(int seed, int frecklesPerTile, int cells, int segmentCount, int segmentRadius, CancellationToken token)
+        {
+            if (frecklesPerTile == 0) return;
+            var faces = LoadHeightMaps(token);
+
+            double worleyBlendStart = 0.5;
+            double worleyLayerMaxHeight = .12; // .1 to flat, .15 too high
+
+            var rnd = new Random(seed);
+            int sphereRadius = 1000;
+            var worley = new SphericalWorleyNoise(seed, sphereRadius, cells);
+            Parallel.ForEach(faces, face =>
+            {
+                var worleyFreckleFile = Path.Combine(
+                    WorkingDirectory,
+                    (face.Key + "_worley.png").ToLower());
+                Image<Rgb24> image = null;
+                if (File.Exists(worleyFreckleFile))
+                    image = Image.Load(worleyFreckleFile) as Image<Rgb24>;
+                if (image == null)
+                    image = new Image<Rgb24>(TileWidth, TileWidth);
+                else if (image.Width != TileWidth)
                 {
-                    Parallel.For(0, iterations, POptions(token), pit =>
+                    image.Mutate(k => k.Resize(TileWidth, TileWidth, KnownResamplers.NearestNeighbor));
+                }
+                for (int i = 0; i < frecklesPerTile; ++i)
+                {
+                    double worleyMin = double.NaN;
+                    double worleyMax = double.NaN;
+                    var worleySubLayer = new double[TileWidth, TileWidth];
+                    var worleyBlendLayer = new double[TileWidth, TileWidth];
+                    List<int[]> patchPoints = new List<int[]>();
+                    // Get Start points. Put them in the middle so we don't have to deal with edge cases
+                    var x = (int)(rnd.NextInt64((int)(TileWidth * .8)) + TileWidth * .1);
+                    var y = (int)(rnd.NextInt64((int)(TileWidth * .8)) + TileWidth * .1);
+                    patchPoints.Add(new int[] { x, y });
+                    // Extend area from start point
+                    int numSteps = (int)rnd.NextInt64(1, segmentCount);
+                    for (int j = 0; j < numSteps; ++j)
                     {
-                        Erode(rnd, token);
-                        Interlocked.Increment(ref progress);
+                        var dx = (int)rnd.NextInt64(segmentRadius * 2) - segmentRadius;
+                        var dy = (int)rnd.NextInt64(segmentRadius * 2) - segmentRadius;
+                        patchPoints.Add(new int[]
+                        {
+                                patchPoints[patchPoints.Count - 1][0] + dx,
+                                patchPoints[patchPoints.Count - 1][1] + dy
+                        });
+                    }
+                    // Draw worley patches
+                    // -------------------
+                    double maxDistance = (segmentRadius + 1); // Outside the radius
+                    // We compare without calculating the square root, so calculate the square
+                    maxDistance *= maxDistance;
+                    // We have x and y parts, so we need to of these.
+                    maxDistance *= 2;
+
+                    // For each patch point...
+                    foreach (var patchPoint in patchPoints)
+                    {
+                        // ... get the surrounding points within the radius (using square for simplicity).
+                        for (x = patchPoint[0] - segmentRadius; x < patchPoint[0] + segmentRadius; ++x)
+                        {
+                            for (y = patchPoint[1] - segmentRadius; y < patchPoint[1] + segmentRadius; ++y)
+                            {
+                                // For each surrounding pount,
+                                // get the minimum distance to any of the patch points.
+
+                                // Skip if already calculated
+                                if (x > (TileWidth-1) || y > (TileWidth - 1) || x < 0 || y < 0 || worleySubLayer[x, y] > 0) continue;
+
+                                var minDistance = maxDistance;
+
+                                foreach (var patchPoint2 in patchPoints)
+                                {
+                                    // Calculate the squared distance of (x,y) to each patch point
+                                    var dx = x - patchPoint2[0];
+                                    dx *= dx;
+                                    var dy = y - patchPoint2[1];
+                                    dy *= dy;
+                                    minDistance = Math.Min(minDistance, dx + dy);
+                                }
+
+                                var distance = Math.Sqrt(minDistance);
+                                if (distance >= segmentRadius) continue;
+
+                                var pt = GetNormalizedSphereCoordinates(face.Key, x, y);
+                                var value = worley.GetValue3D(pt.X*sphereRadius, pt.Y*sphereRadius, pt.Z*sphereRadius);
+
+                                if (double.IsNaN(worleyMax) || worleyMax < value)
+                                    worleyMax = value;
+                                if (double.IsNaN(worleyMin) || worleyMin > value)
+                                    worleyMin = value;
+                                if (distance > (segmentRadius * worleyBlendStart))
+                                {
+                                    // Apply linear blend at the edge of the area
+                                    worleyBlendLayer[x, y] = 1 - (
+                                        (distance - segmentRadius * worleyBlendStart) /
+                                        (segmentRadius - segmentRadius * worleyBlendStart));
+                                }
+                                else worleyBlendLayer[x, y] = 1;
+                                worleySubLayer[x, y] = value;
+                            }
+                        }
+                    }
+                    // Invert and normalize the worley pattern
+                    var offset = -1 * worleyMin;
+                    var stretch = Math.Abs(worleyMax - worleyMin);
+                    for (x = 0; x < TileWidth; ++x)
+                    {
+                        for (y = 0; y < TileWidth; ++y)
+                        {
+                            var value = worleySubLayer[x, y];
+                            if (value == 0) continue;
+                            // Normalize
+                            value += offset;
+                            value /= stretch;
+                            // Invert
+                            value = 1 - value; // TODO: Randomly decide if a formation gets inverted?
+                                               // Flatten peaks
+                                               // Limits values from 0.0 to 0.52
+                            value = -2.56410256 * value * value * value * value + 4.03651904 * value * value * value - 1.05011655 * value * value + 0.10637141 * value;
+                            // Limit and blend
+                            worleySubLayer[x, y] = value * worleyLayerMaxHeight * worleyBlendLayer[x, y];
+                        }
+                    }
+                    Parallel.For(0, TileWidth, POptions(token), x =>
+                    {
+                        for (int y = 0; y < TileWidth; ++y)
+                        {
+                            face.Value[x, y] += worleySubLayer[x, y];
+                            if (worleySubLayer[x, y] > 0)
+                                image[x, y] = new Rgb24(76, 0, 0);
+                        }
                     });
                 }
-                catch { return; } // Cancelled
+                // Save worley areas in file so modder can define them as their own climate zone
+                image.SaveAsPng(worleyFreckleFile);
+                image.Dispose();
+            });
+            Normalize(faces.Values.ToList(), token);
+            SaveFaces(faces, token);
+        }
 
-            }
-
-            UpdateProgress(50);
-
-            // Normalize values
-            maxHeight = 0.85;
-            if (!_debug)
-                Normalize(_faces.Values.ToList(), token, maxHeight);
-            else
-                Normalize(new List<double[,]> { _faces[_debugFace] }, token, maxHeight);
-
-            if (GenerateLakes)
+        public void FlattenHistogram(int minStretch, int maxStretch, CancellationToken token)
+        {
+            // Strech using a SINUS curve.
+            var faces = LoadHeightMaps(token);
+            Parallel.ForEach(faces, face =>
             {
-                MakeLakes(token);
-            }
-
-            // Fix glitches at border of cubemaps, again since erosion does not care about duplicate edge pixels
-            EdgeFixer.MakeSeamless(_faces, token);
-
-            DebugOverlay.DebugDrawCollectedPixels();
-
-            ProgressChanged?.Invoke(this, new ProgressEventArgs(95));
-
-            // WIP, TODO
-            // Planet features:
-            // A: Mountains around 45°
-            // B: Flat poles
-            // - Weighten noise based on location
-            // - Apply some erosion to generate canyons (rain by using gradients + east-west wind)
-            if (!_debug)
-            {
-                // Create pictures
-                foreach (var kv in _faces)
+                Parallel.For(0, TileWidth, x =>
                 {
-                    if (token.IsCancellationRequested) return;
-                    var face = kv.Key;
-                    var tile = kv.Value;
-                    TileToImage(tile, face);
-
-                    if (GenerateLakes)
-                        WriteMaterialMap(_lakes[face], face);
-                }
-            }
-            else
-            {
-                if (token.IsCancellationRequested) return;
-                if (GenerateLakes)
-                    WriteMaterialMap(_lakes[_debugFace], _debugFace);
-                TileToImage(_faces[_debugFace], _debugFace);
-                var image = new Image<Rgb48>(_tileWidth, _tileWidth);
-                Normalize(new List<double[,]> { _debugTileR }, token);
-                Normalize(new List<double[,]> { _debugTileG }, token);
-                Normalize(new List<double[,]> { _debugTileB }, token);
-                Parallel.For(0, _tileWidth, POptions(token), x =>
-                {
-                    for (int y = 0; y < _tileWidth; ++y)
+                    for (int y = 0; y< TileWidth; ++y)
                     {
-                        image[x, y] = new Rgb48((ushort)(_debugTileR[x, y] * 65535*0.2), (ushort)(_debugTileG[x, y] * 65535*0.6), (ushort)(_debugTileB[x, y] * 65535));
+                        var val = face.Value[x, y];
+                        // +-0.2 aligns the Sinus so that the gradient is 1 at value 0.5.
+                        var valStretched = (1 - .2 * 2) * 0.5 * Math.Sin(Math.PI * (val - 0.5)) + 0.5;
+                        // Apply the percentage
+                        // 100% means that 0s are shifted tp 0.2 and 1s are lowered to .8.
+                        // The value range will be sequeezed to 0.2 <-> 0.8
+                        // Lower percentage shifts the values more towards their original.
+
+                        // We have the original value "v".
+                        // We have the stretched valie "s".
+                        // We define a factor "f", so that our target value "t" equals:
+                        // t = (v+s*f)/(1+f)
+                        // If f==1 we get the average between original and stretched.
+                        // f==1 would be percentage p=50%.
+                        // Problem: Our intput is not "f" but the percentage "p".
+                        // This required a complicated Excel spreadsheet with multiple segments:
+                        // It looks like some exponential function at lower percentages but flattens out hard at higher percentages
+                        Func<double, double> getFactor = (p) =>
+                        {
+                            if (p >= 50)
+                            {
+                                return 5.38458104E-08 * p * p * p * p - 1.98322019E-05 * p * p * p + 2.87748371E-03 * p * p - 2.05511035E-01 * p + 6.22399659E+00;
+                            }
+                            else if (p >= 16.66667)
+                            {
+                                return 4.40567976E-06 * p * p * p * p - 7.01736952E-04 * p * p * p + 4.31525352E-02 * p * p - 1.27854469E+00 * p + 1.72278030E+01;
+                            }
+                            else if (p >= 1)
+                            {
+                                return 1.01896976E+02 * Math.Pow(p, -1.06095389E+00);
+                            }
+                            return 100;
+                        };
+                        if (val < .5)
+                        {
+                            if (minStretch == 100)
+                                val = valStretched;
+                            else
+                                val = (val + valStretched) / (1 + getFactor(minStretch));
+                        }
+                        else
+                        {
+                            if (minStretch == 100)
+                                val = valStretched;
+                            else
+                                val = (val + valStretched) / (1 + getFactor(maxStretch));
+                        }
+                        face.Value[x, y] = val;
                     }
                 });
-                image.SaveAsPng("debug.png");
-            }
-
-            ProgressChanged?.Invoke(this, new ProgressEventArgs(100));
+            });
+            SaveFaces(faces, token);
         }
 
-        public bool EnableErosion { get; set; } = true;
-
-        int _erosionMaxDropletLifeTime = 100;
-        public int ErosionMaxDropletLifeTime
+        public void ExponentialStretch(double stretchAmount, int equatorWidthPercentage, CancellationToken token)
         {
-            get => _erosionMaxDropletLifeTime;
-            set
+            var faces = LoadHeightMaps(token);
+            Parallel.ForEach(faces, face =>
             {
-                _erosionMaxDropletLifeTime = value;
-                UpdateEvaporatePart();
-            }
+                Parallel.For(0, TileWidth, x =>
+                {
+                    for (int y = 0; y < TileWidth; ++y)
+                    {
+                        var val = face.Value[x, y];
+
+                        double stretch;
+                        double equatorWidth = TileWidth * equatorWidthPercentage / 100d;
+                        if (equatorWidthPercentage > 1)
+                        {
+                            // Let's generate a Gauss curve that peaks at 2.5 around the equator
+                            // and goes back to around 1.0 to allign with pole tiles.
+                            double yd = y;
+                            if (face.Key == CubeMapFace.Up || face.Key == CubeMapFace.Down)
+                            {
+                                yd = 0; // Apply same value as on equator tile edges for seamless transition.
+                            }
+                            stretch = stretchAmount * Math.Exp(-0.5 * Math.Pow((yd - (TileWidth - 1) / 2) / equatorWidth, 2)) + 1;
+                        }
+                        else
+                        {
+                            // All that complicated stuff inside Math.Exp() above becomes 1 when we are at the equator
+                            stretch = stretchAmount + 1;
+                        }
+                        val = Math.Pow(val, stretch);
+                        if (val < 0) val = 0;
+                        if (val > 1) val = 1;
+                        face.Value[x, y] = val;
+                    }
+                });
+            });
+            SaveFaces(faces, token);
         }
 
-        public double ErosionInteria { get; set; } = 0.01;
-        public double ErosionSedimentCapacityFactor { get; set; } = 35;
-        public double ErosionDepositSpeed { get; set; } = 0.1;
-        public double ErosionErodeSpeed { get; set; } = 0.3;
-        public double ErosionDepositBrush { get; set; } = 3;
-        public double ErosionErodeBrush { get; set; } = 3;
-        public double Gravity { get; set; } = 10;
-
-        double _evaporateSpeed = 0.01;
-        public double EvaporateSpeed
+        public void StrechHistogram(double min, double max, CancellationToken token)
         {
-            get => _evaporateSpeed;
-            set
-            {
-                _evaporateSpeed = value;
-                UpdateEvaporatePart();
-            }
+            var faces = LoadHeightMaps(token);
+            Normalize(faces.Values.ToList(), token);
+            SaveFaces(faces, token);
         }
 
-
-        // WIP: Rock Layer System
-        // Rock layers can have heights in the range
-        // of a few centimeters up to tens of meters or more
-        // Our height map covers 65535 layers at most.
-        // If we pre-generate rock layer infos that would amount
-        // to 274,873,712,640 layer infos per tile.
-        // If we only used a ushort value for defining the hardnes of the layer,
-        // we would have to store 512GB of data per tile !!!
-        // We can either reduce the data or procedurally generate the layer infos.
-        // If we split each tile into 64 polygons, each containing the same layers,
-        // we need only 8MB of data. One area would be 256x256 pixels on average.
-
-        // Store the index of a rock layer definition
-        // There are 64 different layer definitions this index refers to.
-        Dictionary<CubeMapFace, byte[,]> _rockLayerIndexes = new();
-        List<ushort[]> _rockLayers = new();
-        bool _rockLayersEnabled = false;
-
-        // Takes around 5 Minutes for one Tile!
-        // TODO: Use pregenerated layers -> Save as PNG
-        void GenerateRockLayers(int seed, CancellationToken token)
+        public void GenerateSedimentLayers(int seed, int sedimentTypeCount, CancellationToken token)
         {
-            // Step 1: Generate the 64 rock layers
-            // Assign random hardness value to each depth
-            // We want some layers of soft sandstone sediment and
-            // some layers of hard granite stone.
-            // Hardness 0: Very soft -> Sandstone
-            // Hardness 32768: Average hardness -> Something else? I'm not a geologist.
-            // Hardness 65535: Very hard -> Granite
-            // Lets use a Gauss Distribution for hardness
+            // Sediment Layer System
+            // Sediment layers can have heights in the range
+            // of a few centimeters up to tens of meters or more
+            // Our height map covers 65535 layers at most.
+            // If we pre-generate rock layer infos that would amount
+            // to 274,873,712,640 layer infos per tile.
+            // If we only used a ushort value for defining the hardnes of the layer,
+            // we would have to store 512GB of data per tile !!!
+            // We can either reduce the data or procedurally generate the layer infos.
+            // If we split each tile into 64 polygons, each containing the same layers,
+            // we need only 8MB of data. One area would be 256x256 pixels on average.
+
+            // Store the index of a sediment layer definition
+            // There are 64 different layer definitions this index refers to.
+            Dictionary<CubeMapFace, byte[,]> sedimentLayerIndexes = new();
+            List<ushort[]> sedimentLayers = new();
+
             var urnd = new UShortNormalDistributedRandom(seed);
             var rnd = new Random(seed);
-            // TODO: Not sure if full randomness is a good idea.
-            for (int i=0;i<64;++i)
+            // The hardness of sediment layers is normal distributed (Gauss) around 32768
+            for (int i = 0; i < sedimentTypeCount; ++i)
             {
-                if (i==0) // Lets make index 0 special by beeing the default value
+                if (i == 0) // Lets make index 0 special by beeing the default value
                 {
-                    _rockLayers.Add(Enumerable.Repeat<ushort>(32768, 65535).ToArray());
+                    sedimentLayers.Add(Enumerable.Repeat<ushort>(32768, 65536).ToArray());
                     continue;
                 }
 
-                ushort[] layers = new ushort[65535];
-                for (int j = 0; j<65535; ++j)
+                ushort[] layers = new ushort[65536];
+                for (int j = 0; j < 65536; ++j)
                 {
                     if (token.IsCancellationRequested) return;
                     layers[j] = urnd.GetNextValue();
                 }
-                _rockLayers.Add(layers);
+                sedimentLayers.Add(layers);
             }
 
-            // Prepare list of all points that are unset, initialize _rockLayerIndexes.
+            // Prepare list of all points that are unset, initialize sedimentLayerIndexes.
             List<CubeMapPointLight> unsetPoints = new();
             int unsetCount = 0;
             List<CubeMapPointLight> setPointsWithUnsetNeighbors = new();
             var faces = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToList();
-            if (_debug) faces = new List<CubeMapFace> { CubeMapFace.Back };
+            if (DebugMode) faces = new List<CubeMapFace> { PreviewFace };
             foreach (var face in faces)
             {
-                _rockLayerIndexes[face] = new byte[_tileWidth, _tileWidth];
-                for (ushort x = 0; x < _tileWidth; ++x)
-                    for (ushort y = 0; y < _tileWidth; ++y)
+                sedimentLayerIndexes[face] = new byte[TileWidth, TileWidth];
+                for (ushort x = 0; x < TileWidth; ++x)
+                    for (ushort y = 0; y < TileWidth; ++y)
                     {
                         unsetPoints.Add(new(face, x, y));
                         ++unsetCount;
-                        _rockLayerIndexes[face][x, y] = 0;
+                        sedimentLayerIndexes[face][x, y] = 0;
                     }
             }
 
@@ -649,8 +557,8 @@ namespace PlanetCreator
             {
                 var index = (int)rnd.NextInt64(unsetPoints.Count);
                 var item = unsetPoints[index];
-                var seedValue = (byte)(rnd.NextInt64(63) + 1); // Don't use 0
-                _rockLayerIndexes[item.Face][item.X, item.Y] = seedValue;
+                var seedValue = (byte)(rnd.NextInt64(sedimentTypeCount - 1) + 1); // Don't use 0
+                sedimentLayerIndexes[item.Face][item.X, item.Y] = seedValue;
                 unsetPoints.RemoveAt(index);
                 --unsetCount;
                 setPointsWithUnsetNeighbors.Add(item);
@@ -669,7 +577,7 @@ namespace PlanetCreator
                     setPointsWithUnsetNeighbors.RemoveAt(index);
                     continue;
                 }
-                neighbors.RemoveAll(neighbor => _debug && neighbor.Face != CubeMapFace.Back || _rockLayerIndexes[neighbor.Face][neighbor.X, neighbor.Y] != 0);
+                neighbors.RemoveAll(neighbor => DebugMode && neighbor.Face != PreviewFace || sedimentLayerIndexes[neighbor.Face][neighbor.X, neighbor.Y] != 0);
                 if (neighbors.Count == 0)
                 {
                     setPointsWithUnsetNeighbors.RemoveAt(index);
@@ -685,31 +593,43 @@ namespace PlanetCreator
                 {
                     neighbor = neighbors[(int)rnd.NextInt64(neighbors.Count)];
                 }
-                _rockLayerIndexes[neighbor.Face][neighbor.X, neighbor.Y] = _rockLayerIndexes[setPoint.Face][setPoint.X, setPoint.Y];
+                sedimentLayerIndexes[neighbor.Face][neighbor.X, neighbor.Y] = sedimentLayerIndexes[setPoint.Face][setPoint.X, setPoint.Y];
                 setPointsWithUnsetNeighbors.Add(neighbor);
                 --unsetCount;
-                if (unsetCount % 5000 == 0)
-                    Debug.WriteLine("Unset: " + unsetCount);
             }
 
-            var image = new Image<Rgb24>(_tileWidth, _tileWidth);
-            Parallel.For(0, _tileWidth, POptions(token), x =>
+
+            Parallel.ForEach(faces, face =>
             {
-                for (int y = 0; y < _tileWidth; ++y)
+                var image = new Image<Rgb24>(TileWidth, TileWidth);
+                Parallel.For(0, TileWidth, POptions(token), x =>
                 {
-                    var value = (byte)_rockLayerIndexes[CubeMapFace.Back][x, y];
-                    image[x, y] = new Rgb24(value, value, value);
-                }
+                    for (int y = 0; y < TileWidth; ++y)
+                    {
+                        var value = (byte)sedimentLayerIndexes[face][x, y];
+                        image[x, y] = new Rgb24(value, value, value);
+                    }
+                });
+                image.SaveAsPng(Path.Combine(WorkingDirectory, (face + "_sediments.png").ToLower()));
+                image.Dispose();
             });
-            image.SaveAsPng("debugRockLayer.png");
 
+            using (var fs = new FileStream(Path.Combine(WorkingDirectory, "sediments.txt"), FileMode.Create))
+            using (var sw = new StreamWriter(fs))
+            {
+                sw.WriteLine("!!! DO NOT EDIT THIS FILE !!!");
+                foreach (var layer in sedimentLayers)
+                {
+                    foreach(var num in layer)
+                    {
+                        sw.Write(num.ToString(CultureInfo.InvariantCulture) + ";");
+                    }
+                    sw.WriteLine();
+                }
+                sw.Flush();
+                fs.Flush();
+            }
         }
-
-        void UpdateEvaporatePart()
-        {
-            EvaporatePart = Math.Pow(1 - EvaporateSpeed, ErosionMaxDropletLifeTime - 1);
-        }
-        double EvaporatePart { get; set; }
 
         /// <summary>
         /// TODO: Edges not seamless!!! The duplicate point rule is not applied!
@@ -718,224 +638,102 @@ namespace PlanetCreator
         /// <param name="token"></param>
         /// <param name="startPoint">Can be used to start at a specific spot instead of random spot.</param>
         /// <param name="startFace">Can be used to start at a specific face instead of random face.</param>
-        public void Erode(Random rnd, CancellationToken token, PointD? startPoint = null, CubeMapFace? startFace = null)
+
+        HydraulicErosion _hyd;
+        public void InitErosion(bool useSediments, CancellationToken token)
         {
-            // Code based on Sebastian Lague
-            // https://www.youtube.com/watch?v=eaXk97ujbPQ
-            // https://github.com/SebLague/Hydraulic-Erosion
-            // which is based on a paper by Hans Theobald Beyer
-            // https://www.firespark.de/resources/downloads/implementation%20of%20a%20methode%20for%20hydraulic%20erosion.pdf
-            // which is based on a blog entry by Alexey Volynskov
-            // http://ranmantaru.com/blog/2011/10/08/water-erosion-on-heightmap-terrain/
+            var faces = LoadHeightMaps(token);
+            Dictionary<CubeMapFace, byte[,]> sedimentLayerIndexes = null;
+            List<ushort[]> sedimentLayers = null;
 
-            int maxDropletLifetime = ErosionMaxDropletLifeTime;
-            double inertia = ErosionInteria;
-            double speed = 1;
-            double water = 1;
-            double sediment = 0;
-            double sedimentCapacityFactor = ErosionSedimentCapacityFactor;
-            double minSedimentCapacity = 0.5 / 65535; // Half a pixel value
-            double depositSpeed = ErosionDepositSpeed;
-            double erodeSpeed = ErosionErodeSpeed;
-            double erodeBrush = ErosionErodeBrush;
-            double depositBrush = ErosionDepositBrush;
-            double evaporateSpeed = EvaporateSpeed;
-            double gravity = Gravity;
-
-            // Make sure we have no water left at the end:
-            // Modify this exponential curve to become 0 at the end:
-            // water *= (1 - evaporateSpeed);
-            //double waterX = water;
-            //for (int i = 0; i < maxDropletLifetime - 1; ++i)
-            //{
-            //    waterX *= (1 - evaporateSpeed);
-            //}
-            //double evaporatePart = waterX;
-            // => waterModified = water - evaporatePart*iteration
-            // Optimized for-loop, because Math!
-            double evaporatePart = EvaporatePart; //water * Math.Pow(1 - evaporateSpeed, maxDropletLifetime - 1);
-
-            CubeMapFace face = CubeMapFace.Up;
-            PointD pos = new();
-            PointD dir = new();
-            var facesValues = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToArray();
-
-            if (rnd != null)
+            if (useSediments)
             {
-                lock (rnd)
+                try
                 {
-                    if (!_debug)
+                    Parallel.ForEach(faces, face =>
                     {
-                        pos.X = rnd.NextDouble() * 2047;
-                        pos.Y = rnd.NextDouble() * 2047;
-                        face = facesValues[rnd.Next(0, facesValues.Length)];
-                    }
-                    else
+                        sedimentLayerIndexes[face.Key] = new byte[TileWidth, TileWidth];
+                        var fileName = Path.Combine(WorkingDirectory, (face + "_sediments.png").ToLower());
+                        if (File.Exists(fileName))
+                        {
+                            var image = Image.Load(fileName) as Image<Rgb24>;
+                            if (image != null)
+                            {
+                                Parallel.For(0, TileWidth, POptions(token), x =>
+                                {
+                                    for (int y = 0; y < TileWidth; ++y)
+                                    {
+                                        var value = image[x, y].R;
+                                        sedimentLayerIndexes[face.Key][x, y] = value;                                    ;
+                                    }
+                                });
+                                image.Dispose();
+                            }
+                        }
+                    });
+
+                    using (var fs = new FileStream(Path.Combine(WorkingDirectory, "sediments.txt"), FileMode.Open))
+                    using (var sw = new StreamReader(fs))
                     {
-                        if (!ExtendedDebugMode)
+                        string line = sw.ReadLine(); // "!!! DO NOT EDIT THIS FILE !!!"
+                        while ((line = sw.ReadLine()) != null)
                         {
-                            pos.X = rnd.NextDouble() * 512 + 512;
-                            pos.Y = rnd.NextDouble() * 512 + 512;
+                            var spl = line.Split(';');
+                            var array = new ushort[65536];
+                            if (spl.Length < 65536)
+                            {
+                                useSediments = false;
+                                break;
+                            }
+                            for (int i = 0; i < array.Length; ++i)
+                            {
+                                array[i] = ushort.Parse(spl[i]);
+                            }
                         }
-                        else
-                        {
-                            pos.X = rnd.NextDouble() * 2047;
-                            pos.Y = rnd.NextDouble() * 2047;
-                        }
-                        face = _debugFace;
-                        //var p = pos.ToIntegerPoint();
-                        //DebugOverlay.DebugCollectPixel(_debugFace, p.X, p.Y, 255, 255, 0, 0);
                     }
                 }
+                catch
+                {
+                    useSediments = false;
+                }
             }
-            if (startPoint != null)
+
+            if (!useSediments)
             {
-                pos.X = startPoint.Value.X;
-                pos.Y = startPoint.Value.Y;
-            }
-            if (startFace != null)
-            {
-                face = startFace.Value;
+                sedimentLayerIndexes = null;
+                sedimentLayers = null;
             }
 
-            #region Code based on Sebastian Lague
-            for (int i = 0; i < maxDropletLifetime; ++i)
-            {
-                if (token.IsCancellationRequested) return;
-
-                double waterModified = water - (evaporatePart * i / (maxDropletLifetime - 1)); // Will be 0 at last iteration
-
-                // Calculate droplet's offset inside the cell (0,0) = at NW node, (1,1) = at SE node
-                PointD cellOffset = pos.IntegerOffset(); // 0 <= offset < 1
-
-                // Calculate droplet's height and direction of flow with bilinear interpolation of surrounding heights
-                HeightAndGradient heightAndGradient = CalculateHeightAndGradient(pos, face);
-
-                // Update the droplet's direction and position (move position 1 unit regardless of speed)
-                dir = (dir * inertia - heightAndGradient.Gradient * (1 - inertia));
-
-                // Normalize direction
-                dir = dir.Normalize();
-                CubeMapFace faceOld = face;
-                PointD posOld = pos;
-                pos += dir;
-
-                // Stop simulating droplet if it's not moving
-                if (dir.X == 0 && dir.Y == 0)
-                {
-                    break;
-                }
-
-                var posI = pos.ToIntegerPoint();
-                var posOldI = posOld.ToIntegerPoint();
-
-                if (posI.X >= _tileWidth || posI.X < 0 || posI.Y >= _tileWidth || posI.Y < 0)
-                {
-                    // We left the tile! Check in which tile we are now:
-                    var newPosPoint = (new CubeMapPoint(_faces, posOldI.X, posOldI.Y, face) { VelocityX = dir.X, VelocityY = dir.Y, OffsetX = cellOffset.X, OffsetY = cellOffset.Y })
-                        .GetPointRelative(
-                            posI.X - posOldI.X,
-                            posI.Y - posOldI.Y);
-                    // Update face, position, speed and offset:
-                    if (newPosPoint.Face != face)
-                    {
-                        if (newPosPoint.PosX >= _tileWidth || newPosPoint.PosX < 0 || newPosPoint.PosY >= _tileWidth || newPosPoint.PosY < 0)
-                        {
-                            Debugger.Break();
-                        }
-                        face = newPosPoint.Face;
-                        pos.X = newPosPoint.PosX + newPosPoint.OffsetX;
-                        pos.Y = newPosPoint.PosY + newPosPoint.OffsetY;
-                        //Debug.WriteLine("Pos {0};{1}", pos.X, pos.Y);
-                        dir.X = newPosPoint.VelocityX;
-                        dir.Y = newPosPoint.VelocityY;
-                        cellOffset.X = newPosPoint.OffsetX;
-                        cellOffset.Y = newPosPoint.OffsetY;
-                    }
-                }
-
-                posI = pos.ToIntegerPoint();
-
-                // Find the droplet's new height and calculate the deltaHeight
-                double newHeight = CalculateHeightAndGradient(pos, face).Height;
-                double deltaHeight = newHeight - heightAndGradient.Height;
-
-                // Calculate the droplet's sediment capacity (higher when moving fast down a slope and contains lots of water)
-                double sedimentCapacity = Math.Max(-deltaHeight * speed * waterModified * sedimentCapacityFactor, minSedimentCapacity);
-
-
-                if (_debug && (_drawErosionLines || !GenerateLakes))
-                {
-                    _debugTileR[posOldI.X, posOldI.Y] = waterModified;
-                    //if (_drawErosionLines)
-                    //    DebugOverlay.DebugCollectPixel(_debugFace, posOldI.X, posOldI.Y, (byte)(255 * waterModified), 0, 255, 0);
-                    //var sedimentFill = sediment / sedimentCapacity;
-                    //if (sedimentFill > 1) sedimentFill = 1;
-                    //_debugTileG[posOldI.X, posOldI.Y + 1] = sedimentFill;
-                }
-
-                // If carrying more sediment than capacity, or if flowing uphill:
-                var oldPoint = new CubeMapPoint(_faces, posOldI.X, posOldI.Y, faceOld);
-                if (sediment > sedimentCapacity || deltaHeight > 0)
-                {
-                    // If moving uphill (deltaHeight > 0) try fill up to the current height, otherwise deposit a fraction of the excess sediment
-                    double amountToDeposit = (deltaHeight > 0) ? Math.Min(deltaHeight, sediment) : (sediment - sedimentCapacity) * depositSpeed;
-
-                    if (_debug)
-                        _debugTileB[posOldI.X, posOldI.Y] = amountToDeposit;
-
-                    ApplyBrush(depositBrush, oldPoint, posOld, amountToDeposit);
-                    sediment -= amountToDeposit;
-                }
-                else
-                {
-                    // Erode a fraction of the droplet's current carry capacity.
-                    // Clamp the erosion to the change in height so that it doesn't dig a hole in the terrain behind the droplet
-                    double amountToErode = Math.Min((sedimentCapacity - sediment) * erodeSpeed, -deltaHeight);
-
-                    if (_debug)
-                        _debugTileG[posOldI.X, posOldI.Y] = amountToErode;
-
-                    ApplyBrush(erodeBrush, oldPoint, posOld, -amountToErode);
-                    sediment += amountToErode;
-                }
-                // Update delta
-                deltaHeight = newHeight - CalculateHeightAndGradient(posOld, faceOld).Height;
-
-                // Update droplet's speed and water content
-                double gravityDelta = (-deltaHeight) * gravity;
-                double speedSquared = speed * speed;
-                // Prevent speed from becomming double.NaN
-                // None of the authors this code was based on noticed this flaw
-                if (gravityDelta < 0 && -gravityDelta > speedSquared)
-                {
-                    speed = Math.Sqrt(-gravityDelta);
-                    dir.X = -dir.X;
-                    dir.Y = -dir.Y;
-                }
-                else // The square doesn't even make sense, but whatever
-                    speed = Math.Sqrt(speedSquared + gravityDelta);
-                water *= (1 - evaporateSpeed);
-
-            }
-
-            #endregion
+            _hyd = new HydraulicErosion(
+                new Random() /* keep seed random */ , faces, DebugMode, LimitedDebugMode, PreviewFace,
+                sedimentLayerIndexes, sedimentLayers);
+        }
+        public void Erode(CancellationToken token)
+        {
+            _hyd.Erode(token);
+        }
+        public void FinishErode(CancellationToken token)
+        {
+            if (!DebugMode)
+                EdgeFixer.MakeSeamless(_hyd.Faces, token);
+            SaveFaces(_hyd.Faces, token);
         }
 
-        public bool GenerateLakes { get; set; } = true;
-        public ushort LakesPerTile { get; set; } = 40;
-        public double LakeVolumeMultiplier { get; set; } = 1.0;
-
-        public int LakeStampDepth { get; set; } = 100;
+        public void FixEdges(CancellationToken token)
+        {
+            var faces = LoadHeightMaps(token);
+            EdgeFixer.MakeSeamless(faces, token);
+            SaveFaces(faces, token);
+        }
 
         public IDebugOverlay DebugOverlay;
 
-        void CheckFillLake(CubeMapPoint point, double stopHeight, double maxVolume, int maxFilledPixels, CancellationToken token, out int filledPixelCount, out HashSet<CubeMapPointLight> filledPoints , out double filledVolume)
+        void CheckFillLake(CubeMapPoint point, double stopHeight, double maxVolume, int maxFilledPixels, Dictionary<CubeMapFace, double[,]> faces,CancellationToken token, out int filledPixelCount, out HashSet<CubeMapPointLight> filledPoints , out double filledVolume)
         {
             filledPixelCount = 0;
             filledPoints = new();
             filledVolume = 0;
-            if (_debug && point.Face != _debugFace) return;
+            if (DebugMode && point.Face != PreviewFace) return;
             if (point.Value >= stopHeight) return;
             var pointLight = new CubeMapPointLight { Face = point.Face, X = point.PosX, Y = point.PosY };
             //var faceValues = _faces.Keys.ToList();
@@ -951,43 +749,43 @@ namespace PlanetCreator
             {
                 if (token.IsCancellationRequested) return;
                 var pt = queue.Dequeue();
-                if (_debug)
+                if (DebugMode)
                 {
-                    if (pt.Face != _debugFace ||
-                        (pt.X < 1 || pt.X > _tileWidth - 2 ||
-                         pt.Y < 1 || pt.Y > _tileWidth - 2))
+                    if (pt.Face != PreviewFace ||
+                        (pt.X < 1 || pt.X > TileWidth - 2 ||
+                         pt.Y < 1 || pt.Y > TileWidth - 2))
                         continue;
                 }
                 if (!filledPoints.Contains(pt))
                 {
-                    if (_debug && pt.Face != _debugFace) Debugger.Break();
+                    if (DebugMode && pt.Face != PreviewFace) Debugger.Break();
 
                     ++filledPixelCount;
                     filledPoints.Add(pt);
-                    filledVolume += (stopHeight - CubeMapPointLight.GetValue(pt, _faces));
+                    filledVolume += (stopHeight - CubeMapPointLight.GetValue(pt, faces));
                     if (filledVolume > maxVolume || filledPixelCount > maxFilledPixels) return;
                 }
 
                 var np = CubeMapPointLight.GetPointRelativeTo(pt,-1, 0);
-                if (!queuedPoints.Contains(np) && !filledPoints.Contains(np) && CubeMapPointLight.GetValue(np, _faces) < stopHeight)
+                if (!queuedPoints.Contains(np) && !filledPoints.Contains(np) && CubeMapPointLight.GetValue(np, faces) < stopHeight)
                 {
                     queue.Enqueue(np);
                     queuedPoints.Add(np);
                 }
                 np = CubeMapPointLight.GetPointRelativeTo(pt, 0, -1);
-                if (!queuedPoints.Contains(np) && !filledPoints.Contains(np) && CubeMapPointLight.GetValue(np, _faces) < stopHeight)
+                if (!queuedPoints.Contains(np) && !filledPoints.Contains(np) && CubeMapPointLight.GetValue(np, faces) < stopHeight)
                 {
                     queue.Enqueue(np);
                     queuedPoints.Add(np);
                 }
                 np = CubeMapPointLight.GetPointRelativeTo(pt, 1, 0);
-                if (!queuedPoints.Contains(np) && !filledPoints.Contains(np) && CubeMapPointLight.GetValue(np, _faces) < stopHeight)
+                if (!queuedPoints.Contains(np) && !filledPoints.Contains(np) && CubeMapPointLight.GetValue(np, faces) < stopHeight)
                 {
                     queue.Enqueue(np);
                     queuedPoints.Add(np);
                 }
                 np = CubeMapPointLight.GetPointRelativeTo(pt, 0, 1);
-                if (!queuedPoints.Contains(np) && !filledPoints.Contains(np) && CubeMapPointLight.GetValue(np, _faces) < stopHeight)
+                if (!queuedPoints.Contains(np) && !filledPoints.Contains(np) && CubeMapPointLight.GetValue(np, faces) < stopHeight)
                 {
                     queue.Enqueue(np);
                     queuedPoints.Add(np);
@@ -995,46 +793,46 @@ namespace PlanetCreator
             }
         }
 
-        void MakeLakes(CancellationToken token)
+        public void AddLakes(ushort lakesPerTile, double lakeVolumeMultiplier, double lakeStampDepth, CancellationToken token)
         {
+            var faces = LoadHeightMaps(token);
 
             // Strategy: Drop water on tiles and see where they end up. No inertia.
-            int pixelsPerTile = 262144;
-            int totalTilePixels = _tileWidth * _tileWidth;
-            int pixelGap = totalTilePixels / pixelsPerTile;
-            int pixelsPerRow = _tileWidth / pixelGap;
-            int lostPixels = _tileWidth - (pixelsPerRow * pixelGap);
+            int dropletsPerTile = (TileWidth/4)*(TileWidth/4); // Every 4th pixel
+            int totalTilePixels = TileWidth * TileWidth;
+            int pixelGap = totalTilePixels / dropletsPerTile;
+            int pixelsPerRow = TileWidth / pixelGap;
+            int lostPixels = TileWidth - (pixelsPerRow * pixelGap);
             int offset = lostPixels / 2;
 
             Dictionary<CubeMapFace, double[,]> waterSpots = new Dictionary<CubeMapFace, double[,]>();
             Dictionary<CubeMapFace, double[,]> waterSpots2 = new Dictionary<CubeMapFace, double[,]>();
-            var faceValues = _faces.Keys.ToList();
-            if (_debug) { faceValues = new List<CubeMapFace> { CubeMapFace.Back }; }
+            var faceValues = faces.Keys.ToList();
+            if (DebugMode) { faceValues = new List<CubeMapFace> { PreviewFace }; }
             foreach (var face in faceValues)
             {
-                waterSpots[face] = new double[_tileWidth, _tileWidth];
-                waterSpots2[face] = new double[_tileWidth, _tileWidth];
+                waterSpots[face] = new double[TileWidth, TileWidth];
+                waterSpots2[face] = new double[TileWidth, TileWidth];
             }
-            // TODO: Stacking Parallel.For() might not be efficient
             Parallel.For(0, faceValues.Count, POptions(token), faceIndex =>
             {
                 var face = faceValues[faceIndex];
-                Parallel.For(0, 1 + _tileWidth / pixelGap, new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = token }, xred =>
+                Parallel.For(0, 1 + TileWidth / pixelGap, new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = token }, xred =>
                 {
-                    for (int yred = 0; yred < 1 + _tileWidth / pixelGap; ++yred)
+                    for (int yred = 0; yred < 1 + TileWidth / pixelGap; ++yred)
                     {
                         int x = offset + xred * pixelGap;
                         int y = offset + yred * pixelGap;
-                        if (x >= _tileWidth || y >= _tileWidth) continue;
+                        if (x >= TileWidth || y >= TileWidth) continue;
 
                         var currentFace = face;
                         PointD pos = new PointD { X = x, Y = y };
                         PointD posOld = pos;
                         CubeMapPoint oldPoint = null;
-                        HeightAndGradient heightAndGradient = CalculateHeightAndGradient(pos, currentFace);
+                        HeightAndGradient heightAndGradient = HydraulicErosion.CalculateHeightAndGradient(pos, currentFace, faces);
                         int iteration = 0;
                         bool floored = false;
-                        while (iteration++ < _tileWidth / 2 && !token.IsCancellationRequested) // Limit movement to half map
+                        while (iteration++ < TileWidth / 2 && !token.IsCancellationRequested) // Limit movement to half map
                         {
                             var dir = -heightAndGradient.Gradient;
                             dir = dir.Normalize();
@@ -1043,14 +841,14 @@ namespace PlanetCreator
                             HeightAndGradient lastHeight = heightAndGradient;
                             posOld = pos;
                             var posOldI = posOld.ToIntegerPoint();
-                            oldPoint = new CubeMapPoint(_faces, posOldI.X, posOldI.Y, currentFace) { VelocityX = dir.X, VelocityY = dir.Y, OffsetX = cellOffset.X, OffsetY = cellOffset.Y };
+                            oldPoint = new CubeMapPoint(faces, posOldI.X, posOldI.Y, currentFace) { VelocityX = dir.X, VelocityY = dir.Y, OffsetX = cellOffset.X, OffsetY = cellOffset.Y };
 
                             // Update position
                             pos += dir;
 
                             #region Out of bounds handling
                             var posI = pos.ToIntegerPoint();
-                            if (posI.X >= _tileWidth || posI.X < 0 || posI.Y >= _tileWidth || posI.Y < 0)
+                            if (posI.X >= TileWidth || posI.X < 0 || posI.Y >= TileWidth || posI.Y < 0)
                             {
                                 // We left the tile! Check in which tile we are now:
                                 var newPosPoint = oldPoint.GetPointRelative(
@@ -1067,17 +865,17 @@ namespace PlanetCreator
                             }
                             #endregion
 
-                            if (_debug)
-                            {
-                                var ipos = pos.ToIntegerPoint();
-                                _debugTileR[ipos.X, ipos.Y] += 2;
-                                if (_debugTileR[ipos.X, ipos.Y] > 50) _debugTileR[ipos.X, ipos.Y] = 50;
+                            //if (DebugMode) TODO
+                            //{
+                            //    var ipos = pos.ToIntegerPoint();
+                            //    _debugTileR[ipos.X, ipos.Y] += 2;
+                            //    if (_debugTileR[ipos.X, ipos.Y] > 50) _debugTileR[ipos.X, ipos.Y] = 50;
 
-                                if (DebugMode && _drawLakeLines)
-                                    DebugOverlay.DebugCollectPixel(_debugFace, posOldI.X, posOldI.Y, 80, 255, 0, 0);
+                            //    if (DebugMode && _drawLakeLines)
+                            //        DebugOverlay.DebugCollectPixel(_debugFace, posOldI.X, posOldI.Y, 80, 255, 0, 0);
 
-                            }
-                            heightAndGradient = CalculateHeightAndGradient(pos, currentFace);
+                            //}
+                            heightAndGradient = HydraulicErosion.CalculateHeightAndGradient(pos, currentFace, faces);
                             if (heightAndGradient.Height >= lastHeight.Height)
                             {
                                 floored = true;
@@ -1089,7 +887,7 @@ namespace PlanetCreator
                         {
                             continue;
                         }
-                        if (_debug && oldPoint.Face != _debugFace)
+                        if (DebugMode && oldPoint.Face != PreviewFace)
                         {
                             continue;
                         }
@@ -1102,17 +900,15 @@ namespace PlanetCreator
                 });
             });
 
-            UpdateProgress(60);
-
             // Apply a folding matrix to determine maxima
             const int matrixSize = 9;
             for (int faceIndex = 0;  faceIndex < faceValues.Count; ++faceIndex)
             {
                 if (token.IsCancellationRequested) return;
                 var face = faceValues[faceIndex];
-                Parallel.For(0, _tileWidth, POptions(token), x =>
+                Parallel.For(0, TileWidth, POptions(token), x =>
                 {
-                    for (int y = 0; y < _tileWidth; ++y)
+                    for (int y = 0; y < TileWidth; ++y)
                     {
                         if (token.IsCancellationRequested) return;
                         var point = new CubeMapPointLight { Face = face, X = x, Y = y };
@@ -1122,7 +918,7 @@ namespace PlanetCreator
                             for (int y2 = y - matrixSize / 2; y2 <= y + matrixSize / 2; ++y2)
                             {
                                 var dp = CubeMapPointLight.GetPointRelativeTo(point,x2 - x, y2 - y);
-                                if ((!_debug || dp.Face == face))
+                                if ((!DebugMode || dp.Face == face))
                                 {
                                     var value = CubeMapPointLight.GetValue(dp, waterSpots);
                                     if (value > 0)
@@ -1137,11 +933,11 @@ namespace PlanetCreator
                             }
                         }
                         waterSpots2[face][x, y] = sum;
-                        _debugTileB[x, y] = sum;
+                        //_debugTileB[x, y] = sum;
                     }
                 });
             }
-            UpdateProgress(70);
+
             Dictionary<CubeMapFace, List<HighScore>> highscores = new Dictionary<CubeMapFace, List<HighScore>>();
             foreach (var face in faceValues)
             {
@@ -1164,17 +960,17 @@ namespace PlanetCreator
                 double highScoreMin = 0;
                 int highScoreCount = 0;
                 //double highScoreMax = 0;
-                Parallel.For(0, _tileWidth, POptions(token), x =>
+                Parallel.For(0, TileWidth, POptions(token), x =>
                 {
-                    for (int y = 0; y < _tileWidth; ++y)
+                    for (int y = 0; y < TileWidth; ++y)
                     {
                         var value = waterSpotList[x, y];
                         if (value == 0) continue;
-                        if (value > highScoreMin || highScoreCount < (LakesPerTile + 10)) // Allow 10 backups so we can compensate skipping small lakes later
+                        if (value > highScoreMin || highScoreCount < (lakesPerTile + 10)) // Allow 10 backups so we can compensate skipping small lakes later
                         {
                             lock (highscoreList)
                             {
-                                if (value > highScoreMin || highScoreCount < (LakesPerTile + 10))
+                                if (value > highScoreMin || highScoreCount < (lakesPerTile + 10))
                                 {
                                     var score = new HighScore(value, x, y);
                                     var neighbors = highscoreList.Where(s => s.Position.IsWithinRadius(score.Position, safetyDistance)).ToList();
@@ -1184,7 +980,7 @@ namespace PlanetCreator
                                     highscoreList.Add(score);
 
                                     highscoreList.Sort((a, b) => b.Score.CompareTo(a.Score));
-                                    while (highscoreList.Count > LakesPerTile)
+                                    while (highscoreList.Count > lakesPerTile)
                                         highscoreList.RemoveAt(highscoreList.Count - 1);
 
                                     if (highscoreList[0].Score > maxScore[face])
@@ -1197,51 +993,56 @@ namespace PlanetCreator
                     }
                 });
             });
-            UpdateProgress(80);
-            if (_debug)
-            {
-                foreach (var score in highscores[_debugFace])
-                {
-                    var x = score.Position.X;
-                    var y = score.Position.Y;
-                    for (int xx = x - 2; xx < x + 2; xx++)
-                    {
-                        for (int yy = y - 2; yy < y + 2; yy++)
-                        {
-                            if (xx > 0 && yy > 0 && xx < _tileWidth && yy < _tileWidth)
-                                _debugTileR[xx, yy] = 55;
-                        }
-                    }
-                    // Somewhere between 70 and 30
-                    //Debug.WriteLine("SCORE: s=" + (int)score.Score + ", p=" + score.Position.X + ";" + score.Position.Y);
-                }
-            }
+
+            //         Dictionary<CubeMapFace, byte[,]> _lakes;
+
+
+            //if (DebugMode)
+            //{
+            //    foreach (var score in highscores[PreviewFace])
+            //    {
+            //        var x = score.Position.X;
+            //        var y = score.Position.Y;
+            //        for (int xx = x - 2; xx < x + 2; xx++)
+            //        {
+            //            for (int yy = y - 2; yy < y + 2; yy++)
+            //            {
+            //                if (xx > 0 && yy > 0 && xx < _tileWidth && yy < _tileWidth)
+            //                    _debugTileR[xx, yy] = 55;
+            //            }
+            //        }
+            //        // Somewhere between 70 and 30
+            //        //Debug.WriteLine("SCORE: s=" + (int)score.Score + ", p=" + score.Position.X + ";" + score.Position.Y);
+            //    }
+            //}
 
             // Last step: Fill up the lakes
             // Warning! If lake depth is too high it will overflow and fill nearly the whole map
             // We need to determine the maximum sane size of a lake without overflowing
+            Dictionary<CubeMapFace, byte[,]> lakes = new();
             Parallel.For(0, faceValues.Count, POptions(token), faceIndex =>
             {
                 var face = faceValues[faceIndex];
+                lakes[face] = new byte[TileWidth, TileWidth];
                 var highscoreList = highscores[face];
                 int drawnLakeCount = 0;
                 foreach (var score in highscoreList)
                 {
-                    if (drawnLakeCount >= LakesPerTile) break;
+                    if (drawnLakeCount >= lakesPerTile) break;
                     // We want each lake to be up to 100.000 pixels with some tolerance.
                     // Lake depth around 5 increments (1/65535) => volume = 1.5
                     // Max scores around 70:
-                    var volume = score.Score * (1.5 / maxScore[face]) * LakeVolumeMultiplier;
+                    var volume = score.Score * (1.5 / maxScore[face]) * lakeVolumeMultiplier;
                     if (volume < 0.8) volume = 0.8;
-                    int maxFilledPixels = 120000;
+                    int maxFilledPixels = (int)(0.05 * TileWidth * TileWidth); // 5% of tile max
                     int minFilledPixels = 25;
 
-                    var point = new CubeMapPoint(_faces, score.Position.X, score.Position.Y, face);
+                    var point = new CubeMapPoint(faces, score.Position.X, score.Position.Y, face);
                     var height = point.Value;
                     var stopHeight = height + 1.0 / 65535;
 
                     double lastStopHeight = stopHeight;
-                    CheckFillLake(point, stopHeight, volume, maxFilledPixels, token, out var lastFilledPixelCount, out var lastFilledPoints, out var lastFilledVolume);
+                    CheckFillLake(point, stopHeight, volume, maxFilledPixels, faces, token, out var lastFilledPixelCount, out var lastFilledPoints, out var lastFilledVolume);
                     if (lastFilledPixelCount == 0)
                     {
                         Debug.WriteLine("Skipped lake at {0},{1}", point.PosX, point.PosY);
@@ -1257,7 +1058,7 @@ namespace PlanetCreator
                     while (true)
                     {
                         if (token.IsCancellationRequested) return;
-                        CheckFillLake(point, stopHeight, volume, maxFilledPixels, token, out var filledPixelCount, out var filledPoints, out var filledVolume);
+                        CheckFillLake(point, stopHeight, volume, maxFilledPixels, faces, token, out var filledPixelCount, out var filledPoints, out var filledVolume);
                         // Sanity check:
                         if (filledVolume > volume && filledPixelCount < minFilledPixels)
                             volume *= 1.5; // Increase volume by 50% if not enough pixels filled
@@ -1278,7 +1079,7 @@ namespace PlanetCreator
                     while (true)
                     {
                         if (token.IsCancellationRequested) return;
-                        CheckFillLake(point, stopHeight, volume, maxFilledPixels, token, out var filledPixelCount, out var filledPixels, out var filledVolume);
+                        CheckFillLake(point, stopHeight, volume, maxFilledPixels, faces, token, out var filledPixelCount, out var filledPixels, out var filledVolume);
                         if (filledPixelCount > 0 && filledVolume < volume && filledPixelCount < maxFilledPixels)
                         {
                             lastStopHeight = stopHeight;
@@ -1294,16 +1095,16 @@ namespace PlanetCreator
                     // Apply the lake
                     if (lastFilledPixelCount >= minFilledPixels) // Don't draw mini lakes
                     {
-                        lock (_faces)
+                        lock (faces)
                         {
                             // Stamp out the lake bed for more visible transition
-                            double stampedStopHeight = Math.Max(lastStopHeight - (LakeStampDepth / 65535d), 0);
+                            double stampedStopHeight = Math.Max(lastStopHeight - (lakeStampDepth / 65535d), 0);
                             foreach (var pt in lastFilledPoints)
                             {
                                 // Draw final lake pixels
                                 DebugOverlay.DebugCollectPixel(pt.Face, pt.X, pt.Y, 128, 255, 0, 0);
-                                _faces[pt.Face][pt.X, pt.Y] = stampedStopHeight;
-                                _lakes[pt.Face][pt.X, pt.Y] = 82;
+                                faces[pt.Face][pt.X, pt.Y] = stampedStopHeight;
+                                lakes[pt.Face][pt.X, pt.Y] = 82;
                             }
                             ++drawnLakeCount;
                         }
@@ -1312,145 +1113,14 @@ namespace PlanetCreator
             });
         }
 
-        // TODO: This code does not apply the duplicate pixel rule for map edges. Resulting height map is not seamless!
-        void ApplyBrush(double brushRadius, CubeMapPoint mapLocation, PointD exactLocation, double materialAmount)
-        {
-            List<CubeMapPoint> brushPoints = new();
-            List<double> brushWeights = new();
-            int brushDelta = (int)(brushRadius + 0.5);
-            double brushWeightSum = 0;
-            // Cycle through all points within radius
-            for (int dx = -brushDelta; dx <= brushDelta; ++dx)
-            {
-                for (int dy = -brushDelta; dy <= brushDelta; ++dy)
-                {
-                    var pt = mapLocation.GetPointRelative(dx, dy);
-                    double brushWeight = 0;
-                    // Split grid into 16 chunks, divide by 4 on each axis. Vector goes to center of subgrid
-                    for (double subDx = -0.375; subDx <= 0.3751; subDx += 0.25)
-                    {
-                        for (double subDy = -0.375; subDy <= 0.3751; subDy += 0.25)
-                        {
-                            PointD vector = new PointD
-                            {
-                                X = pt.PosX + subDx - exactLocation.X,
-                                Y = pt.PosY + subDy - exactLocation.Y,
-                            };
-                            var distance = vector.Length;
-                            if (distance <= brushRadius)
-                            {
-                                // This is a linear function. I don't like it.
-                                double newWeight = 1 - distance / brushRadius;
-                                // Lets use good old Euler and make the brush more pointy:
-                                if (BrushPointiness > 0.0)
-                                {
-                                    newWeight *= Math.Exp(-BrushPointiness * distance);
-                                }
-                                else
-                                {
-                                    var fuck = 1;
-                                }
-                                //double newWeight = Math.Exp(-BrushPointiness * distance) * (1 - distance) / brushRadius;
 
-                                brushWeight += newWeight;
-                                brushWeightSum += newWeight;
-                            }
-                        }
-                    }
-                    brushPoints.Add(pt);
-                    brushWeights.Add(brushWeight);
-                }
-            }
-            for (int ii = 0; ii < brushWeights.Count; ++ii)
-            {
-                double brushpart = materialAmount * brushWeights[ii] / brushWeightSum;
-
-                var brushPoint = brushPoints[ii];
-                if (_rockLayersEnabled)
-                {
-                    var index = _rockLayerIndexes[brushPoint.Face][brushPoint.PosX, brushPoint.PosY];
-                    var val = (ushort)Math.Min(65535, Math.Max(0, brushPoint.Value * 65535));
-                    var hardness = _rockLayers[index][val];
-                    // 32768 ist default
-                    // 0 is soft, 65535 is hard
-                    // Use linear function:
-                    // y = mx+b with b=2 and y(65535) = 0
-                    var factor = -2.0 * hardness / 65535 + 2;
-                    if (brushpart < 0) brushpart *= (2 - factor);
-                    else brushpart *= factor;
-                }
-
-                brushPoint.Value += brushpart;
-
-                //if (_debug)
-                //{
-                //    if (brushpart > 0)
-                //        _debugTileB[brushPoints[ii].PosX, brushPoints[ii].PosY] += brushpart;
-                //    else
-                //        _debugTileR[brushPoints[ii].PosX, brushPoints[ii].PosY] += -brushpart;
-                //}
-
-                if (brushPoint.Value > 1) brushPoint.Value = 1;
-                else if (brushPoint.Value < 0) brushPoint.Value = 0;
-            }
-
-            // Try to make map seamless by equalizing neighboring points between faces.
-            for (int ii = 0; ii < brushWeights.Count; ++ii)
-            {
-                var pt = brushPoints[ii];
-                int dx = 0;
-                int dy = 0;
-                bool triplet = false;
-                if (pt.PosX == 0 && pt.PosY > 0) dx = -1;
-                else if (pt.PosX == 2047 && pt.PosY > 0) dx = 1;
-                else if (pt.PosY == 0 && pt.PosX > 0) dy = -1;
-                else if (pt.PosY == 2047 && pt.PosX > 0) dy = 1;
-                else if (pt.PosX == 0 && pt.PosY == 0)
-                {
-                    triplet = true; dx = -1; dy = -1;
-                }
-                else if (pt.PosX == 2047 && pt.PosY == 0)
-                {
-                    triplet = true; dx = 1; dy = -1;
-                }
-                else if (pt.PosX == 0 && pt.PosY == 2047)
-                {
-                    triplet = true; dx = -1; dy = 1;
-                }
-                else if (pt.PosX == 2047 && pt.PosY == 2047)
-                {
-                    triplet = true; dx = 1; dy = 1;
-                }
-                else
-                {
-                    continue;
-                }
-                if (triplet)
-                {
-                    var n1 = pt.GetPointRelative(dx, 0);
-                    var n2 = pt.GetPointRelative(0, dy);
-                    var avg = (pt.Value + n1.Value + n2.Value) / 3;
-                    pt.Value = avg;
-                    n1.Value = avg;
-                    n2.Value = avg;
-                }
-                else
-                {
-                    var n = pt.GetPointRelative(dx, dy);
-                    var avg = (pt.Value + n.Value) / 2;
-                    pt.Value = avg;
-                    n.Value = avg;
-                }
-            }
-        }
-
-        void Normalize(List<double[,]> images, CancellationToken token, double maxHeight = 1.0)
+        void Normalize(List<double[,]> images, CancellationToken token, double minHeight = 0, double maxHeight = 1.0, bool invert = false)
         {
             double max = images[0][0, 0];
             double min = images[0][0, 0];
-            Parallel.For(0, _tileWidth, POptions(token), x =>
+            Parallel.For(0, TileWidth, POptions(token), x =>
             {
-                for (int y = 0; y < _tileWidth; ++y)
+                for (int y = 0; y < TileWidth; ++y)
                 {
                     foreach (var image in images)
                     {
@@ -1476,49 +1146,27 @@ namespace PlanetCreator
             if (token.IsCancellationRequested) return;
             double offset = -1 * min;
             double stretch = Math.Abs(max - min);
-            Parallel.For(0, _tileWidth, POptions(token), x =>
+            Parallel.For(0, TileWidth, POptions(token), x =>
             {
-                for (int y = 0; y < _tileWidth; ++y)
+                for (int y = 0; y < TileWidth; ++y)
                 {
                     if (token.IsCancellationRequested) return;
                     foreach (var image in images)
                     {
                         var value = image[x, y];
+                        // Normalize 0...1
                         value += offset;
                         value /= stretch;
-                        image[x, y] = value * maxHeight;
+                        // Stretch min...max
+                        value *= (maxHeight - minHeight);
+                        value += minHeight;
+                        image[x, y] = invert ? (maxHeight - value) : value;
                     }
                 };
             });
         }
 
-        HeightAndGradient CalculateHeightAndGradient(PointD pos, CubeMapFace face)
-        {
-            int coordX = (int)pos.X;
-            int coordY = (int)pos.Y;
-            // Calculate droplet's offset inside the cell (0,0) = at NW node, (1,1) = at SE node
-            // Remarks: x and y are not coordinates, but offsets!
-            double x = pos.X - coordX;
-            double y = pos.Y - coordY;
 
-            var point = new CubeMapPoint(_faces, coordX, coordY, face);
-
-            // Calculate heights of the four nodes of the droplet's cell
-            // Remarks: The pos point is within the NW pixel, so the sky directions might be misleading here.
-            double heightNW = point.Value;
-            double heightNE = point.GetPointRelative(1, 0).Value;
-            double heightSW = point.GetPointRelative(0, 1).Value;
-            double heightSE = point.GetPointRelative(1, 1).Value;
-
-            // Calculate droplet's direction of flow with bilinear interpolation of height difference along the edges
-            double gradientX = (heightNE - heightNW) * (1 - y) + (heightSE - heightSW) * y;
-            double gradientY = (heightSW - heightNW) * (1 - x) + (heightSE - heightNE) * x;
-
-            // Calculate height with bilinear interpolation of the heights of the nodes of the cell
-            double height = heightNW * (1 - x) * (1 - y) + heightNE * x * (1 - y) + heightSW * (1 - x) * y + heightSE * x * y;
-
-            return new HeightAndGradient() { Height = height, Gradient = { X = gradientX, Y = gradientY } };
-        }
 
         class HighScore
         {
@@ -1532,33 +1180,6 @@ namespace PlanetCreator
             }
         }
 
-        struct HeightAndGradient
-        {
-            public double Height;
-            public PointD Gradient;
-        }
-
-        /// <summary>
-        /// This was added for fixing Triton. It does not stretch the values like the internal method!!!
-        /// </summary>
-        /// <param name="face"></param>
-        public void TileToImage(CubeMapFace face)
-        {
-            var image = new Image<L16>(_tileWidth, _tileWidth);
-            var tile = _faces[face];
-            Parallel.For(0, _tileWidth, x =>
-            {
-                Parallel.For(0, _tileWidth, y =>
-                {
-                    var val = (tile[x, y]*65535 + .5);
-                    if (val > 65535) val = 65535;
-                    if (val < 0) val = 0;
-                    image[x, y] = new L16((ushort)val);
-                });
-            });
-            image.SaveAsPng(face.ToString().ToLower() + ".png");
-        }
-
         // tiles must be normalized to 0...1 !!!
         void TileToImage(double[,] tile, CubeMapFace face)
         {
@@ -1566,15 +1187,16 @@ namespace PlanetCreator
         }
         void TileToImage(double[,] tile, string fileName)
         {
-            // Using full spectrum is too exteme. Flatten area:
+            // Using full spectrum is too extreme. Flatten area:
             double minVal = 0.3;
             double maxVal = 0.9;
+            double _lakeDepth = 30.0 / 65535;
             double lakeLevel = (maxVal - minVal) * _lakeDepth + minVal;
 
-            var image = new Image<L16>(_tileWidth, _tileWidth);
-            Parallel.For(0, _tileWidth, x =>
+            var image = new Image<L16>(TileWidth, TileWidth);
+            Parallel.For(0, TileWidth, x =>
             {
-                Parallel.For(0, _tileWidth, y =>
+                Parallel.For(0, TileWidth, y =>
                 {
                     var v = (maxVal-minVal) * tile[x, y] + minVal;
                     if (v > 1) v = 1;
@@ -1594,10 +1216,10 @@ namespace PlanetCreator
 
         void WriteMaterialMap(byte[,] red, string fileName)
         {
-            var image = new Image<Rgb24>(_tileWidth, _tileWidth);
-            Parallel.For(0, _tileWidth, x =>
+            var image = new Image<Rgb24>(TileWidth, TileWidth);
+            Parallel.For(0, TileWidth, x =>
             {
-                Parallel.For(0, _tileWidth, y =>
+                Parallel.For(0, TileWidth, y =>
                 {
                     image[x, y] = new Rgb24(red[x,y], 0,0);
                 });
@@ -1608,7 +1230,7 @@ namespace PlanetCreator
         Point3D GetNormalizedSphereCoordinates(CubeMapFace face, int x, int y)
         {
             Point3D origin = new Point3D();
-            double cubeWidth = 2048;
+            double cubeWidth = TileWidth;
 
             // It makes sense if you draw a picture. See below
             double offset = (cubeWidth - 1) / 2.0;
@@ -1660,63 +1282,6 @@ namespace PlanetCreator
             return new Point3D(origin.X / r, origin.Y / r, origin.Z / r);
         }
 
-    }
-
-    public enum CubeMapFace
-    {
-        Front,
-        Back,
-        Left,
-        Right,
-        Up,
-        Down
-    }
-
-    public struct PointD
-    {
-        public double X;
-        public double Y;
-
-        public static PointD operator +(PointD p1, PointD p2) => new PointD { X = p1.X + p2.X, Y = p1.Y + p2.Y };
-        public static PointD operator +(PointD p1) => p1;
-        public static PointD operator -(PointD p1, PointD p2) => new PointD { X = p1.X - p2.X, Y = p1.Y - p2.Y };
-        public static PointD operator -(PointD p1) => new PointD { X = -p1.X, Y = -p1.Y };
-        public static PointD operator /(PointD p1, double d) => new PointD { X = p1.X / d, Y = p1.Y / d };
-        public static PointD operator /(PointD p1, PointD p2) => new PointD { X = p1.X / p2.X, Y = p1.Y / p2.Y };
-        public static PointD operator *(PointD p1, double d) => new PointD { X = p1.X * d, Y = p1.Y * d };
-        public static PointD operator *(PointD p1, PointD p2) => new PointD { X = p1.X * p2.X, Y = p1.Y * p2.Y };
-
-        public double Length => Math.Sqrt(X* X + Y* Y);
-
-        public PointD Normalize()
-        {
-            var len = Length;
-            if (len == 0) return this;
-            return this / len;
-        }
-
-        // !!! (int)(-0.1) = 0 !!! But we want -1 !!!
-        public PointI ToIntegerPoint() => new PointI() { X = X < 0? (int)(X-1) : (int)X, Y = Y < 0 ? (int)(Y - 1) : (int)Y };
-        public PointD IntegerOffset() => new PointD() { X = X - (int)X, Y = Y - (int)Y };
-    }
-
-    public struct PointI
-    {
-        public int X;
-        public int Y;
-        public double DistanceTo(PointI p)
-        {
-            var dx = p.X - X;
-            var dy = p.Y - Y;
-            return Math.Sqrt(1.0* dx * dx + dy * dy);
-        }
-        public bool IsWithinRadius(PointI p, double radius)
-        {
-            var dx = p.X - X;
-            var dy = p.Y - Y;
-            if (dx < - radius || dx > radius || dy < -radius || dy > radius) return false;
-            return Math.Sqrt(1.0 * dx * dx + dy * dy) <= radius;
-        }
     }
 
     class NoiseMaker

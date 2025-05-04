@@ -1,6 +1,6 @@
 ﻿using MathNet.Numerics.LinearAlgebra;
 using MathNet.Numerics.LinearRegression;
-using SixLabors.ImageSharp.ColorSpaces.Conversion;
+using SpaceEngineersToolsShared;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -10,12 +10,10 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace PlanetCreator
+namespace SpaceEngineersToolsShared
 {
-    static class EdgeFixer
+    public static class EdgeFixer
     {
-        public static int TileWidth = 2048;
-
         class PointWrapper
         {
             public Func<double> GetValue;
@@ -152,6 +150,8 @@ namespace PlanetCreator
         {
             if (token.IsCancellationRequested) return;
 
+            int tileWidth = faces.Values.First().GetLength(0); // Assume tile width and height are the same.
+
             FixCubeTriplets(faces);
 
             // Fix cubemap edges if there are sudden jumps
@@ -185,9 +185,9 @@ namespace PlanetCreator
                 var face2 = pair[1];
                 tasks.Add(Task.Run(() =>
                 {
-                    for (int x = 0; x < TileWidth; ++x)
+                    for (int x = 0; x < tileWidth; ++x)
                     {
-                        if (cornersOnly && x == 5) x = TileWidth - 6;
+                        if (cornersOnly && x == 5) x = tileWidth - 6;
                         if (token.IsCancellationRequested) return;
                         List<PointWrapper> edgePoints = new List<PointWrapper>
                         {
@@ -196,11 +196,11 @@ namespace PlanetCreator
                             new PointWrapper(()=>faces[face1][x, 2], d => faces[face1][x, 2] = d),
                             new PointWrapper(()=>faces[face1][x, 1], d => faces[face1][x, 1] = d),
                             new PointWrapper(()=>faces[face1][x, 0], d => faces[face1][x, 0] = d),           // 4
-                            new PointWrapper(()=>faces[face2][x, 2047], d => faces[face2][x, 2047] = d),     // 5
-                            new PointWrapper(()=>faces[face2][x, 2046], d => faces[face2][x, 2046] = d),
-                            new PointWrapper(()=>faces[face2][x, 2045], d => faces[face2][x, 2045] = d),
-                            new PointWrapper(()=>faces[face2][x, 2044], d => faces[face2][x, 2044] = d),
-                            new PointWrapper(()=>faces[face2][x, 2043], d => faces[face2][x, 2043] = d),
+                            new PointWrapper(()=>faces[face2][x, (tileWidth-1)], d => faces[face2][x, (tileWidth-1)] = d),     // 5
+                            new PointWrapper(()=>faces[face2][x, (tileWidth-2)], d => faces[face2][x, (tileWidth-2)] = d),
+                            new PointWrapper(()=>faces[face2][x, (tileWidth-3)], d => faces[face2][x, (tileWidth-3)] = d),
+                            new PointWrapper(()=>faces[face2][x, (tileWidth-4)], d => faces[face2][x, (tileWidth-4)] = d),
+                            new PointWrapper(()=>faces[face2][x, (tileWidth-5)], d => faces[face2][x, (tileWidth-5)] = d),
                         };
                         //if (x == 1880) Debugger.Break();
                         ApplyEdgeFix(edgePoints);
@@ -225,17 +225,17 @@ namespace PlanetCreator
                 var face2 = pair[1];
                 tasks.Add(Task.Run(() =>
                 {
-                    for (int y = 0; y < TileWidth; ++y)
+                    for (int y = 0; y < tileWidth; ++y)
                     {
-                        if (cornersOnly && y == 5) y = TileWidth - 6;
+                        if (cornersOnly && y == 5) y = tileWidth - 6;
                         if (token.IsCancellationRequested) return;
                         List<PointWrapper> edgePoints = new List<PointWrapper>
                         {
-                            new PointWrapper(()=>faces[face1][2043, y], d => faces[face1][2043, y] = d),
-                            new PointWrapper(()=>faces[face1][2044, y], d => faces[face1][2044, y] = d),
-                            new PointWrapper(()=>faces[face1][2045, y], d => faces[face1][2045, y] = d),
-                            new PointWrapper(()=>faces[face1][2046, y], d => faces[face1][2046, y] = d),
-                            new PointWrapper(()=>faces[face1][2047, y], d => faces[face1][2047, y] = d),
+                            new PointWrapper(()=>faces[face1][(tileWidth-5), y], d => faces[face1][(tileWidth-5), y] = d),
+                            new PointWrapper(()=>faces[face1][(tileWidth-4), y], d => faces[face1][(tileWidth-4), y] = d),
+                            new PointWrapper(()=>faces[face1][(tileWidth-3), y], d => faces[face1][(tileWidth-3), y] = d),
+                            new PointWrapper(()=>faces[face1][(tileWidth-2), y], d => faces[face1][(tileWidth-2), y] = d),
+                            new PointWrapper(()=>faces[face1][(tileWidth-1), y], d => faces[face1][(tileWidth-1), y] = d),
                             new PointWrapper(()=>faces[face2][0, y], d => faces[face2][0, y] = d),
                             new PointWrapper(()=>faces[face2][1, y], d => faces[face2][1, y] = d),
                             new PointWrapper(()=>faces[face2][2, y], d => faces[face2][2, y] = d),
@@ -250,22 +250,22 @@ namespace PlanetCreator
             // Front <-> Down
             tasks.Add(Task.Run(() =>
             {
-                for (int x = 0; x < TileWidth; ++x)
+                for (int x = 0; x < tileWidth; ++x)
                 {
-                    if (cornersOnly && x == 5) x = TileWidth - 6;
+                    if (cornersOnly && x == 5) x = tileWidth - 6;
                     if (token.IsCancellationRequested) return;
                     List<PointWrapper> edgePoints = new List<PointWrapper>
                     {
-                        new PointWrapper(()=>faces[CubeMapFace.Front][x, 2043], d => faces[CubeMapFace.Front][x, 2043] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Front][x, 2044], d => faces[CubeMapFace.Front][x, 2044] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Front][x, 2045], d => faces[CubeMapFace.Front][x, 2045] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Front][x, 2046], d => faces[CubeMapFace.Front][x, 2046] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Front][x, 2047], d => faces[CubeMapFace.Front][x, 2047] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Down][2047 - x, 2047], d => faces[CubeMapFace.Down][2047 - x, 2047] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Down][2047 - x, 2046], d => faces[CubeMapFace.Down][2047 - x, 2046] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Down][2047 - x, 2045], d => faces[CubeMapFace.Down][2047 - x, 2045] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Down][2047 - x, 2044], d => faces[CubeMapFace.Down][2047 - x, 2044] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Down][2047 - x, 2043], d => faces[CubeMapFace.Down][2047 - x, 2043] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Front][x, (tileWidth-5)], d => faces[CubeMapFace.Front][x, (tileWidth-5)] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Front][x, (tileWidth-4)], d => faces[CubeMapFace.Front][x, (tileWidth-4)] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Front][x, (tileWidth-3)], d => faces[CubeMapFace.Front][x, (tileWidth-3)] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Front][x, (tileWidth-2)], d => faces[CubeMapFace.Front][x, (tileWidth-2)] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Front][x, (tileWidth-1)], d => faces[CubeMapFace.Front][x, (tileWidth-1)] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][(tileWidth-1) - x, (tileWidth-1)], d => faces[CubeMapFace.Down][(tileWidth-1) - x, (tileWidth-1)] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][(tileWidth-1) - x, (tileWidth-2)], d => faces[CubeMapFace.Down][(tileWidth-1) - x, (tileWidth-2)] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][(tileWidth-1) - x, (tileWidth-3)], d => faces[CubeMapFace.Down][(tileWidth-1) - x, (tileWidth-3)] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][(tileWidth-1) - x, (tileWidth-4)], d => faces[CubeMapFace.Down][(tileWidth-1) - x, (tileWidth-4)] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][(tileWidth-1) - x, (tileWidth-5)], d => faces[CubeMapFace.Down][(tileWidth-1) - x, (tileWidth-5)] = d),
                     };
                     ApplyEdgeFix(edgePoints);
                 }
@@ -274,22 +274,22 @@ namespace PlanetCreator
             // Right <-> Down
             tasks.Add(Task.Run(() =>
             {
-                for (int z = 0; z < TileWidth; ++z)
+                for (int z = 0; z < tileWidth; ++z)
                 {
-                    if (cornersOnly && z == 5) z = TileWidth - 6;
+                    if (cornersOnly && z == 5) z = tileWidth - 6;
                     if (token.IsCancellationRequested) return;
                     List<PointWrapper> edgePoints = new List<PointWrapper>
                     {
-                        new PointWrapper(()=>faces[CubeMapFace.Right][z, 2043], d => faces[CubeMapFace.Right][z, 2043] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Right][z, 2044], d => faces[CubeMapFace.Right][z, 2044] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Right][z, 2045], d => faces[CubeMapFace.Right][z, 2045] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Right][z, 2046], d => faces[CubeMapFace.Right][z, 2046] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Right][z, 2047], d => faces[CubeMapFace.Right][z, 2047] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Down][0, 2047-z], d => faces[CubeMapFace.Down][0, 2047-z] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Down][1, 2047-z], d => faces[CubeMapFace.Down][1, 2047-z] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Down][2, 2047-z], d => faces[CubeMapFace.Down][2, 2047-z] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Down][3, 2047-z], d => faces[CubeMapFace.Down][3, 2047-z] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Down][4, 2047-z], d => faces[CubeMapFace.Down][4, 2047-z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Right][z, (tileWidth-5)], d => faces[CubeMapFace.Right][z, (tileWidth-5)] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Right][z, (tileWidth-4)], d => faces[CubeMapFace.Right][z, (tileWidth-4)] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Right][z, (tileWidth-3)], d => faces[CubeMapFace.Right][z, (tileWidth-3)] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Right][z, (tileWidth-2)], d => faces[CubeMapFace.Right][z, (tileWidth-2)] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Right][z, (tileWidth-1)], d => faces[CubeMapFace.Right][z, (tileWidth-1)] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][0, (tileWidth-1)-z], d => faces[CubeMapFace.Down][0, (tileWidth-1)-z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][1, (tileWidth-1)-z], d => faces[CubeMapFace.Down][1, (tileWidth-1)-z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][2, (tileWidth-1)-z], d => faces[CubeMapFace.Down][2, (tileWidth-1)-z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][3, (tileWidth-1)-z], d => faces[CubeMapFace.Down][3, (tileWidth-1)-z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][4, (tileWidth-1)-z], d => faces[CubeMapFace.Down][4, (tileWidth-1)-z] = d),
                     };
                     ApplyEdgeFix(edgePoints);
                 }
@@ -298,22 +298,22 @@ namespace PlanetCreator
             // Left <-> Down
             tasks.Add(Task.Run(() =>
             {
-                for (int z = 0; z < TileWidth; ++z)
+                for (int z = 0; z < tileWidth; ++z)
                 {
-                    if (cornersOnly && z == 5) z = TileWidth - 6;
+                    if (cornersOnly && z == 5) z = tileWidth - 6;
                     if (token.IsCancellationRequested) return;
                     List<PointWrapper> edgePoints = new List<PointWrapper>
                     {
-                        new PointWrapper(()=>faces[CubeMapFace.Left][z, 2043], d => faces[CubeMapFace.Left][z, 2043] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Left][z, 2044], d => faces[CubeMapFace.Left][z, 2044] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Left][z, 2045], d => faces[CubeMapFace.Left][z, 2045] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Left][z, 2046], d => faces[CubeMapFace.Left][z, 2046] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Left][z, 2047], d => faces[CubeMapFace.Left][z, 2047] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Down][2047, z], d => faces[CubeMapFace.Down][2047, z] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Down][2046, z], d => faces[CubeMapFace.Down][2046, z] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Down][2045, z], d => faces[CubeMapFace.Down][2045, z] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Down][2044, z], d => faces[CubeMapFace.Down][2044, z] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Down][2043, z], d => faces[CubeMapFace.Down][2043, z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Left][z, (tileWidth-5)], d => faces[CubeMapFace.Left][z, (tileWidth-5)] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Left][z, (tileWidth-4)], d => faces[CubeMapFace.Left][z, (tileWidth-4)] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Left][z, (tileWidth-3)], d => faces[CubeMapFace.Left][z, (tileWidth-3)] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Left][z, (tileWidth-2)], d => faces[CubeMapFace.Left][z, (tileWidth-2)] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Left][z, (tileWidth-1)], d => faces[CubeMapFace.Left][z, (tileWidth-1)] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][(tileWidth-1), z], d => faces[CubeMapFace.Down][(tileWidth-1), z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][(tileWidth-2), z], d => faces[CubeMapFace.Down][(tileWidth-2), z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][(tileWidth-3), z], d => faces[CubeMapFace.Down][(tileWidth-3), z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][(tileWidth-4), z], d => faces[CubeMapFace.Down][(tileWidth-4), z] = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Down][(tileWidth-5), z], d => faces[CubeMapFace.Down][(tileWidth-5), z] = d),
                     };
                     ApplyEdgeFix(edgePoints);
                 }
@@ -322,9 +322,9 @@ namespace PlanetCreator
             // Right <-> Up
             tasks.Add(Task.Run(() =>
             {
-                for (int z = 0; z < TileWidth; ++z)
+                for (int z = 0; z < tileWidth; ++z)
                 {
-                    if (cornersOnly && z == 5) z = TileWidth - 6;
+                    if (cornersOnly && z == 5) z = tileWidth - 6;
                     if (token.IsCancellationRequested) return;
                     List<PointWrapper> edgePoints = new List<PointWrapper>
                     {
@@ -333,11 +333,11 @@ namespace PlanetCreator
                         new PointWrapper(()=>faces[CubeMapFace.Right][z, 2], d => faces[CubeMapFace.Right][z, 2] = d),
                         new PointWrapper(()=>faces[CubeMapFace.Right][z, 1], d => faces[CubeMapFace.Right][z, 1] = d),
                         new PointWrapper(()=>faces[CubeMapFace.Right][z, 0], d => faces[CubeMapFace.Right][z, 0] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Up][2047, 2047-z] , d => faces[CubeMapFace.Up][2047, 2047-z]  = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Up][2046, 2047-z] , d => faces[CubeMapFace.Up][2046, 2047-z]  = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Up][2045, 2047-z] , d => faces[CubeMapFace.Up][2045, 2047-z]  = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Up][2044, 2047-z] , d => faces[CubeMapFace.Up][2044, 2047-z]  = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Up][2043, 2047-z] , d => faces[CubeMapFace.Up][2043, 2047-z]  = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][(tileWidth-1), (tileWidth-1)-z] , d => faces[CubeMapFace.Up][(tileWidth-1), (tileWidth-1)-z]  = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][(tileWidth-2), (tileWidth-1)-z] , d => faces[CubeMapFace.Up][(tileWidth-2), (tileWidth-1)-z]  = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][(tileWidth-3), (tileWidth-1)-z] , d => faces[CubeMapFace.Up][(tileWidth-3), (tileWidth-1)-z]  = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][(tileWidth-4), (tileWidth-1)-z] , d => faces[CubeMapFace.Up][(tileWidth-4), (tileWidth-1)-z]  = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][(tileWidth-5), (tileWidth-1)-z] , d => faces[CubeMapFace.Up][(tileWidth-5), (tileWidth-1)-z]  = d),
                     };
                     ApplyEdgeFix(edgePoints);
                 }
@@ -346,9 +346,9 @@ namespace PlanetCreator
             // Back <-> Up
             tasks.Add(Task.Run(() =>
             {
-                for (int z = 0; z < TileWidth; ++z)
+                for (int z = 0; z < tileWidth; ++z)
                 {
-                    if (cornersOnly && z == 5) z = TileWidth - 6;
+                    if (cornersOnly && z == 5) z = tileWidth - 6;
                     if (token.IsCancellationRequested) return;
                     List<PointWrapper> edgePoints = new List<PointWrapper>
                     {
@@ -357,11 +357,11 @@ namespace PlanetCreator
                         new PointWrapper(()=>faces[CubeMapFace.Back][z, 2], d => faces[CubeMapFace.Back][z, 2] = d),
                         new PointWrapper(()=>faces[CubeMapFace.Back][z, 1], d => faces[CubeMapFace.Back][z, 1] = d),
                         new PointWrapper(()=>faces[CubeMapFace.Back][z, 0], d => faces[CubeMapFace.Back][z, 0] = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Up][2047-z, 0] , d => faces[CubeMapFace.Up][2047-z, 0]  = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Up][2047-z, 1] , d => faces[CubeMapFace.Up][2047-z, 1]  = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Up][2047-z, 2] , d => faces[CubeMapFace.Up][2047-z, 2]  = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Up][2047-z, 3] , d => faces[CubeMapFace.Up][2047-z, 3]  = d),
-                        new PointWrapper(()=>faces[CubeMapFace.Up][2047-z, 4] , d => faces[CubeMapFace.Up][2047-z, 4]  = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][(tileWidth-1)-z, 0] , d => faces[CubeMapFace.Up][(tileWidth-1)-z, 0]  = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][(tileWidth-1)-z, 1] , d => faces[CubeMapFace.Up][(tileWidth-1)-z, 1]  = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][(tileWidth-1)-z, 2] , d => faces[CubeMapFace.Up][(tileWidth-1)-z, 2]  = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][(tileWidth-1)-z, 3] , d => faces[CubeMapFace.Up][(tileWidth-1)-z, 3]  = d),
+                        new PointWrapper(()=>faces[CubeMapFace.Up][(tileWidth-1)-z, 4] , d => faces[CubeMapFace.Up][(tileWidth-1)-z, 4]  = d),
                     };
                     ApplyEdgeFix(edgePoints);
                 }
@@ -370,9 +370,9 @@ namespace PlanetCreator
             // Left <-> Up
             tasks.Add(Task.Run(() =>
             {
-                for (int z = 0; z < TileWidth; ++z)
+                for (int z = 0; z < tileWidth; ++z)
                 {
-                    if (cornersOnly && z == 5) z = TileWidth - 6;
+                    if (cornersOnly && z == 5) z = tileWidth - 6;
                     if (token.IsCancellationRequested) return;
                     List<PointWrapper> edgePoints = new List<PointWrapper>
                     {
@@ -404,21 +404,9 @@ namespace PlanetCreator
 
             if (erodeCorners)
             {
-                var gen = new PlanetGenerator()
-                {
-                    DebugMode = false,
-                    Faces = faces,
-                    ErosionErodeBrush = 2,
-                    ErosionDepositBrush = 2,
-                    BrushPointiness = 0,
-                    ErosionErodeSpeed = 0.03,
-                    ErosionDepositSpeed = 0.01,
-                    EvaporateSpeed = 0.01,
-                    ErosionSedimentCapacityFactor = 35,
-                    ErosionInteria = 0.01,
-                    ErosionMaxDropletLifeTime = 30
-                };
-
+                var hyd = new HydraulicErosion(new Random(0), faces);
+                hyd.ErosionMaxDropletLifeTime = 30;
+                hyd.ErosionSedimentCapacityFactor = 30;
                 var faceVals = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToArray();
                 List<PointD> points = new List<PointD>
                 {
@@ -430,8 +418,8 @@ namespace PlanetCreator
                 {
                     foreach (var point in points)
                     {
-                        gen.Erode(null, CancellationToken.None, point, face);
-                        gen.Erode(null, CancellationToken.None, new PointD() { X = 2047-point.X, Y = 2047-point.Y }, face);
+                        hyd.Erode(token, point, face);
+                        hyd.Erode(token, new PointD() { X = (tileWidth-1)-point.X, Y = (tileWidth-1)-point.Y }, face);
                     }
                 }
                 FixCubeTriplets(faces);
@@ -451,48 +439,50 @@ namespace PlanetCreator
         /// <param name="faces"></param>
         public static void FixCubeTriplets(Dictionary<CubeMapFace, double[,]> faces)
         {
+            int tileWidth = faces.Values.First().GetLength(0); // Assume tile width and height are the same.
+
             List<List<PointWrapper>> triplets = new List<List<PointWrapper>>();
             // There are 8 points in total:
             // - Front-Up-Left
             var pw1 = new PointWrapper(() => faces[CubeMapFace.Front][0, 0], d => faces[CubeMapFace.Front][0, 0] = d);
-            var pw2 = new PointWrapper(() => faces[CubeMapFace.Up][0, 2047], d => faces[CubeMapFace.Up][0, 2047] = d);
-            var pw3 = new PointWrapper(() => faces[CubeMapFace.Left][2047, 0], d => faces[CubeMapFace.Left][2047, 0] = d);
+            var pw2 = new PointWrapper(() => faces[CubeMapFace.Up][0, (tileWidth-1)], d => faces[CubeMapFace.Up][0, (tileWidth-1)] = d);
+            var pw3 = new PointWrapper(() => faces[CubeMapFace.Left][(tileWidth-1), 0], d => faces[CubeMapFace.Left][(tileWidth-1), 0] = d);
             triplets.Add(new List<PointWrapper> { pw1, pw2, pw3 });
             // - Front-Up-Right
-            pw1 = new PointWrapper(() => faces[CubeMapFace.Front][2047, 0], d => faces[CubeMapFace.Front][2047, 0] = d);
-            pw2 = new PointWrapper(() => faces[CubeMapFace.Up][2047, 2047], d => faces[CubeMapFace.Up][2047, 2047] = d);
+            pw1 = new PointWrapper(() => faces[CubeMapFace.Front][(tileWidth-1), 0], d => faces[CubeMapFace.Front][(tileWidth-1), 0] = d);
+            pw2 = new PointWrapper(() => faces[CubeMapFace.Up][(tileWidth-1), (tileWidth-1)], d => faces[CubeMapFace.Up][(tileWidth-1), (tileWidth-1)] = d);
             pw3 = new PointWrapper(() => faces[CubeMapFace.Right][0, 0], d => faces[CubeMapFace.Right][0, 0] = d);
             triplets.Add(new List<PointWrapper> { pw1, pw2, pw3 });
             // - Front-Down-Left
-            pw1 = new PointWrapper(() => faces[CubeMapFace.Front][0, 2047], d => faces[CubeMapFace.Front][0, 2047] = d);
-            pw2 = new PointWrapper(() => faces[CubeMapFace.Down][2047, 2047], d => faces[CubeMapFace.Down][2047, 2047] = d);
-            pw3 = new PointWrapper(() => faces[CubeMapFace.Left][2047, 2047], d => faces[CubeMapFace.Left][2047, 2047] = d);
+            pw1 = new PointWrapper(() => faces[CubeMapFace.Front][0, (tileWidth-1)], d => faces[CubeMapFace.Front][0, (tileWidth-1)] = d);
+            pw2 = new PointWrapper(() => faces[CubeMapFace.Down][(tileWidth-1), (tileWidth-1)], d => faces[CubeMapFace.Down][(tileWidth-1), (tileWidth-1)] = d);
+            pw3 = new PointWrapper(() => faces[CubeMapFace.Left][(tileWidth-1), (tileWidth-1)], d => faces[CubeMapFace.Left][(tileWidth-1), (tileWidth-1)] = d);
             triplets.Add(new List<PointWrapper> { pw1, pw2, pw3 });
             // - Front-Down-Right
-            pw1 = new PointWrapper(() => faces[CubeMapFace.Front][2047, 2047], d => faces[CubeMapFace.Front][2047, 2047] = d);
-            pw2 = new PointWrapper(() => faces[CubeMapFace.Down] [0, 2047], d => faces[CubeMapFace.Down][0, 2047] = d);
-            pw3 = new PointWrapper(() => faces[CubeMapFace.Right][0, 2047], d => faces[CubeMapFace.Right][0, 2047] = d);
+            pw1 = new PointWrapper(() => faces[CubeMapFace.Front][(tileWidth-1), (tileWidth-1)], d => faces[CubeMapFace.Front][(tileWidth-1), (tileWidth-1)] = d);
+            pw2 = new PointWrapper(() => faces[CubeMapFace.Down] [0, (tileWidth-1)], d => faces[CubeMapFace.Down][0, (tileWidth-1)] = d);
+            pw3 = new PointWrapper(() => faces[CubeMapFace.Right][0, (tileWidth-1)], d => faces[CubeMapFace.Right][0, (tileWidth-1)] = d);
             triplets.Add(new List<PointWrapper> { pw1, pw2, pw3 });
 
             // - Back-Up-Right
             pw1 = new PointWrapper(() => faces[CubeMapFace.Back][0, 0], d => faces[CubeMapFace.Back][0, 0] = d);
-            pw2 = new PointWrapper(() => faces[CubeMapFace.Up][2047, 0], d => faces[CubeMapFace.Up][2047, 0] = d);
-            pw3 = new PointWrapper(() => faces[CubeMapFace.Right][2047, 0], d => faces[CubeMapFace.Right][2047, 0] = d);
+            pw2 = new PointWrapper(() => faces[CubeMapFace.Up][(tileWidth-1), 0], d => faces[CubeMapFace.Up][(tileWidth-1), 0] = d);
+            pw3 = new PointWrapper(() => faces[CubeMapFace.Right][(tileWidth-1), 0], d => faces[CubeMapFace.Right][(tileWidth-1), 0] = d);
             triplets.Add(new List<PointWrapper> { pw1, pw2, pw3 });
             // - Back-Up-Left
-            pw1 = new PointWrapper(() => faces[CubeMapFace.Back][2047, 0], d => faces[CubeMapFace.Back][2047, 0] = d);
+            pw1 = new PointWrapper(() => faces[CubeMapFace.Back][(tileWidth-1), 0], d => faces[CubeMapFace.Back][(tileWidth-1), 0] = d);
             pw2 = new PointWrapper(() => faces[CubeMapFace.Up][0, 0], d => faces[CubeMapFace.Up][0, 0] = d);
             pw3 = new PointWrapper(() => faces[CubeMapFace.Left][0, 0], d => faces[CubeMapFace.Left][0, 0] = d);
             triplets.Add(new List<PointWrapper> { pw1, pw2, pw3 });
             // - Back-Down-Right
-            pw1 = new PointWrapper(() => faces[CubeMapFace.Back][0, 2047], d => faces[CubeMapFace.Back][0, 2047] = d);
+            pw1 = new PointWrapper(() => faces[CubeMapFace.Back][0, (tileWidth-1)], d => faces[CubeMapFace.Back][0, (tileWidth-1)] = d);
             pw2 = new PointWrapper(() => faces[CubeMapFace.Down][0, 0], d => faces[CubeMapFace.Down][0, 0] = d);
-            pw3 = new PointWrapper(() => faces[CubeMapFace.Right][2047, 2047], d => faces[CubeMapFace.Right][2047, 2047] = d);
+            pw3 = new PointWrapper(() => faces[CubeMapFace.Right][(tileWidth-1), (tileWidth-1)], d => faces[CubeMapFace.Right][(tileWidth-1), (tileWidth-1)] = d);
             triplets.Add(new List<PointWrapper> { pw1, pw2, pw3 });
             // - Back-Down-Left
-            pw1 = new PointWrapper(() => faces[CubeMapFace.Back][2047, 2047], d => faces[CubeMapFace.Back][2047, 2047] = d);
-            pw2 = new PointWrapper(() => faces[CubeMapFace.Down][2047, 0], d => faces[CubeMapFace.Down][2047, 0] = d);
-            pw3 = new PointWrapper(() => faces[CubeMapFace.Left][0, 2047], d => faces[CubeMapFace.Left][0, 2047] = d);
+            pw1 = new PointWrapper(() => faces[CubeMapFace.Back][(tileWidth-1), (tileWidth-1)], d => faces[CubeMapFace.Back][(tileWidth-1), (tileWidth-1)] = d);
+            pw2 = new PointWrapper(() => faces[CubeMapFace.Down][(tileWidth-1), 0], d => faces[CubeMapFace.Down][(tileWidth-1), 0] = d);
+            pw3 = new PointWrapper(() => faces[CubeMapFace.Left][0, (tileWidth-1)], d => faces[CubeMapFace.Left][0, (tileWidth-1)] = d);
             triplets.Add(new List<PointWrapper> { pw1, pw2, pw3 });
 
             foreach (var triplet in triplets)

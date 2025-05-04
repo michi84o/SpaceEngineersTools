@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\SpaceEngineersToolsShared\SpaceEngineersToolsShared.csproj" />
     <ProjectReference Include="..\PlanetCreator\PlanetCreator.csproj" />
   </ItemGroup>
 
