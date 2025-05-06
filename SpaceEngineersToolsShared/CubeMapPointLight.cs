@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using MathNet.Numerics.RootFinding;
+using System.Collections.Generic;
 
 namespace SpaceEngineersToolsShared
 {
@@ -9,11 +10,20 @@ namespace SpaceEngineersToolsShared
         public CubeMapFace Face;
         public ushort TileWidth = 2048;
 
+        public CubeMapPointLight()
+        {
+            X = 0;
+            Y = 0;
+            Face = CubeMapFace.Front;
+            TileWidth = 2048;
+        }
+
         public CubeMapPointLight(CubeMapFace face, int x, int y, int tileWidth = 2048)
         {
             Face = face;
             X = x;
             Y = y;
+            TileWidth = (ushort)tileWidth;
         }
 
         public static double GetValue(CubeMapPointLight point, Dictionary<CubeMapFace, double[,]> faces)
@@ -48,6 +58,7 @@ namespace SpaceEngineersToolsShared
                                 Face = CubeMapFace.Left,
                                 X = currentX,
                                 Y = currentY,
+                                TileWidth=origin.TileWidth
                             }, dy, 0);
                     case CubeMapFace.Down:
                         // West of 'Down' is 'Right', rotated counterclockwise by 90°
@@ -60,6 +71,7 @@ namespace SpaceEngineersToolsShared
                                Face = CubeMapFace.Right,
                                 X = currentX,
                                 Y = currentY,
+                                TileWidth = origin.TileWidth
                             }, (ushort)-dy, 0);
                     case CubeMapFace.Left:
                         // West of 'Left' is 'Back'
@@ -98,6 +110,7 @@ namespace SpaceEngineersToolsShared
                                 Face = CubeMapFace.Right,
                                 X = currentX,
                                 Y = currentY,
+                                TileWidth = origin.TileWidth
                             }, -dy, 0);
                     case CubeMapFace.Down:
                         // East of 'Down' is 'Left', rotated clockwise by 90°
@@ -226,7 +239,8 @@ namespace SpaceEngineersToolsShared
             {
                 Face = currentFace,
                 X = currentX,
-                Y = currentY
+                Y = currentY,
+                TileWidth = origin.TileWidth
             };
         }
 

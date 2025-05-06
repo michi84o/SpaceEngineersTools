@@ -8,6 +8,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -155,6 +156,8 @@ namespace PlanetCreator
             var faces = GetFaces();
             GetPixelRange(out var cStart, out var cEnd);
 
+            OnProgress(1);
+
             // Layers of diferent noise frequencies
             List<NoiseMaker> list = new();
             var octave = 1;
@@ -205,6 +208,8 @@ namespace PlanetCreator
             double sphereRadius = 1000;
             SphericalWorleyNoise noise = new(seed, sphereRadius, cells);
 
+            OnProgress(1);
+
             int cStart = 0;
             int cEnd = TileWidth;
             if (LimitedDebugMode)
@@ -247,12 +252,16 @@ namespace PlanetCreator
             if (frecklesPerTile == 0) return;
             var faces = LoadHeightMaps(token);
 
+            OnProgress(1);
+
             double worleyBlendStart = 0.5;
             double worleyLayerMaxHeight = .12; // .1 to flat, .15 too high
 
             var rnd = new Random(seed);
             int sphereRadius = 1000;
             var worley = new SphericalWorleyNoise(seed, sphereRadius, cells);
+            int progress = 1;
+            int progressIncrement = (int)(0.5 + 89 / (faces.Count * frecklesPerTile));
             Parallel.ForEach(faces, face =>
             {
                 var worleyFreckleFile = Path.Combine(
@@ -269,6 +278,12 @@ namespace PlanetCreator
                 }
                 for (int i = 0; i < frecklesPerTile; ++i)
                 {
+                    if (i>0)
+                    {
+                        Interlocked.Add(ref progress, progressIncrement);
+                        OnProgress(progress);
+                    }
+
                     double worleyMin = double.NaN;
                     double worleyMax = double.NaN;
                     var worleySubLayer = new double[TileWidth, TileWidth];
@@ -381,14 +396,20 @@ namespace PlanetCreator
                 image.SaveAsPng(worleyFreckleFile);
                 image.Dispose();
             });
+
+            OnProgress(90);
             Normalize(faces.Values.ToList(), token);
+            OnProgress(99);
             SaveFaces(faces, token);
+            OnProgress(100);
         }
 
         public void FlattenHistogram(int minStretch, int maxStretch, CancellationToken token)
         {
             // Strech using a SINUS curve.
             var faces = LoadHeightMaps(token);
+            OnProgress(1);
+
             Parallel.ForEach(faces, face =>
             {
                 Parallel.For(0, TileWidth, x =>
@@ -446,12 +467,33 @@ namespace PlanetCreator
                     }
                 });
             });
+            OnProgress(90);
             SaveFaces(faces, token);
+            OnProgress(100);
         }
 
+        public void Invert(CancellationToken token)
+        {
+            var faces = LoadHeightMaps(token);
+            OnProgress(1);
+            Parallel.ForEach(faces, face =>
+            {
+                Parallel.For(0, TileWidth, x =>
+                {
+                    for (int y = 0; y < TileWidth; ++y)
+                    {
+                        face.Value[x, y] = 1 - face.Value[x, y];
+                    }
+                });
+            });
+            OnProgress(90);
+            SaveFaces(faces, token);
+            OnProgress(100);
+        }
         public void ExponentialStretch(double stretchAmount, int equatorWidthPercentage, CancellationToken token)
         {
             var faces = LoadHeightMaps(token);
+            OnProgress(1);
             Parallel.ForEach(faces, face =>
             {
                 Parallel.For(0, TileWidth, x =>
@@ -485,18 +527,24 @@ namespace PlanetCreator
                     }
                 });
             });
+            OnProgress(90);
             SaveFaces(faces, token);
+            OnProgress(100);
         }
 
         public void StrechHistogram(double min, double max, CancellationToken token)
         {
             var faces = LoadHeightMaps(token);
+            OnProgress(1);
             Normalize(faces.Values.ToList(), token);
+            OnProgress(90);
             SaveFaces(faces, token);
+            OnProgress(100);
         }
 
-        public void GenerateSedimentLayers(int seed, int sedimentTypeCount, CancellationToken token)
+        public void GenerateSedimentLayers(int seed, int sedimentTypeCount, int sedimentPlateCount, CancellationToken token)
         {
+            OnProgress(0);
             // Sediment Layer System
             // Sediment layers can have heights in the range
             // of a few centimeters up to tens of meters or more
@@ -528,77 +576,169 @@ namespace PlanetCreator
                 ushort[] layers = new ushort[65536];
                 for (int j = 0; j < 65536; ++j)
                 {
-                    if (token.IsCancellationRequested) return;
                     layers[j] = urnd.GetNextValue();
                 }
                 sedimentLayers.Add(layers);
             }
 
-            // Prepare list of all points that are unset, initialize sedimentLayerIndexes.
-            List<CubeMapPointLight> unsetPoints = new();
+            if (token.IsCancellationRequested) return;
+            OnProgress(1);
+
+            // Initialize sedimentLayerIndexes.
             int unsetCount = 0;
-            List<CubeMapPointLight> setPointsWithUnsetNeighbors = new();
             var faces = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToList();
             if (DebugMode) faces = new List<CubeMapFace> { PreviewFace };
-            foreach (var face in faces)
+            foreach(var face in  faces)
             {
                 sedimentLayerIndexes[face] = new byte[TileWidth, TileWidth];
                 for (ushort x = 0; x < TileWidth; ++x)
                     for (ushort y = 0; y < TileWidth; ++y)
                     {
-                        unsetPoints.Add(new(face, x, y));
                         ++unsetCount;
                         sedimentLayerIndexes[face][x, y] = 0;
                     }
-            }
+            };
 
-            // Place 768 random seeds
-            for (int i = 0; i < 768; ++i)
+            if (token.IsCancellationRequested) return;
+            OnProgress(2);
+
+            // Place sedimentPlateCount random seeds
+            HashSet<(CubeMapFace, int, int)> placedSeeds = new();
+            int cnt = 0;
+
+            var faceValues = sedimentLayerIndexes.Keys.ToList();
+
+            while (placedSeeds.Count < sedimentPlateCount)
             {
-                var index = (int)rnd.NextInt64(unsetPoints.Count);
-                var item = unsetPoints[index];
+                (CubeMapFace, int, int) tuple = new()
+                {
+                    Item1 = faceValues[faces.Count == 1 ? 0 : (int)rnd.NextInt64(0, faces.Count)],
+                    Item2 = (int)rnd.NextInt64(0, TileWidth),
+                    Item3 = (int)rnd.NextInt64(0, TileWidth)
+                };
+                if (placedSeeds.Contains(tuple)) continue;
+                placedSeeds.Add(tuple);
+                ++cnt;
+            }
+            foreach (var tuple in placedSeeds)
+            {
                 var seedValue = (byte)(rnd.NextInt64(sedimentTypeCount - 1) + 1); // Don't use 0
-                sedimentLayerIndexes[item.Face][item.X, item.Y] = seedValue;
-                unsetPoints.RemoveAt(index);
-                --unsetCount;
-                setPointsWithUnsetNeighbors.Add(item);
+                sedimentLayerIndexes[tuple.Item1][tuple.Item2, tuple.Item3] = seedValue;
             }
-            unsetPoints.Clear();
-            unsetPoints = null;
-            // Loop on all
-            while (unsetCount > 0 && setPointsWithUnsetNeighbors.Count > 0)
+            unsetCount -= sedimentPlateCount;
+
+            if (token.IsCancellationRequested) return;
+            OnProgress(3);
+
+            // Let the seeds randomly grow
+            var initialUnsetCount = unsetCount;
+            int concurrency = 256;
+
+            long iteration = 0;
+            int lastProgress = 3;
+            while (unsetCount > 0 && placedSeeds.Count > 0)
             {
-                var index = (int)rnd.NextInt64(setPointsWithUnsetNeighbors.Count);
-                var setPoint = setPointsWithUnsetNeighbors[index];
+                // Don't screw ourselves with parallel stuff when nearly no pixels are left
+                if (unsetCount * 4 < concurrency)
+                    concurrency = 1;
 
-                var neighbors = setPoint.GetNeighbors();
-                if (neighbors.Count == 0)
+                HashSet<int> nextIndexes = new();
+                int deadLockDetect = 0;
+                while (nextIndexes.Count < concurrency && nextIndexes.Count < placedSeeds.Count)
                 {
-                    setPointsWithUnsetNeighbors.RemoveAt(index);
-                    continue;
+                    var index = (int)rnd.NextInt64(placedSeeds.Count);
+                    if (!nextIndexes.Add(index) && ++deadLockDetect > 10000)
+                    {
+                        MessageBox.Show("Random Number Generator is deadlocked! Please try again with another seed.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
                 }
-                neighbors.RemoveAll(neighbor => DebugMode && neighbor.Face != PreviewFace || sedimentLayerIndexes[neighbor.Face][neighbor.X, neighbor.Y] != 0);
-                if (neighbors.Count == 0)
+                var indexes = nextIndexes.ToArray();
+                ConcurrentBag<(CubeMapFace, int, int)> pointsToRemove = new();
+                ConcurrentBag<(CubeMapFace, int, int, byte)> pointsToSet = new();
+                var list = placedSeeds.ToList();
+                Parallel.For(0, indexes.Length, i =>
                 {
-                    setPointsWithUnsetNeighbors.RemoveAt(index);
-                    continue;
-                }
-                CubeMapPointLight neighbor;
-                if (neighbors.Count == 1)
+                    // Pick random item from HashSet
+                    var index = indexes[i];
+
+                    var tuple = list[index];
+                    // This code avoids converting the hashset into a list.
+                    // But is it waaaaaay slower
+                    //int currentIndex = 0;
+                    //(CubeMapFace, int, int) tuple = default;
+                    //foreach (var element in placedSeeds)
+                    //{
+                    //    if (currentIndex == index)
+                    //    {
+                    //        tuple = element;
+                    //        break;
+                    //    }
+                    //    ++currentIndex;
+                    //}
+
+                    var point = new CubeMapPointLight(tuple.Item1, tuple.Item2, tuple.Item3);
+
+                    var neighbors = point.GetNeighbors();
+                    if (neighbors.Count == 0)
+                    {
+                        pointsToRemove.Add(tuple);
+                        return;
+                    }
+                    neighbors.RemoveAll(neighbor => DebugMode && neighbor.Face != PreviewFace || sedimentLayerIndexes[neighbor.Face][neighbor.X, neighbor.Y] != 0);
+                    if (neighbors.Count == 0)
+                    {
+                        pointsToRemove.Add(tuple);
+                        return;
+                    }
+                    CubeMapPointLight neighbor;
+                    if (neighbors.Count == 1)
+                    {
+                        neighbor = neighbors[0];
+                        pointsToRemove.Add(tuple);
+                    }
+                    else
+                    {
+                        lock (rnd) // Not locking caused rnd instance to get corrupted. It only returned 0s after a while.
+                        {
+                            neighbor = neighbors[(int)rnd.NextInt64(neighbors.Count)];
+                        }
+                    }
+                    pointsToSet.Add((
+                        neighbor.Face,
+                        neighbor.X,
+                        neighbor.Y,
+                        sedimentLayerIndexes[point.Face][point.X, point.Y]));
+                });
+
+                var pointsToSetList = pointsToSet.ToList();
+                var pointsToRemoveList = pointsToRemove.ToList();
+
+                foreach (var point in pointsToSetList)
                 {
-                    neighbor = neighbors[0];
-                    setPointsWithUnsetNeighbors.RemoveAt(index);
+                    sedimentLayerIndexes[point.Item1][point.Item2, point.Item3] = point.Item4;
+                    placedSeeds.Add((point.Item1, point.Item2, point.Item3));
+                    --unsetCount;
                 }
-                else
+                foreach (var point in pointsToRemoveList)
                 {
-                    neighbor = neighbors[(int)rnd.NextInt64(neighbors.Count)];
+                    placedSeeds.Remove(point);
                 }
-                sedimentLayerIndexes[neighbor.Face][neighbor.X, neighbor.Y] = sedimentLayerIndexes[setPoint.Face][setPoint.X, setPoint.Y];
-                setPointsWithUnsetNeighbors.Add(neighbor);
-                --unsetCount;
+
+                if (token.IsCancellationRequested) return;
+                if (++iteration % 1000 == 0)
+                {
+                    int progress = (int)(.5 + 3 + 92 * (1 - unsetCount * 1.0 / initialUnsetCount));
+                    if (progress != lastProgress)
+                    {
+                        OnProgress((int)progress);
+                        lastProgress = progress;
+                    }
+                }
             }
 
-
+            if (token.IsCancellationRequested) return;
+            OnProgress(95);
             Parallel.ForEach(faces, face =>
             {
                 var image = new Image<Rgb24>(TileWidth, TileWidth);
@@ -613,6 +753,8 @@ namespace PlanetCreator
                 image.SaveAsPng(Path.Combine(WorkingDirectory, (face + "_sediments.png").ToLower()));
                 image.Dispose();
             });
+
+            OnProgress(98);
 
             using (var fs = new FileStream(Path.Combine(WorkingDirectory, "sediments.txt"), FileMode.Create))
             using (var sw = new StreamWriter(fs))
@@ -629,15 +771,9 @@ namespace PlanetCreator
                 sw.Flush();
                 fs.Flush();
             }
-        }
 
-        /// <summary>
-        /// TODO: Edges not seamless!!! The duplicate point rule is not applied!
-        /// </summary>
-        /// <param name="rnd"></param>
-        /// <param name="token"></param>
-        /// <param name="startPoint">Can be used to start at a specific spot instead of random spot.</param>
-        /// <param name="startFace">Can be used to start at a specific face instead of random face.</param>
+            OnProgress(100);
+        }
 
         HydraulicErosion _hyd;
         public void InitErosion(bool useSediments, CancellationToken token)
@@ -735,7 +871,7 @@ namespace PlanetCreator
             filledVolume = 0;
             if (DebugMode && point.Face != PreviewFace) return;
             if (point.Value >= stopHeight) return;
-            var pointLight = new CubeMapPointLight { Face = point.Face, X = point.PosX, Y = point.PosY };
+            var pointLight = new CubeMapPointLight { Face = point.Face, X = point.PosX, Y = point.PosY, TileWidth = (ushort)TileWidth };
             //var faceValues = _faces.Keys.ToList();
             //if (_debug) faceValues = new List<CubeMapFace> { _debugFace };
             //foreach ( var faceValue in faceValues ) filledPixels[faceValue] = new bool[_tileWidth, _tileWidth];
@@ -911,7 +1047,7 @@ namespace PlanetCreator
                     for (int y = 0; y < TileWidth; ++y)
                     {
                         if (token.IsCancellationRequested) return;
-                        var point = new CubeMapPointLight { Face = face, X = x, Y = y };
+                        var point = new CubeMapPointLight { Face = face, X = x, Y = y, TileWidth=(ushort)TileWidth };
                         double sum = 0;
                         for (int x2 = x - matrixSize / 2; x2 <= x + matrixSize / 2; ++x2)
                         {
@@ -1116,11 +1252,19 @@ namespace PlanetCreator
 
         void Normalize(List<double[,]> images, CancellationToken token, double minHeight = 0, double maxHeight = 1.0, bool invert = false)
         {
-            double max = images[0][0, 0];
-            double min = images[0][0, 0];
-            Parallel.For(0, TileWidth, POptions(token), x =>
+            int cStart = 0;
+            int cEnd = TileWidth;
+            if (LimitedDebugMode)
             {
-                for (int y = 0; y < TileWidth; ++y)
+                cStart = TileWidth / 4;
+                cEnd = cStart * 2;
+            }
+
+            double max = images[0][cStart, cStart];
+            double min = images[0][cStart, cStart];
+            Parallel.For(cStart, cEnd, POptions(token), x =>
+            {
+                for (int y = cStart; y < cEnd; ++y)
                 {
                     foreach (var image in images)
                     {
@@ -1146,9 +1290,9 @@ namespace PlanetCreator
             if (token.IsCancellationRequested) return;
             double offset = -1 * min;
             double stretch = Math.Abs(max - min);
-            Parallel.For(0, TileWidth, POptions(token), x =>
+            Parallel.For(cStart, cEnd, POptions(token), x =>
             {
-                for (int y = 0; y < TileWidth; ++y)
+                for (int y = cStart; y < cEnd; ++y)
                 {
                     if (token.IsCancellationRequested) return;
                     foreach (var image in images)

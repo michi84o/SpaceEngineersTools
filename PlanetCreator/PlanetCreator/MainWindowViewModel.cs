@@ -979,6 +979,7 @@ namespace PlanetCreator
                 try
                 {
                     var gen = GetGenerator();
+                    gen.LimitedDebugMode = false;
                     gen.AddWorleyFreckles(FreckleSeed, FrecklesPerTile, WorleyCells, FreckleSegments, FreckleRadius, _cts.Token);
                     LoadPictures();
                 }
@@ -1028,7 +1029,23 @@ namespace PlanetCreator
                 try
                 {
                     var gen = GetGenerator();
-                    gen.FlattenHistogram(FlattenLowsAmount, FlattenPeaksAmount, _cts.Token);
+                    gen.StrechHistogram(StretchHistogramMin, StretchHistogramMax, _cts.Token);
+                    LoadPictures();
+                }
+                finally
+                { IsBusy = false; }
+            });
+        });
+
+        public ICommand InvertCommand => new RelayCommand(o =>
+        {
+            IsBusy = true;
+            Task.Run(() =>
+            {
+                try
+                {
+                    var gen = GetGenerator();
+                    gen.Invert(_cts.Token);
                     LoadPictures();
                 }
                 finally
@@ -1044,7 +1061,7 @@ namespace PlanetCreator
                 try
                 {
                     var gen = GetGenerator();
-                    gen.GenerateSedimentLayers(Seed, SedimentTypes, _cts.Token);
+                    gen.GenerateSedimentLayers(Seed, SedimentTypes, SedimentPlateCount, _cts.Token);
                 }
                 finally
                 { IsBusy = false; }

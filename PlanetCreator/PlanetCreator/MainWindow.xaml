@@ -401,7 +401,10 @@
                                   Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="2" Margin="3" Content="Stretch Histogram"
                                   ToolTip="Stretch histogram so all values are between Min and Max"
                                   Command="{Binding HistomgramStretchCommand}"/>
-                        </Grid>
+                                <Button
+                                  Grid.Row="9" Grid.Column="0" Grid.ColumnSpan="2" Margin="3" Content="Invert"
+                                  Command="{Binding InvertCommand}"/>
+                            </Grid>
                     </GroupBox>
                     <GroupBox
                         Grid.Row="5" Header="Sediment Layers" Margin="3">
@@ -421,7 +424,7 @@
                                     Text="Total Sed. Plates" VerticalAlignment="Center" />
                                 <TextBox
                                     Grid.Row="0" Grid.Column="1" Margin="3"
-                                    Text="{Binding SedimantPlateCount}"/>
+                                    Text="{Binding SedimentPlateCount}"/>
                                 <TextBlock
                                     Grid.Row="1" Grid.Column="0" Margin="3"
                                     Text="Sediment Sets" VerticalAlignment="Center" />
