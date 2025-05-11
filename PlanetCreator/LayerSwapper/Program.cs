@@ -12,6 +12,7 @@ namespace MyApp
         static void Main(string[] args)
         {
             Console.WriteLine("Layer Swapper for Material Maps");
+            Console.WriteLine("Layer Swapper for Material Maps. Only files with 2048x2048 pixels are supported!");
             Console.WriteLine("Folder with source layers:");
             string source = Console.ReadLine();
             if (!Directory.Exists(source))

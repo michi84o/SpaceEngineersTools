@@ -91,12 +91,14 @@ namespace SpaceEngineersToolsShared
                 {
                     _depositedSedimentMap[f.Key] = new double[_tileWidth, _tileWidth];
                 }
+                _sedimentLayerIndexes = sedimentLayerIndexes;
+                _sedimentLayers = sedimentLayers;
             }
         }
 
-        public double[,] DebugTileWaterFlow { get; set; }
-        public double[,] DebugTileErode { get; set; }
-        public double[,] DebugTileDeposit { get; set; }
+        //public double[,] DebugTileWaterFlow { get; set; }
+        //public double[,] DebugTileErode { get; set; }
+        //public double[,] DebugTileDeposit { get; set; }
 
         public void Erode(CancellationToken token,
             PointD? startPoint = null,
@@ -241,10 +243,10 @@ namespace SpaceEngineersToolsShared
                 double sedimentCapacity = Math.Max(-deltaHeight * speed * waterModified * sedimentCapacityFactor, minSedimentCapacity);
 
 
-                if (_debugMode && DebugTileWaterFlow != null)
-                {
-                    DebugTileWaterFlow[posOldI.X, posOldI.Y] = waterModified;
-                }
+                //if (_debugMode && DebugTileWaterFlow != null)
+                //{
+                //    DebugTileWaterFlow[posOldI.X, posOldI.Y] = waterModified;
+                //}
 
                 // If carrying more sediment than capacity, or if flowing uphill:
                 var oldPoint = new CubeMapPoint(_faces, posOldI.X, posOldI.Y, faceOld);
@@ -253,11 +255,14 @@ namespace SpaceEngineersToolsShared
                     // If moving uphill (deltaHeight > 0) try fill up to the current height, otherwise deposit a fraction of the excess sediment
                     double amountToDeposit = (deltaHeight > 0) ? Math.Min(deltaHeight, sediment) : (sediment - sedimentCapacity) * depositSpeed;
 
-                    if (_debugMode)
-                        DebugTileDeposit[posOldI.X, posOldI.Y] = amountToDeposit;
+                    //if (_debugMode)
+                    //    DebugTileDeposit[posOldI.X, posOldI.Y] = amountToDeposit;
 
-                    ApplyBrush(depositBrush, oldPoint, posOld, amountToDeposit);
-                    sediment -= amountToDeposit;
+                    if (amountToDeposit != 0)
+                    {
+                        ApplyBrush(depositBrush, oldPoint, posOld, amountToDeposit);
+                        sediment -= amountToDeposit;
+                    }
                 }
                 else
                 {
@@ -265,11 +270,14 @@ namespace SpaceEngineersToolsShared
                     // Clamp the erosion to the change in height so that it doesn't dig a hole in the terrain behind the droplet
                     double amountToErode = Math.Min((sedimentCapacity - sediment) * erodeSpeed, -deltaHeight);
 
-                    if (_debugMode)
-                        DebugTileErode[posOldI.X, posOldI.Y] = amountToErode;
+                    //if (_debugMode && DebugTileErode != null)
+                    //    DebugTileErode[posOldI.X, posOldI.Y] = amountToErode;
 
-                    ApplyBrush(erodeBrush, oldPoint, posOld, -amountToErode);
-                    sediment += amountToErode;
+                    if (amountToErode != 0)
+                    {
+                        ApplyBrush(erodeBrush, oldPoint, posOld, -amountToErode);
+                        sediment += amountToErode;
+                    }
                 }
                 // Update delta
                 deltaHeight = newHeight - CalculateHeightAndGradient(posOld, faceOld, _faces).Height;
@@ -292,7 +300,7 @@ namespace SpaceEngineersToolsShared
             }
         }
 
-        // TODO: This code does not apply the duplicate pixel rule for map edges. Resulting height map is not seamless!
+        // This code does not apply the duplicate pixel rule for map edges. Resulting height map is not seamless!
         void ApplyBrush(double brushRadius, CubeMapPoint mapLocation, PointD exactLocation, double materialAmount)
         {
             List<CubeMapPoint> brushPoints = new();
@@ -347,61 +355,72 @@ namespace SpaceEngineersToolsShared
                     if (brushpart < 0) // Erode
                     {
                         bool skip = false;
-                        // First erode deposited soft sediment
+                        // First erode deposited soft sediment.
+                        double softErosionFactor = 2.0;
                         if (_depositedSedimentMap.TryGetValue(brushPoint.Face, out var map))
                         {
                             var depositedSediment = map[brushPoint.PosX, brushPoint.PosY];
                             if (depositedSediment > 0)
                             {
-                                depositedSediment += brushpart * 2; // brushpart is negative!
+                                depositedSediment += brushpart * softErosionFactor; // brushpart is negative!
                                 if (depositedSediment > 0)
                                 {
                                     map[brushPoint.PosX, brushPoint.PosY] = depositedSediment;
-                                    brushpart *= 2;
+                                    brushpart *= softErosionFactor;
                                     skip = true;
                                 }
                                 else
                                 {
                                     // There is more stuff to erode, update value
-                                    // Undo the factor 2 that we added
-                                    brushpart = depositedSediment / 2;
+                                    // Undo the factor  that we added
+                                    brushpart = depositedSediment / softErosionFactor; // depositedSediment is negative!
                                 }
                             }
                         }
-                        if (!skip)
+                        if (!skip) // We enter here if no deposited sediment is left to erode
                         {
                             // We need to loop in case we erode through multiple layers of sediment
                             if (_sedimentLayerIndexes.TryGetValue(brushPoint.Face, out var indexes))
                             {
                                 var index = indexes[brushPoint.PosX, brushPoint.PosY];
                                 double layerThickness = 1d / 65536d;
-                                double amountToErode = -1 * brushpart; // Negative number !
+                                double amountToErode = brushpart; // brushpart is negative !
                                 double erodedAmount = 0;
                                 double currentHeight = brushPoint.Value;
-                                while (amountToErode > 0)
+                                while (amountToErode < 0)
                                 {
                                     var val = (ushort)Math.Min(65535, Math.Max(0, currentHeight * 65535));
                                     var hardness = _sedimentLayers[index][val];
+
+                                    var remaining = currentHeight % layerThickness;
+                                    if (remaining == 0) remaining = layerThickness; // Prevent endless loop
                                     // 32768 ist default
                                     // 0 is soft, 65535 is hard
                                     // Use linear function:
-                                    // y = mx+b with b=2 and y(65535) = 0
-                                    var factor = -2.0 * hardness / 65535 + 2;
-                                    // Value range: 0 (Hard) .. .. 2 (Soft)
+                                    // y = mx+b with b=1.9 and y(65536) = 0.1
+                                    var factor = -1.8 * hardness / 65536 + 1.9;
+                                    // Value range: 0.1 (Hard) .. .. 1.9 (Soft)
 
                                     var sedimentToBeEroded = amountToErode * factor;
-                                    if (sedimentToBeEroded > layerThickness)
+                                    // Check how much we have to erode to reach next sediment layer
+
+
+                                    if (-1 * sedimentToBeEroded > remaining)
                                     {
                                         // Only erode layer, then iterate
-                                        erodedAmount += layerThickness;
-                                        currentHeight -= layerThickness;
-                                        amountToErode -= layerThickness;
+                                        erodedAmount -= remaining;
+                                        currentHeight -= remaining;
+                                        amountToErode += remaining;
                                         if (currentHeight <= 0) break;
                                     }
-                                    // We eroded less that a layer, abort
-                                    break;
+                                    else
+                                    {
+                                        // We eroded less that a layer, abort
+                                        erodedAmount += sedimentToBeEroded;
+                                        break;
+                                    }
                                 }
-                                brushpart = -1 * erodedAmount;
+                                brushpart =  erodedAmount;
                             }
                         }
                     }

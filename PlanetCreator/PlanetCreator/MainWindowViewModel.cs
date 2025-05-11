@@ -15,6 +15,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -93,9 +94,10 @@ namespace PlanetCreator
             if (SessionLocked)
             {
                 // Update Backups List
-                var dirs = Directory.GetDirectories(WorkingDir);
+                var dirs = Directory.GetDirectories(WorkingDir,"Backup_*").Select(Path.GetFileName);
                 foreach (var dir in dirs)
                 {
+                    Path.GetDirectoryName(dir);
                     if (dir.StartsWith("Backup_"))
                     {
                         Backups.Add(dir.Substring("Backup_".Length));
@@ -272,7 +274,10 @@ namespace PlanetCreator
 
                     if (hMapCount > 0)
                     {
-                        Backups.Add(NewBackupName);
+                        Application.Current.Dispatcher.Invoke(new Action(() =>
+                        {
+                            Backups.Add(NewBackupName);
+                        }));
                     }
                     if (Directory.GetFiles(dir).Length == 0)
                         Directory.Delete(dir);
@@ -306,28 +311,34 @@ namespace PlanetCreator
             {
                 if (_cts.Token.IsCancellationRequested) return;
                 var tilePath = Path.Combine(dir, face + ".png");
+                var overlayPath = Path.Combine(dir, face + "_overlay.png");
                 switch (face)
                 {
                     case CubeMapFace.Up:
                         try { TileUp = GetImage(tilePath); } catch { }
+                        try { OverlayBitmapUp = GetWritableBitmap(overlayPath); } catch { }
                         break;
                     case CubeMapFace.Down:
                         try { TileDown = GetImage(tilePath); } catch { }
+                        try { OverlayBitmapDown = GetWritableBitmap(overlayPath); } catch { }
                         break;
                     case CubeMapFace.Left:
                         try { TileLeft = GetImage(tilePath); } catch { }
+                        try { OverlayBitmapLeft = GetWritableBitmap(overlayPath); } catch { }
                         break;
                     case CubeMapFace.Right:
                         try { TileRight = GetImage(tilePath); } catch { }
+                        try { OverlayBitmapRight = GetWritableBitmap(overlayPath); } catch { }
                         break;
                     case CubeMapFace.Front:
                         try { TileFront = GetImage(tilePath); } catch { }
+                        try { OverlayBitmapFront = GetWritableBitmap(overlayPath); } catch { }
                         break;
                     case CubeMapFace.Back:
                         try { TileBack = GetImage(tilePath); } catch { }
+                        try { OverlayBitmapBack = GetWritableBitmap(overlayPath); } catch { }
                         break;
                 }
-
             }
         }
 
@@ -585,7 +596,11 @@ namespace PlanetCreator
         public bool PreviewMode
         {
             get => _previewMode;
-            set => SetProp(ref _previewMode, value);
+            set
+            {
+                if (SetProp(ref _previewMode, value) && !value)
+                    LimitedPreview = false;
+            }
         }
 
         bool _limitedPreview;
@@ -594,8 +609,8 @@ namespace PlanetCreator
             get => _limitedPreview;
             set
             {
-                if (!SetProp(ref _limitedPreview, value)) return;
-                PreviewMode = true;
+                if (SetProp(ref _limitedPreview, value) && value)
+                    PreviewMode = true;
             }
         }
 
@@ -811,6 +826,43 @@ namespace PlanetCreator
             set => SetProp(ref _lakeStampDepth, value);
         }
 
+        byte _lakeMatMapValue = 82;
+        public byte LakeMatMapValue
+        {
+            get => _lakeMatMapValue;
+            set => SetProp(ref _lakeMatMapValue, value);
+        }
+
+        int _lakeMode = 0;
+        public bool LakeModeReplace
+        {
+            get => (_lakeMode == 0);
+            set
+            {
+                if (value == LakeModeReplace) return;
+                if (value)
+                    _lakeMode = 0;
+                else
+                    _lakeMode = 1;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(LakeModeAdd));
+            }
+        }
+        public bool LakeModeAdd
+        {
+            get => (_lakeMode == 0);
+            set
+            {
+                if (value == LakeModeAdd) return;
+                if (value)
+                    _lakeMode = 1;
+                else
+                    _lakeMode = 0;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(LakeModeReplace));
+            }
+        }
+
         int _worleyCells = 55;
         public int WorleyCells
         {
@@ -873,7 +925,7 @@ namespace PlanetCreator
             }
         }
 
-        int _sedimentPlateCount = 768;
+        int _sedimentPlateCount = 4500;
         public int SedimentPlateCount
         {
             get => _sedimentPlateCount;
@@ -1075,15 +1127,33 @@ namespace PlanetCreator
             IsBusy = true;
             Task.Run(() =>
             {
-
                 try
                 {
-                    gen.InitErosion(UseSedimentLayers, CancellationToken.None);
-                    Parallel.For(0, ErosionIterations, pit =>
+                    gen.InitErosion(UseSedimentLayers, _cts.Token);
+                    int iterationCount = 0;
+                    Task.Run(async () =>
+                    {
+                        while (IsBusy && !_cts.Token.IsCancellationRequested && iterationCount < ErosionIterations)
+                        {
+                            try
+                            {
+                                await Task.Delay(100, _cts.Token);
+                                Progress = (int)(.5 + (100.0 * iterationCount) / ErosionIterations);
+                            }
+                            catch
+                            {
+                                Progress = 100;
+                                break;
+                            }
+                        }
+                    });
+                    Parallel.For(0, ErosionIterations, gen.POptions(_cts.Token), pit =>
                     {
                         gen.Erode(_cts.Token);
+                        Interlocked.Increment(ref iterationCount);
                     });
                     gen.FinishErode(_cts.Token);
+                    LoadPictures();
                 }
                 catch { return; } // Cancelled
                 finally
@@ -1098,8 +1168,13 @@ namespace PlanetCreator
             {
                 try
                 {
+                    var faces = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToList();
+                    if (PreviewMode) faces = new List<CubeMapFace> { PreviewTile };
+                    foreach (var face in faces)
+                        DebugClearPixels(face);
                     var gen = GetGenerator();
-                    gen.AddLakes(LakesPerTile, LakeVolumeMultiplier, LakeStampDepth, _cts.Token);
+                    gen.AddLakes(LakesPerTile, LakeVolumeMultiplier, LakeStampDepth, MaterialSource, LakeMatMapValue, LakeModeAdd, _cts.Token);
+                    LoadPictures();
                 }
                 catch { }
                 finally
@@ -1134,6 +1209,30 @@ namespace PlanetCreator
                 img.StreamSource = stream;
                 img.EndInit();
                 return img;
+            }
+            catch { return null; }
+        }
+
+        WriteableBitmap GetWritableBitmap(string fileName)
+        {
+            try
+            {
+                if (!File.Exists(fileName)) return null;
+
+                var image = Image.Load(fileName);
+
+                if (image.Width != TileWidth)
+                {
+                    image.Mutate(k => k.Resize(TileWidth, TileWidth, KnownResamplers.NearestNeighbor));
+                }
+
+                var bitmap = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
+                for (int x=0;x<image.Width;++x)
+                    for (int y = 0; y < image.Height; ++y)
+                    {
+
+                    }
+               return bitmap;
             }
             catch { return null; }
         }

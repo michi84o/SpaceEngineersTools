@@ -9,7 +9,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HeightMapEdgeFixer", "Heigh
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LayerSwapper", "LayerSwapper\LayerSwapper.csproj", "{D10CBE92-5C17-439D-A2ED-1CF5520A62E3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpaceEngineersToolsShared", "..\SpaceEngineersToolsShared\SpaceEngineersToolsShared.csproj", "{7FE50080-6B4C-4DAB-82F3-757F15935A7F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SpaceEngineersToolsShared", "..\SpaceEngineersToolsShared\SpaceEngineersToolsShared.csproj", "{7FE50080-6B4C-4DAB-82F3-757F15935A7F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SedimentLayerGenerator", "..\ProofOfConcept\SedimentLayerGenerator\SedimentLayerGenerator.csproj", "{662AC01E-3244-427C-8118-55625101D77F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,6 +35,10 @@ Global
 		{7FE50080-6B4C-4DAB-82F3-757F15935A7F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7FE50080-6B4C-4DAB-82F3-757F15935A7F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7FE50080-6B4C-4DAB-82F3-757F15935A7F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{662AC01E-3244-427C-8118-55625101D77F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{662AC01E-3244-427C-8118-55625101D77F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{662AC01E-3244-427C-8118-55625101D77F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{662AC01E-3244-427C-8118-55625101D77F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

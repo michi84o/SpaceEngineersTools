@@ -350,9 +350,9 @@
                                     </Grid.ColumnDefinitions>
                                     <Slider
                                         Grid.Column="0" Margin="3" Minimum="5" Maximum="50" TickFrequency="5"
-                                        Value="{Binding EquatorFlatSigma, StringFormat={}{0}%}"
+                                        Value="{Binding EquatorFlatWidth}"
                                         IsEnabled="{Binding FlattenEquator}"/>
-                                    <TextBlock Grid.Column="1" Margin="3" Text="{Binding EquatorFlatSigma}"/>
+                                    <TextBlock Grid.Column="1" Margin="3" Text="{Binding EquatorFlatWidth, StringFormat={}{0}%}"/>
                                     <CheckBox Grid.Column="3" Margin="3" IsChecked="{Binding FlattenEquator}" ToolTip="Apply exponential flatten only to area around Equator"/>
                             </Grid>
                             <Button
@@ -439,10 +439,6 @@
                                          ToolTip="Unique number of sediment layer definitions. Each Plate has a random definition."/>
                                     <TextBlock Grid.Column="1" Margin="3" Text="{Binding SedimentTypes}"/>
                                 </Grid>
-                                <TextBlock
-                                    Grid.Row="2" Grid.Column="0" Margin="3"
-                                    Text="Use for Erosion" VerticalAlignment="Center" />
-                                <CheckBox Grid.Row="2" Grid.Column="1" Margin="3" IsChecked="{Binding UseSedimentLayers}"/>
                                 <Button
                                     Grid.Column="0" Grid.Row="3" Margin="3" Grid.ColumnSpan="2"
                                     Content="Create Sediment Layers"
@@ -458,7 +454,8 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
@@ -535,15 +532,21 @@
                             <TextBox
                                 Grid.Row="10" Grid.Column="1" Margin="3"
                                 Text="{Binding EvaporateSpeed}"/>
-                            <Button
-                                Grid.Column="0" Grid.Row="11" Margin="3" Grid.ColumnSpan="2"
-                                Content="Erode"
-                                Command="{Binding ErodeHydraulicCommand}"/>
+                                <TextBlock
+                                     Grid.Row="11" Grid.Column="0" Margin="3"
+                                     Text="Use Sediments" VerticalAlignment="Center" />
+                                <CheckBox Grid.Row="11" Grid.Column="1" Margin="3" IsChecked="{Binding UseSedimentLayers}"/>
+                                <Button
+                                    Grid.Column="0" Grid.Row="12" Margin="3" Grid.ColumnSpan="2"
+                                    Content="Erode"
+                                    Command="{Binding ErodeHydraulicCommand}"/>
                             </Grid>
                     </GroupBox>
                     <GroupBox Grid.Row="7" Header="Lakes">
                         <Grid>
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
@@ -579,11 +582,24 @@
                             <TextBox
                                 Grid.Row="3" Grid.Column="1" Margin="3"
                                 Text="{Binding LakeStampDepth}" ToolTip="Height units to lower the lake height. Makes lake edges more distinct." />
-                            <Button
-                                Grid.Row="4" Grid.Column="0"  Margin="3" Grid.ColumnSpan="2"
+                            <TextBlock
+                                Grid.Row="4" Grid.Column="0" Margin="3"
+                                Text="Mat. Map Value"  />
+                            <TextBox
+                                Grid.Row="4" Grid.Column="1" Margin="3"
+                                Text="{Binding LakeMatMapValue}" ToolTip="Red channel value in material map (1-255), default 82." />
+                             <TextBlock
+                                Grid.Row="5" Grid.Column="0" Margin="3" VerticalAlignment="Center"
+                                Text="Mode"  />
+                                <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <RadioButton Content="Replace" Margin="3,0,3,0" VerticalAlignment="Center" IsChecked="{Binding LakeModeReplace, UpdateSourceTrigger=PropertyChanged}"/>
+                                    <RadioButton Content="Add" VerticalAlignment="Center" IsChecked="{Binding LakeModeAdd, UpdateSourceTrigger=PropertyChanged}"/>
+                                </StackPanel>
+                                <Button
+                                Grid.Row="6" Grid.Column="0"  Margin="3" Grid.ColumnSpan="2"
                                 Content="Add Lakes"
                                 Command="{Binding AddLakesCommand}"/>
-                            </Grid>
+                        </Grid>
                     </GroupBox>
                 </Grid>
 
@@ -629,7 +645,7 @@
                         <Image Opacity=".8" RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="4096" Source="{Binding OverlayBitmapDown}" />
 
                         <Border
-                            Canvas.Top="512" Canvas.Left="512" Width="512" Height="512" BorderThickness="5" BorderBrush="Black"
+                            Canvas.Top="512" Canvas.Left="512" Width="512" Height="512" BorderThickness="5" BorderBrush="Red"
                             x:Name="PreviewBorder" Visibility="Collapsed" />
                         <Border
                             Width="2048" Height="2048" BorderThickness="2" BorderBrush="Red"

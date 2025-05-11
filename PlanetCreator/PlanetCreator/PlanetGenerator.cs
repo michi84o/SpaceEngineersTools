@@ -1,4 +1,5 @@
 ﻿using MathNet.Numerics.Random;
+using Microsoft.Win32;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
@@ -123,6 +124,7 @@ namespace PlanetCreator
             }
         }
 
+
         Dictionary<CubeMapFace, double[,]> LoadHeightMaps(CancellationToken token)
         {
             var faces = GetFaces();
@@ -134,6 +136,8 @@ namespace PlanetCreator
                     try
                     {
                         var img = Image.Load(sourceFile) as Image<L16>;
+                        if (img.Width != TileWidth)
+                            img.Mutate(k => k.Resize(TileWidth, TileWidth, KnownResamplers.NearestNeighbor));
                         if (img != null)
                         {
                             Parallel.For(0, TileWidth, x =>
@@ -410,11 +414,19 @@ namespace PlanetCreator
             var faces = LoadHeightMaps(token);
             OnProgress(1);
 
+            int cStart = 0;
+            int cEnd = TileWidth;
+            if (LimitedDebugMode)
+            {
+                cStart = TileWidth / 4;
+                cEnd = cStart * 2;
+            }
+
             Parallel.ForEach(faces, face =>
             {
-                Parallel.For(0, TileWidth, x =>
+                Parallel.For(cStart, cEnd, x =>
                 {
-                    for (int y = 0; y< TileWidth; ++y)
+                    for (int y = cStart; y< cEnd; ++y)
                     {
                         var val = face.Value[x, y];
                         // +-0.2 aligns the Sinus so that the gradient is 1 at value 0.5.
@@ -454,14 +466,20 @@ namespace PlanetCreator
                             if (minStretch == 100)
                                 val = valStretched;
                             else
-                                val = (val + valStretched) / (1 + getFactor(minStretch));
+                            {
+                                var factor = getFactor(minStretch);
+                                val = (val * factor + valStretched) / (1 + factor);
+                            }
                         }
                         else
                         {
-                            if (minStretch == 100)
+                            if (maxStretch == 100)
                                 val = valStretched;
                             else
-                                val = (val + valStretched) / (1 + getFactor(maxStretch));
+                            {
+                                var factor = getFactor(maxStretch);
+                                val = (val * factor + valStretched) / (1 + factor);
+                            }
                         }
                         face.Value[x, y] = val;
                     }
@@ -542,6 +560,7 @@ namespace PlanetCreator
             OnProgress(100);
         }
 
+        // TODO: handle preview mode and limited preview mode
         public void GenerateSedimentLayers(int seed, int sedimentTypeCount, int sedimentPlateCount, CancellationToken token)
         {
             OnProgress(0);
@@ -561,10 +580,7 @@ namespace PlanetCreator
             // There are 64 different layer definitions this index refers to.
             Dictionary<CubeMapFace, byte[,]> sedimentLayerIndexes = new();
             List<ushort[]> sedimentLayers = new();
-
-            var urnd = new UShortNormalDistributedRandom(seed);
-            var rnd = new Random(seed);
-            // The hardness of sediment layers is normal distributed (Gauss) around 32768
+            Random rnd = new Random(seed);
             for (int i = 0; i < sedimentTypeCount; ++i)
             {
                 if (i == 0) // Lets make index 0 special by beeing the default value
@@ -572,12 +588,7 @@ namespace PlanetCreator
                     sedimentLayers.Add(Enumerable.Repeat<ushort>(32768, 65536).ToArray());
                     continue;
                 }
-
-                ushort[] layers = new ushort[65536];
-                for (int j = 0; j < 65536; ++j)
-                {
-                    layers[j] = urnd.GetNextValue();
-                }
+                ushort[] layers = SedimentGenerator.GenerateSedimentLayers(rnd, 65536, 0.002, 0.9, 2000, 0.01);
                 sedimentLayers.Add(layers);
             }
 
@@ -784,14 +795,19 @@ namespace PlanetCreator
 
             if (useSediments)
             {
+                sedimentLayerIndexes = new();
                 try
                 {
-                    Parallel.ForEach(faces, face =>
+                    foreach (var face in faces)
                     {
                         sedimentLayerIndexes[face.Key] = new byte[TileWidth, TileWidth];
-                        var fileName = Path.Combine(WorkingDirectory, (face + "_sediments.png").ToLower());
+                    }
+                    Parallel.ForEach(faces, face =>
+                    {
+                        var fileName = Path.Combine(WorkingDirectory, (face.Key + "_sediments.png").ToLower());
                         if (File.Exists(fileName))
                         {
+                            var myArray = sedimentLayerIndexes[face.Key];
                             var image = Image.Load(fileName) as Image<Rgb24>;
                             if (image != null)
                             {
@@ -800,7 +816,7 @@ namespace PlanetCreator
                                     for (int y = 0; y < TileWidth; ++y)
                                     {
                                         var value = image[x, y].R;
-                                        sedimentLayerIndexes[face.Key][x, y] = value;                                    ;
+                                        myArray[x, y] = value;                                    ;
                                     }
                                 });
                                 image.Dispose();
@@ -808,6 +824,7 @@ namespace PlanetCreator
                         }
                     });
 
+                    sedimentLayers = new();
                     using (var fs = new FileStream(Path.Combine(WorkingDirectory, "sediments.txt"), FileMode.Open))
                     using (var sw = new StreamReader(fs))
                     {
@@ -821,10 +838,23 @@ namespace PlanetCreator
                                 useSediments = false;
                                 break;
                             }
+                            ushort min = 65535;
+                            ushort max = 0;
                             for (int i = 0; i < array.Length; ++i)
                             {
                                 array[i] = ushort.Parse(spl[i]);
+                                min = array[i] < min ? array[i] : min;
+                                max = array[i] > max ? array[i] : max;
                             }
+                            if (min < max)
+                            {
+                                // Scale layers
+                                for (int i = 0; i < array.Length; ++i)
+                                {
+                                    array[i] = (ushort)(((double)(array[i] - min) / (max - min)) * 65535.0);
+                                }
+                            }
+                            sedimentLayers.Add(array);
                         }
                     }
                 }
@@ -841,8 +871,8 @@ namespace PlanetCreator
             }
 
             _hyd = new HydraulicErosion(
-                new Random() /* keep seed random */ , faces, DebugMode, LimitedDebugMode, PreviewFace,
-                sedimentLayerIndexes, sedimentLayers);
+            new Random() /* keep seed random */ , faces, DebugMode, LimitedDebugMode, PreviewFace,
+            sedimentLayerIndexes, sedimentLayers);
         }
         public void Erode(CancellationToken token)
         {
@@ -869,7 +899,6 @@ namespace PlanetCreator
             filledPixelCount = 0;
             filledPoints = new();
             filledVolume = 0;
-            if (DebugMode && point.Face != PreviewFace) return;
             if (point.Value >= stopHeight) return;
             var pointLight = new CubeMapPointLight { Face = point.Face, X = point.PosX, Y = point.PosY, TileWidth = (ushort)TileWidth };
             //var faceValues = _faces.Keys.ToList();
@@ -929,9 +958,27 @@ namespace PlanetCreator
             }
         }
 
-        public void AddLakes(ushort lakesPerTile, double lakeVolumeMultiplier, double lakeStampDepth, CancellationToken token)
+        public void AddLakes(ushort lakesPerTile, double lakeVolumeMultiplier, double lakeStampDepth, string materialSource, byte redValue, bool addMode, CancellationToken token)
         {
             var faces = LoadHeightMaps(token);
+
+            if (!Directory.Exists(materialSource))
+            {
+                materialSource = null;
+                var dlgRes = MessageBox.Show("You did not specifiy a valid directory as a material map source.\r\n"+
+                    "The generated lakes can automatically be added to an existing material map.\r\n"+
+                    "If you don't specify a directory, the output files will have black blue and green channels.\r\n"+
+                    "The output files will be written to the current working directory. If the source files are somewhere else, they will not be overriden.\r\n\r\nSpecify a source folder now?",
+                    "No Material Map Source specified", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (dlgRes == MessageBoxResult.Yes)
+                {
+                    var dlg = new OpenFileDialog() { Filter="PNG Files|*.png", FileName = "back_mat.png" };
+                    if (dlg.ShowDialog() == true)
+                    {
+                        materialSource = Path.GetDirectoryName(materialSource);
+                    }
+                }
+            }
 
             // Strategy: Drop water on tiles and see where they end up. No inertia.
             int dropletsPerTile = (TileWidth/4)*(TileWidth/4); // Every 4th pixel
@@ -944,12 +991,20 @@ namespace PlanetCreator
             Dictionary<CubeMapFace, double[,]> waterSpots = new Dictionary<CubeMapFace, double[,]>();
             Dictionary<CubeMapFace, double[,]> waterSpots2 = new Dictionary<CubeMapFace, double[,]>();
             var faceValues = faces.Keys.ToList();
-            if (DebugMode) { faceValues = new List<CubeMapFace> { PreviewFace }; }
             foreach (var face in faceValues)
             {
                 waterSpots[face] = new double[TileWidth, TileWidth];
                 waterSpots2[face] = new double[TileWidth, TileWidth];
             }
+
+            int cStart = 0;
+            int cEnd = TileWidth;
+            if (LimitedDebugMode)
+            {
+                cStart = TileWidth / 4;
+                cEnd = cStart * 2;
+            }
+
             Parallel.For(0, faceValues.Count, POptions(token), faceIndex =>
             {
                 var face = faceValues[faceIndex];
@@ -960,6 +1015,9 @@ namespace PlanetCreator
                         int x = offset + xred * pixelGap;
                         int y = offset + yred * pixelGap;
                         if (x >= TileWidth || y >= TileWidth) continue;
+
+                        if (x < cStart || x > cEnd) continue;
+                        if (y < cStart || y > cEnd) continue;
 
                         var currentFace = face;
                         PointD pos = new PointD { X = x, Y = y };
@@ -1042,9 +1100,9 @@ namespace PlanetCreator
             {
                 if (token.IsCancellationRequested) return;
                 var face = faceValues[faceIndex];
-                Parallel.For(0, TileWidth, POptions(token), x =>
+                Parallel.For(cStart, cEnd, POptions(token), x =>
                 {
-                    for (int y = 0; y < TileWidth; ++y)
+                    for (int y = cStart; y < cEnd; ++y)
                     {
                         if (token.IsCancellationRequested) return;
                         var point = new CubeMapPointLight { Face = face, X = x, Y = y, TileWidth=(ushort)TileWidth };
@@ -1054,7 +1112,7 @@ namespace PlanetCreator
                             for (int y2 = y - matrixSize / 2; y2 <= y + matrixSize / 2; ++y2)
                             {
                                 var dp = CubeMapPointLight.GetPointRelativeTo(point,x2 - x, y2 - y);
-                                if ((!DebugMode || dp.Face == face))
+                                if (dp.Face == face)
                                 {
                                     var value = CubeMapPointLight.GetValue(dp, waterSpots);
                                     if (value > 0)
@@ -1096,9 +1154,9 @@ namespace PlanetCreator
                 double highScoreMin = 0;
                 int highScoreCount = 0;
                 //double highScoreMax = 0;
-                Parallel.For(0, TileWidth, POptions(token), x =>
+                Parallel.For(cStart, cEnd, POptions(token), x =>
                 {
-                    for (int y = 0; y < TileWidth; ++y)
+                    for (int y = cStart; y < cEnd; ++y)
                     {
                         var value = waterSpotList[x, y];
                         if (value == 0) continue;
@@ -1130,36 +1188,54 @@ namespace PlanetCreator
                 });
             });
 
-            //         Dictionary<CubeMapFace, byte[,]> _lakes;
-
-
-            //if (DebugMode)
-            //{
-            //    foreach (var score in highscores[PreviewFace])
-            //    {
-            //        var x = score.Position.X;
-            //        var y = score.Position.Y;
-            //        for (int xx = x - 2; xx < x + 2; xx++)
-            //        {
-            //            for (int yy = y - 2; yy < y + 2; yy++)
-            //            {
-            //                if (xx > 0 && yy > 0 && xx < _tileWidth && yy < _tileWidth)
-            //                    _debugTileR[xx, yy] = 55;
-            //            }
-            //        }
-            //        // Somewhere between 70 and 30
-            //        //Debug.WriteLine("SCORE: s=" + (int)score.Score + ", p=" + score.Position.X + ";" + score.Position.Y);
-            //    }
-            //}
 
             // Last step: Fill up the lakes
             // Warning! If lake depth is too high it will overflow and fill nearly the whole map
             // We need to determine the maximum sane size of a lake without overflowing
-            Dictionary<CubeMapFace, byte[,]> lakes = new();
+            Dictionary<CubeMapFace, Image<Rgb24>> lakes = new();
+            foreach (var face in faceValues)
+            {
+                Image<Rgb24> image = null;
+                if (materialSource != null)
+                {
+                    var path = Path.Combine(WorkingDirectory, face.ToString().ToLower() + "_mat.png");
+                    if (File.Exists(path))
+                    {
+                        try
+                        {
+                            var img = Image.Load(path);
+                            image = img as Image<Rgb24>;
+                            if (image == null)
+                            {
+                                image = img.CloneAs<Rgb24>();
+                                img.Dispose();
+                            }
+                            if (image.Width != TileWidth)
+                            {
+                                image.Mutate(k => k.Resize(TileWidth, TileWidth, KnownResamplers.NearestNeighbor));
+                            }
+                            if (!addMode)
+                            {
+                                // Delete red channel
+                                for (int y = 0; y < image.Height; y++)
+                                {
+                                    Span<Rgb24> pixelRow = image.GetPixelRowSpan(y);
+                                    for (int x = 0; x < image.Width; x++)
+                                    {
+                                        pixelRow[x].R = 0;
+                                    }
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+                }
+                if (image == null)
+                    lakes[face] = new Image<Rgb24>(TileWidth, TileWidth);
+            }
             Parallel.For(0, faceValues.Count, POptions(token), faceIndex =>
             {
                 var face = faceValues[faceIndex];
-                lakes[face] = new byte[TileWidth, TileWidth];
                 var highscoreList = highscores[face];
                 int drawnLakeCount = 0;
                 foreach (var score in highscoreList)
@@ -1238,15 +1314,25 @@ namespace PlanetCreator
                             foreach (var pt in lastFilledPoints)
                             {
                                 // Draw final lake pixels
-                                DebugOverlay.DebugCollectPixel(pt.Face, pt.X, pt.Y, 128, 255, 0, 0);
+                                //DebugOverlay.DebugCollectPixel(pt.Face, pt.X, pt.Y, 128, 255, 0, 0);
                                 faces[pt.Face][pt.X, pt.Y] = stampedStopHeight;
-                                lakes[pt.Face][pt.X, pt.Y] = 82;
+                                lakes[pt.Face][pt.X, pt.Y] = new Rgb24(redValue, 0,0);
                             }
                             ++drawnLakeCount;
                         }
                     }
                 }
-            });
+            }); // ParallelFor
+            // Stamp height maps
+            SaveFaces(faces, token);
+            // Write material maps
+            foreach (var kv in lakes)
+            {
+                try
+                {
+                    kv.Value.SaveAsPng(Path.Combine(WorkingDirectory, (kv.Key + "_mat.png").ToLower()));
+                } catch { }
+            }
         }
 
 
@@ -1449,6 +1535,8 @@ namespace PlanetCreator
         }
     }
 
+    // Was originally used to create sediment layers
+    // The approach used now is much more realistic
     public class UShortNormalDistributedRandom
     {
         private readonly Random _random;
