@@ -102,16 +102,21 @@ namespace PlanetCreator
         {
             GetPixelRange(out var cStart, out var cEnd);
             // Save output
-            foreach (var kv in faces)
+            Parallel.ForEach(faces, kv =>
             {
                 var image = new Image<L16>(TileWidth, TileWidth);
-                Parallel.For(cStart, cEnd, x =>
+
+                image.ProcessPixelRows(rows =>
                 {
-                    Parallel.For(cStart, cEnd, y =>
+                    for (int y = 0; y < rows.Height; y++)
                     {
-                        ushort value = (ushort)(kv.Value[x, y] * 65535);
-                        image[x, y] = new L16(value);
-                    });
+                        Span<L16> pixelRow = rows.GetRowSpan(y);
+                        for (int x = 0; x < pixelRow.Length; x++)
+                        {
+                            ushort value = (ushort)(kv.Value[x, y] * 65535);
+                            pixelRow[x].PackedValue = value;
+                        }
+                    }
                 });
                 try
                 {
@@ -121,7 +126,7 @@ namespace PlanetCreator
                 {
                     MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
-            }
+            });
         }
 
 
@@ -144,7 +149,7 @@ namespace PlanetCreator
                             {
                                 for (int y = 0; y < TileWidth; ++y)
                                 {
-                                    kv.Value[x, y] = img[x, y].PackedValue / 65535d;
+                                    kv.Value[x, y] = img[x, y].PackedValue / 65535d; // TODO Slow AF, use ProcessPixelRows method!
                                 };
                             });
                         }
@@ -392,7 +397,7 @@ namespace PlanetCreator
                         {
                             face.Value[x, y] += worleySubLayer[x, y];
                             if (worleySubLayer[x, y] > 0)
-                                image[x, y] = new Rgb24(76, 0, 0);
+                                image[x, y] = new Rgb24(76, 0, 0); // TODO Slow AF, use ProcessPixelRows method!
                         }
                     });
                 }
@@ -554,7 +559,7 @@ namespace PlanetCreator
         {
             var faces = LoadHeightMaps(token);
             OnProgress(1);
-            Normalize(faces.Values.ToList(), token);
+            Normalize(faces.Values.ToList(), token, min, max);
             OnProgress(90);
             SaveFaces(faces, token);
             OnProgress(100);
@@ -758,7 +763,7 @@ namespace PlanetCreator
                     for (int y = 0; y < TileWidth; ++y)
                     {
                         var value = (byte)sedimentLayerIndexes[face][x, y];
-                        image[x, y] = new Rgb24(value, value, value);
+                        image[x, y] = new Rgb24(value, value, value); // TODO Slow AF, use ProcessPixelRows method!
                     }
                 });
                 image.SaveAsPng(Path.Combine(WorkingDirectory, (face + "_sediments.png").ToLower()));
@@ -815,7 +820,7 @@ namespace PlanetCreator
                                 {
                                     for (int y = 0; y < TileWidth; ++y)
                                     {
-                                        var value = image[x, y].R;
+                                        var value = image[x, y].R; // TODO Slow AF, use ProcessPixelRows method!
                                         myArray[x, y] = value;                                    ;
                                     }
                                 });
@@ -883,13 +888,6 @@ namespace PlanetCreator
             if (!DebugMode)
                 EdgeFixer.MakeSeamless(_hyd.Faces, token);
             SaveFaces(_hyd.Faces, token);
-        }
-
-        public void FixEdges(CancellationToken token)
-        {
-            var faces = LoadHeightMaps(token);
-            EdgeFixer.MakeSeamless(faces, token);
-            SaveFaces(faces, token);
         }
 
         public IDebugOverlay DebugOverlay;
@@ -1193,7 +1191,7 @@ namespace PlanetCreator
             // Warning! If lake depth is too high it will overflow and fill nearly the whole map
             // We need to determine the maximum sane size of a lake without overflowing
             Dictionary<CubeMapFace, Image<Rgb24>> lakes = new();
-            foreach (var face in faceValues)
+            Parallel.ForEach(faceValues, face =>
             {
                 Image<Rgb24> image = null;
                 if (materialSource != null)
@@ -1217,14 +1215,17 @@ namespace PlanetCreator
                             if (!addMode)
                             {
                                 // Delete red channel
-                                for (int y = 0; y < image.Height; y++)
+                                image.ProcessPixelRows(rows => // TODO: If this is faster, use it everywhere else
                                 {
-                                    Span<Rgb24> pixelRow = image.GetPixelRowSpan(y);
-                                    for (int x = 0; x < image.Width; x++)
+                                    for (int y = 0; y < rows.Height; y++)
                                     {
-                                        pixelRow[x].R = 0;
+                                        Span<Rgb24> pixelRow = rows.GetRowSpan(y);
+                                        for (int x = 0; x < pixelRow.Length; x++)
+                                        {
+                                            pixelRow[x].R = 0;
+                                        }
                                     }
-                                }
+                                });
                             }
                         }
                         catch { }
@@ -1232,7 +1233,7 @@ namespace PlanetCreator
                 }
                 if (image == null)
                     lakes[face] = new Image<Rgb24>(TileWidth, TileWidth);
-            }
+            });
             Parallel.For(0, faceValues.Count, POptions(token), faceIndex =>
             {
                 var face = faceValues[faceIndex];
@@ -1335,7 +1336,6 @@ namespace PlanetCreator
             }
         }
 
-
         void Normalize(List<double[,]> images, CancellationToken token, double minHeight = 0, double maxHeight = 1.0, bool invert = false)
         {
             int cStart = 0;
@@ -1396,8 +1396,6 @@ namespace PlanetCreator
             });
         }
 
-
-
         class HighScore
         {
             public double Score;
@@ -1408,53 +1406,6 @@ namespace PlanetCreator
                 Position.X = x;
                 Position.Y = y;
             }
-        }
-
-        // tiles must be normalized to 0...1 !!!
-        void TileToImage(double[,] tile, CubeMapFace face)
-        {
-            TileToImage(tile, face.ToString().ToLower() + ".png");
-        }
-        void TileToImage(double[,] tile, string fileName)
-        {
-            // Using full spectrum is too extreme. Flatten area:
-            double minVal = 0.3;
-            double maxVal = 0.9;
-            double _lakeDepth = 30.0 / 65535;
-            double lakeLevel = (maxVal - minVal) * _lakeDepth + minVal;
-
-            var image = new Image<L16>(TileWidth, TileWidth);
-            Parallel.For(0, TileWidth, x =>
-            {
-                Parallel.For(0, TileWidth, y =>
-                {
-                    var v = (maxVal-minVal) * tile[x, y] + minVal;
-                    if (v > 1) v = 1;
-                    else if (v < 0) v = 0;
-                    if (v < lakeLevel) v = lakeLevel;
-                    ushort value = (ushort)(v * 65535);
-                    image[x, y] = new L16(value);
-                });
-            });
-            image.SaveAsPng(fileName);
-        }
-
-        void WriteMaterialMap(byte[,] red, CubeMapFace face)
-        {
-            WriteMaterialMap(red, face.ToString().ToLower() + "_lakes.png");
-        }
-
-        void WriteMaterialMap(byte[,] red, string fileName)
-        {
-            var image = new Image<Rgb24>(TileWidth, TileWidth);
-            Parallel.For(0, TileWidth, x =>
-            {
-                Parallel.For(0, TileWidth, y =>
-                {
-                    image[x, y] = new Rgb24(red[x,y], 0,0);
-                });
-            });
-            image.SaveAsPng(fileName);
         }
 
         Point3D GetNormalizedSphereCoordinates(CubeMapFace face, int x, int y)

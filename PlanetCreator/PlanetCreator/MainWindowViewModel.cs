@@ -6,16 +6,12 @@ using SpaceEngineersToolsShared;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Data.Common;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -1296,7 +1292,7 @@ namespace PlanetCreator
                     for (int x = 0; x < image.Width; ++x)
                         for (int y = 0; y < image.Width; ++y)
                         {
-                            imageData[x, y] = image[x, y].PackedValue / 65535.0;
+                            imageData[x, y] = image[x, y].PackedValue / 65535.0; // TODO Slow AF, use ProcessPixelRows method!
                         }
                     images[face] = imageData;
                 }
@@ -1337,7 +1333,7 @@ namespace PlanetCreator
                             var val = imageData[x, y] * 65535;
                             if (val < 0) val = 0;
                             if (val > 65535) val = 65535;
-                            image[x, y] = new L16 { PackedValue = (ushort)val };
+                            image[x, y] = new L16 { PackedValue = (ushort)val }; // TODO Slow AF, use ProcessPixelRows method!
                         }
                     image.Save(fileName);
                 }
