@@ -6,6 +6,7 @@ using SpaceEngineersToolsShared;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -377,12 +378,46 @@ namespace PlanetCreator
             set => SetProp(ref _tileDown, value);
         }
 
-        public WriteableBitmap OverlayBitmapUp { get; set; }
-        public WriteableBitmap OverlayBitmapFront { get; set; }
-        public WriteableBitmap OverlayBitmapRight { get; set; }
-        public WriteableBitmap OverlayBitmapBack { get; set; }
-        public WriteableBitmap OverlayBitmapLeft { get; set; }
-        public WriteableBitmap OverlayBitmapDown { get; set; }
+        WriteableBitmap _overlayBitmapUp;
+        public WriteableBitmap OverlayBitmapUp
+        {
+            get => _overlayBitmapUp;
+            set => SetProp(ref _overlayBitmapUp, value);
+        }
+        private WriteableBitmap _overlayBitmapFront;
+        public WriteableBitmap OverlayBitmapFront
+        {
+            get => _overlayBitmapFront;
+            set => SetProp(ref _overlayBitmapFront, value);
+        }
+
+        private WriteableBitmap _overlayBitmapRight;
+        public WriteableBitmap OverlayBitmapRight
+        {
+            get => _overlayBitmapRight;
+            set => SetProp(ref _overlayBitmapRight, value);
+        }
+
+        private WriteableBitmap _overlayBitmapBack;
+        public WriteableBitmap OverlayBitmapBack
+        {
+            get => _overlayBitmapBack;
+            set => SetProp(ref _overlayBitmapBack, value);
+        }
+
+        private WriteableBitmap _overlayBitmapLeft;
+        public WriteableBitmap OverlayBitmapLeft
+        {
+            get => _overlayBitmapLeft;
+            set => SetProp(ref _overlayBitmapLeft, value);
+        }
+
+        private WriteableBitmap _overlayBitmapDown;
+        public WriteableBitmap OverlayBitmapDown
+        {
+            get => _overlayBitmapDown;
+            set => SetProp(ref _overlayBitmapDown, value);
+        }
 
         public MainWindowViewModel()
         {
@@ -846,7 +881,7 @@ namespace PlanetCreator
         }
         public bool LakeModeAdd
         {
-            get => (_lakeMode == 0);
+            get => (_lakeMode == 1);
             set
             {
                 if (value == LakeModeAdd) return;
@@ -983,13 +1018,13 @@ namespace PlanetCreator
         public ICommand SimplexNoiseFillMapCommand => new RelayCommand(o =>
         {
             IsBusy = true;
+            foreach (var face in CubeMapFaces)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                { DebugClearPixels(face); });
+            }
             Task.Run(() =>
             {
-                foreach (var face in CubeMapFaces)
-                {
-                    Application.Current.Dispatcher.Invoke(() =>
-                    { DebugClearPixels(face); });
-                }
                 try
                 {
                     var gen = GetGenerator();
@@ -1160,14 +1195,17 @@ namespace PlanetCreator
         public ICommand AddLakesCommand => new RelayCommand(o =>
         {
             IsBusy = true;
+            foreach (var face in CubeMapFaces)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                { DebugClearPixels(face); });
+            }
             Task.Run(() =>
             {
                 try
                 {
                     var faces = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToList();
                     if (PreviewMode) faces = new List<CubeMapFace> { PreviewTile };
-                    foreach (var face in faces)
-                        DebugClearPixels(face);
                     var gen = GetGenerator();
                     gen.AddLakes(LakesPerTile, LakeVolumeMultiplier, LakeStampDepth, MaterialSource, LakeMatMapValue, LakeModeAdd, _cts.Token);
                     LoadPictures();
@@ -1178,6 +1216,38 @@ namespace PlanetCreator
             });
         });
 
+        bool _addingLake;
+        public bool AddingLake
+        {
+            get => _addingLake;
+            set
+            {
+                if (SetProp(ref _addingLake, value))
+                {
+                    IsBusy = value;
+                    BusyText = value ? "Right click on a dark spot on the map.\r\nLeft click to abort." : null;
+                }
+            }
+        }
+
+        string _busyText;
+        public string BusyText
+        {
+            get => _busyText;
+            set => SetProp(ref _busyText, value);
+        }
+
+        public ICommand AddLakeByClickCommand => new RelayCommand(o =>
+        {
+            AddingLake = true;
+        });
+
+        public void HandleLakeAddClick(CubeMapFace face, int x, int y)
+        {
+            Debug.WriteLine(face + "," +x + "," +y);
+            MessageBox.Show("Not implemented, WIP");
+            IsBusy = false;
+        }
 
         bool IsCancellationRequested => _cts.IsCancellationRequested == true;
         CancellationTokenSource _cts = new CancellationTokenSource();
@@ -1214,21 +1284,46 @@ namespace PlanetCreator
             try
             {
                 if (!File.Exists(fileName)) return null;
-
                 var image = Image.Load(fileName);
-
                 if (image.Width != TileWidth)
                 {
                     image.Mutate(k => k.Resize(TileWidth, TileWidth, KnownResamplers.NearestNeighbor));
                 }
-
-                var bitmap = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
-                for (int x=0;x<image.Width;++x)
-                    for (int y = 0; y < image.Height; ++y)
+                Image<Rgba32> rgba = image as Image<Rgba32>;
+                if (rgba == null)
+                {
+                    rgba = image.CloneAs<Rgba32>();
+                    image.Dispose();
+                }
+                var bmp = new WriteableBitmap(image.Width, image.Height, 96, 96, PixelFormats.Bgra32, null);
+                bmp.Lock();
+                try
+                {
+                    rgba.ProcessPixelRows(accessor =>
                     {
+                        var backBuffer = bmp.BackBuffer;
 
-                    }
-               return bitmap;
+                        for (var y = 0; y < rgba.Height; y++)
+                        {
+                            Span<Rgba32> pixelRow = accessor.GetRowSpan(y);
+
+                            for (var x = 0; x < rgba.Width; x++)
+                            {
+                                var backBufferPos = backBuffer + (y * rgba.Width + x) * 4;
+                                var val = pixelRow[x];
+                                var color = val.A << 24 | val.R << 16 | val.G << 8 | val.B;
+
+                                System.Runtime.InteropServices.Marshal.WriteInt32(backBufferPos, color);
+                            }
+                        }
+                    });
+                    bmp.AddDirtyRect(new Int32Rect(0, 0, rgba.Width, rgba.Height));
+                }
+                finally
+                {
+                    bmp.Unlock();
+                }
+                return bmp;
             }
             catch { return null; }
         }
@@ -1287,13 +1382,9 @@ namespace PlanetCreator
                 {
                     var fileName = Path.Combine(folder, files[i]);
                     var face = faces[i];
-                    var image = SixLabors.ImageSharp.Image.Load(fileName) as Image<L16>;
+                    var image = Image.Load(fileName) as Image<L16>;
                     double[,] imageData = new double[image.Width, image.Width];
-                    for (int x = 0; x < image.Width; ++x)
-                        for (int y = 0; y < image.Width; ++y)
-                        {
-                            imageData[x, y] = image[x, y].PackedValue / 65535.0; // TODO Slow AF, use ProcessPixelRows method!
-                        }
+                    ImageHelper.ExtractPixels(image, imageData);
                     images[face] = imageData;
                 }
                 catch (Exception e)
@@ -1327,14 +1418,7 @@ namespace PlanetCreator
                     var imageData = images[face];
                     var width = imageData.GetLength(0);
                     var image = new SixLabors.ImageSharp.Image<L16>(width, width);
-                    for (int x = 0; x < width; ++x)
-                        for (int y = 0; y < width; ++y)
-                        {
-                            var val = imageData[x, y] * 65535;
-                            if (val < 0) val = 0;
-                            if (val > 65535) val = 65535;
-                            image[x, y] = new L16 { PackedValue = (ushort)val }; // TODO Slow AF, use ProcessPixelRows method!
-                        }
+                    ImageHelper.InsertPixels(image, imageData);
                     image.Save(fileName);
                 }
                 catch (Exception e)

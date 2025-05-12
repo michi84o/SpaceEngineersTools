@@ -78,7 +78,7 @@ namespace MyApp
                     for (int y = 0; y < 2048; ++y)
                     {
                         // Local image is lake only
-                        var sourceImgVal = sourceImage[x, y]; // TODO Slow AF, use ProcessPixelRows method!
+                        var sourceImgVal = sourceImage[x, y]; // TODO ProcessPixelRows is faster
                         var targetImageVal = targetImage[x, y];
                         var targetOverrideVal = new Rgb24(
                                 (byte)(iChoice == 1 ? sourceImgVal.R : targetImageVal.R),

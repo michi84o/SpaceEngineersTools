@@ -542,9 +542,11 @@
                                     Command="{Binding ErodeHydraulicCommand}"/>
                             </Grid>
                     </GroupBox>
-                    <GroupBox Grid.Row="7" Header="Lakes">
+                    <GroupBox
+                        Grid.Row="7" Header="Lakes">
                         <Grid>
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
@@ -596,10 +598,14 @@
                                     <RadioButton Content="Add" VerticalAlignment="Center" IsChecked="{Binding LakeModeAdd, UpdateSourceTrigger=PropertyChanged}"/>
                                 </StackPanel>
                                 <Button
-                                Grid.Row="6" Grid.Column="0"  Margin="3" Grid.ColumnSpan="2"
-                                Content="Add Lakes"
-                                Command="{Binding AddLakesCommand}"/>
-                        </Grid>
+                                    Grid.Row="6" Grid.Column="0"  Margin="3" Grid.ColumnSpan="2"
+                                    Content="Add Lakes"
+                                    Command="{Binding AddLakesCommand}"/>
+                                <Button
+                                    Grid.Row="7" Grid.Column="0" Margin="3" Grid.ColumnSpan="2"
+                                    Content="Add Lake by Right Click"
+                                    Command="{Binding AddLakeByClickCommand}"/>
+                            </Grid>
                     </GroupBox>
                 </Grid>
 
@@ -607,10 +613,11 @@
             </ScrollViewer>
             <Grid
                 Grid.Column="0" Visibility="{Binding IsBusy, Converter={StaticResource BoolVis}}">
-                <Border Background="LightGray" Opacity=".8" />
+                <Border Background="LightGray" Opacity=".9" />
                 <Grid
                     VerticalAlignment="Top">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
@@ -623,6 +630,7 @@
                         <TextBlock Grid.Row="0" Text="{Binding Progress, StringFormat={}{0}%}" Margin="10" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Grid>
                     <Button Grid.Row="1" Margin="10,0,10,10" Content="Cancel"/>
+                    <TextBlock Grid.Row="2" Margin="5,10,5,10" Text="{Binding BusyText}" HorizontalAlignment="Center" TextAlignment="Center" />
                 </Grid>
             </Grid>
             <GroupBox

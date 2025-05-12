@@ -1,5 +1,7 @@
-﻿using System;
+﻿using SpaceEngineersToolsShared;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -27,9 +29,19 @@ namespace PlanetCreator
             ImageView.MouseWheel += ImageView_MouseWheel;
             BorderView.MouseLeftButtonDown += ImageView_MouseLeftButtonDown; ;
             BorderView.MouseLeftButtonUp += ImageView_MouseLeftButtonUp; ;
+            BorderView.MouseRightButtonDown += BorderView_MouseRightButtonDown;
             BorderView.MouseMove += ImageView_MouseMove;
 
             Loaded += MainWindow_Loaded;
+        }
+
+        private void BorderView_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (!ViewModel.AddingLake) return;
+            if (_isMouseOnFace)
+            {
+                ViewModel.HandleLakeAddClick(_lastMouseOverCubeMapFace, _lastMouseOverCubeMapX, _lastMouseOverCubeMapY);
+            }
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -92,9 +104,81 @@ namespace PlanetCreator
         private Point _start;
         bool _moved = false;
 
+        bool _isMouseOnFace;
+        CubeMapFace _lastMouseOverCubeMapFace;
+        int _lastMouseOverCubeMapX;
+        int _lastMouseOverCubeMapY;
+
+        bool IsWithin(FrameworkElement elem, int x, int y)
+        {
+            var left = (int)(Canvas.GetLeft(elem)+.5);
+            var top = (int)(Canvas.GetTop(elem) +.5);
+            var within =
+                 x >= left && x < (left + 2048) &&
+                 y >= top  && y < (top  + 2048);
+
+            // Update offsets
+            if (within)
+            {
+                _lastMouseOverCubeMapX = x - left;
+                _lastMouseOverCubeMapY = y - top;
+            }
+            return within;
+        }
+
+        void UpdateMapCoordinates(Point p)
+        {
+            _isMouseOnFace = false;
+            Matrix m = ImageView.RenderTransform.Value;
+            if (p.X >= 0 && p.Y >= 0 && p.X < BorderView.ActualWidth && p.Y < BorderView.ActualHeight)
+            {
+                double top = (p.Y - m.OffsetY) / m.M11;
+                double left = (p.X - m.OffsetX) / m.M11;
+                if (left < 0) return;
+                if (top < 0) return;
+                if (left > ImageView.Width) return;
+                if (top > ImageView.Height) return;
+
+                int x = (int)(left+.5);
+                int y = (int)(top+.5);
+
+                _isMouseOnFace = true;
+                // Determine Face
+                if (IsWithin(TUp, x, y))
+                {
+                    _lastMouseOverCubeMapFace = CubeMapFace.Up;
+                }
+                else if (IsWithin(TFront, x, y))
+                {
+                    _lastMouseOverCubeMapFace = CubeMapFace.Front;
+                }
+                else if (IsWithin(TRight, x, y))
+                {
+                    _lastMouseOverCubeMapFace = CubeMapFace.Right;
+                }
+                else if (IsWithin(TBack, x, y))
+                {
+                    _lastMouseOverCubeMapFace = CubeMapFace.Back;
+                }
+                else if (IsWithin(TLeft, x, y))
+                {
+                    _lastMouseOverCubeMapFace = CubeMapFace.Left;
+                }
+                else if (IsWithin(TDown, x, y))
+                {
+                    _lastMouseOverCubeMapFace = CubeMapFace.Down;
+                }
+                else _isMouseOnFace = false;
+            }
+        }
+
         private void ImageView_MouseMove(object sender, MouseEventArgs e)
         {
-            if (!BorderView.IsMouseCaptured) { return; }
+            if (!BorderView.IsMouseCaptured)
+            {
+                UpdateMapCoordinates(e.MouseDevice.GetPosition(BorderView));
+                return;
+            }
             if (!_moved)
             {
                 // For some reason we get a mouse moved event uppon first mouse_down.
@@ -116,6 +200,8 @@ namespace PlanetCreator
         {
             BorderView.ReleaseMouseCapture();
             _moved = false;
+            if (ViewModel.AddingLake)
+                ViewModel.AddingLake = false;
         }
 
         private void ImageView_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

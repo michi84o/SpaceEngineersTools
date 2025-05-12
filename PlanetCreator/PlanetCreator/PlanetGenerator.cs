@@ -1,6 +1,7 @@
 ﻿using MathNet.Numerics.Random;
 using Microsoft.Win32;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using SpaceEngineersToolsShared;
@@ -105,19 +106,7 @@ namespace PlanetCreator
             Parallel.ForEach(faces, kv =>
             {
                 var image = new Image<L16>(TileWidth, TileWidth);
-
-                image.ProcessPixelRows(rows =>
-                {
-                    for (int y = 0; y < rows.Height; y++)
-                    {
-                        Span<L16> pixelRow = rows.GetRowSpan(y);
-                        for (int x = 0; x < pixelRow.Length; x++)
-                        {
-                            ushort value = (ushort)(kv.Value[x, y] * 65535);
-                            pixelRow[x].PackedValue = value;
-                        }
-                    }
-                });
+                ImageHelper.InsertPixels(image, kv.Value);
                 try
                 {
                     image.SaveAsPng(Path.Combine(WorkingDirectory, (kv.Key + ".png").ToLower()));
@@ -128,7 +117,6 @@ namespace PlanetCreator
                 }
             });
         }
-
 
         Dictionary<CubeMapFace, double[,]> LoadHeightMaps(CancellationToken token)
         {
@@ -143,16 +131,7 @@ namespace PlanetCreator
                         var img = Image.Load(sourceFile) as Image<L16>;
                         if (img.Width != TileWidth)
                             img.Mutate(k => k.Resize(TileWidth, TileWidth, KnownResamplers.NearestNeighbor));
-                        if (img != null)
-                        {
-                            Parallel.For(0, TileWidth, x =>
-                            {
-                                for (int y = 0; y < TileWidth; ++y)
-                                {
-                                    kv.Value[x, y] = img[x, y].PackedValue / 65535d; // TODO Slow AF, use ProcessPixelRows method!
-                                };
-                            });
-                        }
+                        ImageHelper.ExtractPixels(img, kv.Value);
                     }
                     catch { }
                 }
@@ -397,7 +376,7 @@ namespace PlanetCreator
                         {
                             face.Value[x, y] += worleySubLayer[x, y];
                             if (worleySubLayer[x, y] > 0)
-                                image[x, y] = new Rgb24(76, 0, 0); // TODO Slow AF, use ProcessPixelRows method!
+                                image[x, y] = new Rgb24(76, 0, 0);
                         }
                     });
                 }
@@ -973,7 +952,7 @@ namespace PlanetCreator
                     var dlg = new OpenFileDialog() { Filter="PNG Files|*.png", FileName = "back_mat.png" };
                     if (dlg.ShowDialog() == true)
                     {
-                        materialSource = Path.GetDirectoryName(materialSource);
+                        materialSource = Path.GetDirectoryName(dlg.FileName);
                     }
                 }
             }
@@ -1196,7 +1175,7 @@ namespace PlanetCreator
                 Image<Rgb24> image = null;
                 if (materialSource != null)
                 {
-                    var path = Path.Combine(WorkingDirectory, face.ToString().ToLower() + "_mat.png");
+                    var path = Path.Combine(materialSource, face.ToString().ToLower() + "_mat.png");
                     if (File.Exists(path))
                     {
                         try
@@ -1231,8 +1210,8 @@ namespace PlanetCreator
                         catch { }
                     }
                 }
-                if (image == null)
-                    lakes[face] = new Image<Rgb24>(TileWidth, TileWidth);
+                lock (lakes)
+                    lakes[face] = image ?? new Image<Rgb24>(TileWidth, TileWidth);
             });
             Parallel.For(0, faceValues.Count, POptions(token), faceIndex =>
             {
@@ -1317,7 +1296,8 @@ namespace PlanetCreator
                                 // Draw final lake pixels
                                 //DebugOverlay.DebugCollectPixel(pt.Face, pt.X, pt.Y, 128, 255, 0, 0);
                                 faces[pt.Face][pt.X, pt.Y] = stampedStopHeight;
-                                lakes[pt.Face][pt.X, pt.Y] = new Rgb24(redValue, 0,0);
+                                var val = lakes[pt.Face][pt.X, pt.Y];
+                                lakes[pt.Face][pt.X, pt.Y] = new Rgb24(redValue, val.G,val.B);
                             }
                             ++drawnLakeCount;
                         }
@@ -1332,8 +1312,33 @@ namespace PlanetCreator
                 try
                 {
                     kv.Value.SaveAsPng(Path.Combine(WorkingDirectory, (kv.Key + "_mat.png").ToLower()));
+                    var overlay = kv.Value.CloneAs<Rgba32>();
+                    overlay.ProcessPixelRows(rows =>
+                    {
+                        for (int y = 0; y < rows.Height; y++)
+                        {
+                            Span<Rgba32> pixelRow = rows.GetRowSpan(y);
+                            for (int x = 0; x < pixelRow.Length; x++)
+                            {
+                                if (pixelRow[x].R != redValue)
+                                {
+                                    pixelRow[x].R = 0;
+                                    pixelRow[x].A = 0;
+                                }
+                                pixelRow[x].G = 0;
+                                pixelRow[x].B = 0;
+                            }
+                        }
+                    });
+                    overlay.SaveAsPng(Path.Combine(WorkingDirectory, (kv.Key + "_overlay.png").ToLower()), new PngEncoder { ColorType = PngColorType.RgbWithAlpha });
                 } catch { }
             }
+        }
+
+        public bool AddSingleLake(CubeMapFace face, int x, int y)
+        {
+            //var faces = LoadHeightMaps(token);
+            return false;
         }
 
         void Normalize(List<double[,]> images, CancellationToken token, double minHeight = 0, double maxHeight = 1.0, bool invert = false)
