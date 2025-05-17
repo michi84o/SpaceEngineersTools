@@ -13,9 +13,12 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Xaml;
+using Image = SixLabors.ImageSharp.Image;
 
 namespace PlanetCreator
 {
@@ -28,7 +31,7 @@ namespace PlanetCreator
 
     public class MainWindowViewModel : PropChangeNotifier, IDebugOverlay
     {
-        public List<int> TileWidths { get; } = new List<int> { 2048, 4096 };
+        public List<int> TileWidths { get; } = new List<int> { 512, 1024, 2048, 4096, 8192 };
 
         int _tileWidth = 2048;
         public int TileWidth
@@ -225,73 +228,83 @@ namespace PlanetCreator
 
         public ICommand SaveBackupCommand => new RelayCommand(o =>
         {
-            IsBusy = true;
-            Task.Run(() =>
+            SaveBackup(NewBackupName);
+        }, o=> SessionLocked && !string.IsNullOrEmpty(NewBackupName));
+
+        const string AutoBackupName = "AutoBackup";
+        void SaveBackup(string backupName)
+        {
+            try
             {
-                try
+                var dir = Path.Combine(WorkingDir, "Backup_" + backupName);
+                if (!Directory.Exists(dir))
                 {
-                    var dir = Path.Combine(WorkingDir, "Backup_" + NewBackupName);
                     Directory.CreateDirectory(dir);
-                    var faces = Enum.GetValues<CubeMapFace>().ToList();
-                    int hMapCount = 0;
-                    foreach (var face in faces)
-                    {
-                        var destination = Path.Combine(dir, (face + ".png").ToLower());
-                        var source = Path.Combine(WorkingDir, face + ".png");
-                        if (File.Exists(source))
-                        {
-                            File.Copy(source, destination, true);
-                            ++hMapCount;
-                        }
-
-                        destination = Path.Combine(dir, (face + "_mat.png").ToLower());
-                        source = Path.Combine(WorkingDir, face + "_mat.png");
-                        if (File.Exists(source))
-                            File.Copy(source, destination, true);
-
-                        destination = Path.Combine(dir, (face + "_lakes.png").ToLower());
-                        source = Path.Combine(WorkingDir, face + "_lakes.png");
-                        if (File.Exists(source))
-                            File.Copy(source, destination, true);
-
-                        destination = Path.Combine(dir, (face + "_worley.png").ToLower());
-                        source = Path.Combine(WorkingDir, face + "_worley.png");
-                        if (File.Exists(source))
-                            File.Copy(source, destination, true);
-
-                        destination = Path.Combine(dir, (face + "_sediments.png").ToLower());
-                        source = Path.Combine(WorkingDir, face + "_sediments.png");
-                        if (File.Exists(source))
-                            File.Copy(source, destination, true);
-                    }
-
-                    var sedimentTxt = Path.Combine(WorkingDir, "sediments.txt");
-                    if (File.Exists(sedimentTxt))
-                        File.Copy(sedimentTxt, Path.Combine(dir, "sediments.txt"), true);
-
-                    if (hMapCount > 0)
-                    {
-                        Application.Current.Dispatcher.Invoke(new Action(() =>
-                        {
-                            Backups.Add(NewBackupName);
-                        }));
-                    }
-                    if (Directory.GetFiles(dir).Length == 0)
-                        Directory.Delete(dir);
                 }
-                catch (Exception ex)
+                var faces = Enum.GetValues<CubeMapFace>().ToList();
+                int hMapCount = 0;
+                string destination;
+                string source;
+                foreach (var face in faces)
                 {
-                    MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
+                    destination = Path.Combine(dir, (face + ".png").ToLower());
+                    source = Path.Combine(WorkingDir, face + ".png");
+                    if (File.Exists(source))
+                    {
+                        File.Copy(source, destination, true);
+                        ++hMapCount;
+                    }
+                    else if (File.Exists(destination)) File.Delete(destination);
+
+                    destination = Path.Combine(dir, (face + "_mat.png").ToLower());
+                    source = Path.Combine(WorkingDir, face + "_mat.png");
+                    if (File.Exists(source))
+                        File.Copy(source, destination, true);
+                    else if (File.Exists(destination)) File.Delete(destination);
+
+                    destination = Path.Combine(dir, (face + "_lakes.png").ToLower());
+                    source = Path.Combine(WorkingDir, face + "_lakes.png");
+                    if (File.Exists(source))
+                        File.Copy(source, destination, true);
+                    else if (File.Exists(destination)) File.Delete(destination);
+
+                    destination = Path.Combine(dir, (face + "_worley.png").ToLower());
+                    source = Path.Combine(WorkingDir, face + "_worley.png");
+                    if (File.Exists(source))
+                        File.Copy(source, destination, true);
+                    else if (File.Exists(destination)) File.Delete(destination);
+
+                    destination = Path.Combine(dir, (face + "_sediments.png").ToLower());
+                    source = Path.Combine(WorkingDir, face + "_sediments.png");
+                    if (File.Exists(source))
+                        File.Copy(source, destination, true);
+                    else if (File.Exists(destination)) File.Delete(destination);
                 }
-                finally { IsBusy = false; }
-            });
-        }, o=> SessionLocked && !string.IsNullOrEmpty(NewBackupName) &&
-        !Directory.Exists(Path.Combine(WorkingDir, NewBackupName)) );
+
+                source = Path.Combine(WorkingDir, "sediments.txt");
+                destination = Path.Combine(dir, "sediments.txt");
+                if (File.Exists(source))
+                    File.Copy(source, destination, true);
+                else if (File.Exists(destination)) File.Delete(destination);
+
+                if (hMapCount > 0)
+                {
+                    if (!Backups.Contains(backupName))
+                        Backups.Add(backupName);
+                }
+                if (Directory.GetFiles(dir).Length == 0)
+                    Directory.Delete(dir);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+        }
 
         public void LoadPictures()
         {
-            if (!Application.Current.Dispatcher.CheckAccess())
+            if (!System.Windows.Application.Current.Dispatcher.CheckAccess())
             {
                 Application.Current.Dispatcher.Invoke(new Action(() =>
                 {
@@ -306,7 +319,7 @@ namespace PlanetCreator
         {
             foreach (var face in faces)
             {
-                if (_cts.Token.IsCancellationRequested) return;
+                //if (_cts.Token.IsCancellationRequested) return;
                 var tilePath = Path.Combine(dir, face + ".png");
                 var overlayPath = Path.Combine(dir, face + "_overlay.png");
                 switch (face)
@@ -337,6 +350,23 @@ namespace PlanetCreator
                         break;
                 }
             }
+        }
+
+        void ClearOverlays()
+        {
+            OverlayBitmapUp = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
+            OverlayBitmapDown = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
+            OverlayBitmapRight = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
+            OverlayBitmapLeft = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
+            OverlayBitmapFront = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
+            OverlayBitmapBack = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
+        }
+
+        bool _showOverlays = true;
+        public bool ShowOverlays
+        {
+            get => _showOverlays;
+            set => SetProp(ref _showOverlays, value);
         }
 
         BitmapImage _tileUp;
@@ -453,14 +483,27 @@ namespace PlanetCreator
             return bitmap;
         }
 
-        Dictionary<CubeMapFace, List<object[]>> _collectedPixels = new();
+        Dictionary<CubeMapFace, List<ArgbPixel>> _collectedPixels = new();
+        struct ArgbPixel
+        {
+            public int X;
+            public int Y;
+            public byte A;
+            public byte R;
+            public byte G;
+            public byte B;
+            public ArgbPixel(int x, int y, byte a, byte r, byte g, byte b)
+            {
+                X = x; Y = y; A = a; R = r; G = g; B = b;
+            }
+        }
         public void DebugCollectPixel(CubeMapFace face, int x, int y, byte a, byte r, byte g, byte b)
         {
             lock (_collectedPixels)
             {
                 if (!_collectedPixels.ContainsKey(face))
-                    _collectedPixels.Add(face, new List<object[]>());
-                _collectedPixels[face].Add(new object[] { x, y, a, r, g, b });
+                    _collectedPixels.Add(face, new List<ArgbPixel>());
+                _collectedPixels[face].Add(new ArgbPixel(x, y, a, r, g, b));
             }
         }
 
@@ -481,33 +524,26 @@ namespace PlanetCreator
 
                             foreach (var pix in _collectedPixels[face])
                             {
-                                int x = (int)pix[0];
-                                int y = (int)pix[1];
-                                byte a = (byte)pix[2];
-                                byte r = (byte)pix[3];
-                                byte g = (byte)pix[4];
-                                byte b = (byte)pix[5];
-
                                 unsafe
                                 {
                                     // Get a pointer to the back buffer.
                                     IntPtr pBackBuffer = bitmap.BackBuffer;
 
                                     // Find the address of the pixel to draw.
-                                    pBackBuffer += y * bitmap.BackBufferStride;
-                                    pBackBuffer += x * 4;
+                                    pBackBuffer += pix.Y * bitmap.BackBufferStride;
+                                    pBackBuffer += pix.X * 4;
 
                                     // Compute the pixel's color.
-                                    int color_data = b;    // B
-                                    color_data |= g << 8;  // G
-                                    color_data |= r << 16; // R
-                                    color_data |= a << 24; // A
+                                    int color_data = pix.B;    // B
+                                    color_data |= pix.G << 8;  // G
+                                    color_data |= pix.R << 16; // R
+                                    color_data |= pix.A << 24; // A
 
                                     // Assign the color data to the pixel.
                                     *((int*)pBackBuffer) = color_data;
                                 }
                                 // Specify the area of the bitmap that changed.
-                                bitmap.AddDirtyRect(new Int32Rect(x, y, 1, 1));
+                                bitmap.AddDirtyRect(new Int32Rect(pix.X, pix.Y, 1, 1));
                             }
                         }
                         finally
@@ -516,6 +552,7 @@ namespace PlanetCreator
                             bitmap.Unlock();
                         }
                     }
+                    _collectedPixels.Clear();
                 }
             });
         }
@@ -828,11 +865,11 @@ namespace PlanetCreator
             get => _lakesPerTile;
             set => SetProp(ref _lakesPerTile, value);
         }
-        double _lakeVolumeMultiplier = 1.0;
-        public double LakeVolumeMultiplier
+        double _lakeAreaMultiplier = 1.0;
+        public double LakeAreaMultiplier
         {
-            get => _lakeVolumeMultiplier;
-            set => SetProp(ref _lakeVolumeMultiplier, value);
+            get => _lakeAreaMultiplier;
+            set => SetProp(ref _lakeAreaMultiplier, value);
         }
 
         double _brushPointiness = 0.25;
@@ -1001,7 +1038,7 @@ namespace PlanetCreator
             if (EvaporateSpeed < 0) EvaporateSpeed = 0;
             if (EvaporateSpeed > 1) EvaporateSpeed = 1;
             if (LakeStampDepth < 0) LakeStampDepth = 0;
-            if (LakeVolumeMultiplier > 100000) LakeVolumeMultiplier = 100000;
+            if (LakeAreaMultiplier > 100000) LakeAreaMultiplier = 100000;
             if (FreckleRadius > 200) FreckleRadius = 200;
             if (FreckleRadius < 10) FreckleRadius = 10;
             if (FrecklesPerTile > 32) FrecklesPerTile = 32;
@@ -1017,6 +1054,7 @@ namespace PlanetCreator
 
         public ICommand SimplexNoiseFillMapCommand => new RelayCommand(o =>
         {
+            SaveBackup(AutoBackupName);
             IsBusy = true;
             foreach (var face in CubeMapFaces)
             {
@@ -1038,6 +1076,7 @@ namespace PlanetCreator
 
         public ICommand WorleyNoiseFillMapCommand => new RelayCommand(o =>
         {
+            SaveBackup(AutoBackupName);
             IsBusy = true;
             foreach (var face in CubeMapFaces)
                 DebugClearPixels(face);
@@ -1056,6 +1095,7 @@ namespace PlanetCreator
 
         public ICommand WorleyAddFrecklesCommand => new RelayCommand(o =>
         {
+            SaveBackup(AutoBackupName);
             IsBusy = true;
             Task.Run(() =>
             {
@@ -1073,6 +1113,7 @@ namespace PlanetCreator
 
         public ICommand HistomgramFlattenCommand => new RelayCommand(o =>
         {
+            SaveBackup(AutoBackupName);
             IsBusy = true;
             Task.Run(() =>
             {
@@ -1089,6 +1130,7 @@ namespace PlanetCreator
 
         public ICommand EquatorFlattenCommand => new RelayCommand(o =>
         {
+            SaveBackup(AutoBackupName);
             IsBusy = true;
             Task.Run(() =>
             {
@@ -1106,6 +1148,7 @@ namespace PlanetCreator
 
         public ICommand HistomgramStretchCommand => new RelayCommand(o =>
         {
+            SaveBackup(AutoBackupName);
             IsBusy = true;
             Task.Run(() =>
             {
@@ -1122,6 +1165,7 @@ namespace PlanetCreator
 
         public ICommand InvertCommand => new RelayCommand(o =>
         {
+            SaveBackup(AutoBackupName);
             IsBusy = true;
             Task.Run(() =>
             {
@@ -1138,6 +1182,7 @@ namespace PlanetCreator
 
         public ICommand GenerateSedimentLayersCommand => new RelayCommand(o =>
         {
+            SaveBackup(AutoBackupName);
             IsBusy = true;
             Task.Run(() =>
             {
@@ -1154,6 +1199,7 @@ namespace PlanetCreator
 
         public ICommand ErodeHydraulicCommand => new RelayCommand(o =>
         {
+            SaveBackup(AutoBackupName);
             var gen = GetGenerator();
             IsBusy = true;
             Task.Run(() =>
@@ -1194,6 +1240,7 @@ namespace PlanetCreator
 
         public ICommand AddLakesCommand => new RelayCommand(o =>
         {
+            SaveBackup(AutoBackupName);
             IsBusy = true;
             foreach (var face in CubeMapFaces)
             {
@@ -1207,7 +1254,7 @@ namespace PlanetCreator
                     var faces = Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>().ToList();
                     if (PreviewMode) faces = new List<CubeMapFace> { PreviewTile };
                     var gen = GetGenerator();
-                    gen.AddLakes(LakesPerTile, LakeVolumeMultiplier, LakeStampDepth, MaterialSource, LakeMatMapValue, LakeModeAdd, _cts.Token);
+                    gen.AddLakes(LakesPerTile, LakeAreaMultiplier, LakeStampDepth, MaterialSource, LakeMatMapValue, LakeModeAdd, _cts.Token);
                     LoadPictures();
                 }
                 catch { }
@@ -1216,6 +1263,7 @@ namespace PlanetCreator
             });
         });
 
+        const string AddLakeBusyString = "Right click on a dark spot on the map.\r\nUse slider to adjust max filled pixels.";
         bool _addingLake;
         public bool AddingLake
         {
@@ -1225,7 +1273,7 @@ namespace PlanetCreator
                 if (SetProp(ref _addingLake, value))
                 {
                     IsBusy = value;
-                    BusyText = value ? "Right click on a dark spot on the map.\r\nLeft click to abort." : null;
+                    BusyText = value ? AddLakeBusyString : null;
                 }
             }
         }
@@ -1239,14 +1287,74 @@ namespace PlanetCreator
 
         public ICommand AddLakeByClickCommand => new RelayCommand(o =>
         {
+            SaveBackup(AutoBackupName);
             AddingLake = true;
         });
 
+        int _maxLakeFillSingleClick = 10000;
+        public int MaxLakeFillSingleClick
+        {
+            get => _maxLakeFillSingleClick;
+            set => SetProp(ref _maxLakeFillSingleClick, value);
+        }
+        bool _busyAddingLake = false; // Use to block additional right clicks
+
+        // Value and points of each added blob
+        double _addedLakePointsHeight;
+        HashSet<CubeMapPointLight> _lakePointsToAdd = null;
         public void HandleLakeAddClick(CubeMapFace face, int x, int y)
         {
-            Debug.WriteLine(face + "," +x + "," +y);
-            MessageBox.Show("Not implemented, WIP");
-            IsBusy = false;
+            if (PreviewMode && face != PreviewTile)
+            {
+                MessageBox.Show("Please disable preview mode if you want to click another tile than the preview tile.", "", MessageBoxButton.OK, MessageBoxImage.Exclamation);
+                return;
+            }
+
+            ClearOverlays();
+            _lakePointsToAdd = null;
+            _addedLakePointsHeight = -1;
+            _busyAddingLake = true;
+            Progress = 50;
+            BusyText = "PLEASE WAIT";
+            Task.Run(() =>
+            {
+                try
+                {
+                    var gen = GetGenerator();
+                    var addResult = gen.CheckAddSingleLake(face, x, y, MaxLakeFillSingleClick, _cts.Token, out _lakePointsToAdd, out var lakeHeight);
+                    if (addResult)
+                    {
+                        _addedLakePointsHeight = lakeHeight;
+
+                        // Draw blue channel
+                        if (PreviewMode)
+                        {
+                            foreach (var pixel in _lakePointsToAdd)
+                            {
+                                if (pixel.Face == PreviewTile)
+                                    DebugCollectPixel(pixel.Face, pixel.X, pixel.Y, 128, 0, 0, 255);
+                            }
+                        }
+                        else
+                        {
+                            foreach (var pixel in _lakePointsToAdd)
+                            {
+                                DebugCollectPixel(pixel.Face, pixel.X, pixel.Y, 128, 0, 0, 255);
+                            }
+                        }
+
+                        DebugDrawCollectedPixels();
+                    }
+                    else
+                        MessageBox.Show("Limit reached! Increase slider if necessary.");
+                }
+                finally
+                {
+                    _busyAddingLake = false;
+                    BusyText = AddLakeBusyString;
+                    Progress = 0;
+                }
+            });
         }
 
         bool IsCancellationRequested => _cts.IsCancellationRequested == true;
@@ -1254,7 +1362,37 @@ namespace PlanetCreator
         public ICommand AbortCommand => new RelayCommand(o =>
         {
             try { _cts?.Cancel(); } catch { }
+
+            if (AddingLake)
+            {
+                AddingLake = false;
+            }
+            LoadPictures();
         }, o => IsBusy);
+
+        public ICommand ConfirmCommand => new RelayCommand(o =>
+        {
+            if (AddingLake)
+            {
+                AddingLake = false;
+                if (_lakePointsToAdd != null && _lakePointsToAdd.Count > 0)
+                {
+                    IsBusy = true;
+                    Task.Run(() =>
+                    {
+                        try
+                        {
+                            // Modify height maps and material maps
+                            var gen = GetGenerator();
+                            gen.AddSingleLake(_lakePointsToAdd, _addedLakePointsHeight, LakeStampDepth, MaterialSource, LakeMatMapValue, _cts.Token);
+                            _lakePointsToAdd.Clear();
+                            LoadPictures();
+                        }
+                        finally { IsBusy = false; }
+                    });
+                }
+            }
+        });
 
         private void Generator_ProgressChanged(object sender, ProgressEventArgs e)
         {

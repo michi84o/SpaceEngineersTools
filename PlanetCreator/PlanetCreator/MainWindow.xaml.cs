@@ -200,8 +200,6 @@ namespace PlanetCreator
         {
             BorderView.ReleaseMouseCapture();
             _moved = false;
-            if (ViewModel.AddingLake)
-                ViewModel.AddingLake = false;
         }
 
         private void ImageView_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -226,5 +224,13 @@ namespace PlanetCreator
             ImageView.RenderTransform = new MatrixTransform(m);
         }
 
+        private void Hyperlink_Click(object sender, RoutedEventArgs e)
+        {
+            var sInfo = new System.Diagnostics.ProcessStartInfo("https://github.com/michi84o/SpaceEngineersTools")
+            {
+                UseShellExecute = true,
+            };
+            System.Diagnostics.Process.Start(sInfo);
+        }
     }
 }

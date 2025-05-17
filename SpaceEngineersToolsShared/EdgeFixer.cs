@@ -146,6 +146,17 @@ namespace SpaceEngineersToolsShared
             //ApplyBlend(edgePoints);
         }
 
+        /// <summary>
+        /// Fix the edges of the height map to be seamless.
+        /// Don't set the 'cornersOnly' or 'erodeCorners' parameters for normal use cases.
+        /// </summary>
+        /// <param name="faces"></param>
+        /// <param name="token"></param>
+        /// <param name="cornersOnly">If true, only the 5 pixel rows or columns near the corners are fixed. Also if true, no hydraulic erosion is applied unless specified with 'erodeCorners'.</param>
+        /// <param name="erodeCorners">
+        /// If true, hydraulic erosion is applied to the corners. This is already done automatically if 'cornersOnly' is false.
+        /// If 'cornersOnly' is false and 'erodeCorners' is true, corners will be eroded twice!
+        /// </param>
         public static void MakeSeamless(Dictionary<CubeMapFace, double[,]> faces, CancellationToken token, bool cornersOnly = false, bool erodeCorners = false)
         {
             if (token.IsCancellationRequested) return;

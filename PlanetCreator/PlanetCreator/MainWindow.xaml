@@ -23,8 +23,9 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <Menu Grid.Row="0">
-            <MenuItem Header="Edge Fix" Command="{Binding EdgeFixCommand}"/>
-            <MenuItem Header="Triplet Fix" Command="{Binding TripletFixCommand}"/>
+            <MenuItem Header="Edge Fix" Command="{Binding EdgeFixCommand}" ToolTip="Fix the seams at the edges of the height maps."/>
+            <MenuItem Header="Triplet Fix" Command="{Binding TripletFixCommand}" ToolTip="Fix the corners of the height maps. Only call if 'Edge Fix' could not fix these."/>
+            <Hyperlink Click="Hyperlink_Click">github.com/michi84o/SpaceEngineersTools</Hyperlink>
         </Menu>
         <GroupBox Header="Session" Grid.Row="1" Grid.Column="0">
             <Grid>
@@ -335,8 +336,8 @@
                                         <ColumnDefinition/>
                                         <ColumnDefinition Width="30"/>
                                     </Grid.ColumnDefinitions>
-                                    <Slider Grid.Column="0" Margin="3" Minimum=".5" Maximum="4" Value="{Binding ExponentialFlattenStrength}" TickFrequency=".1"/>
-                                    <TextBlock Grid.Column="1" Margin="3" Text="{Binding ExponentialFlattenStrength}"/>
+                                    <Slider Grid.Column="0" Margin="3" Minimum=".5" Maximum="4" Value="{Binding ExponentialFlattenStrength}" TickFrequency=".1" SmallChange="0.1" IsSnapToTickEnabled="True"/>
+                                    <TextBlock Grid.Column="1" Margin="3" Text="{Binding ExponentialFlattenStrength, StringFormat=N1}"/>
                                 </Grid>
 
                                 <TextBlock
@@ -380,9 +381,9 @@
                                     <ColumnDefinition Width="30"/>
                                 </Grid.ColumnDefinitions>
                                 <Slider
-                                    Grid.Column="0" Margin="3" Minimum="0" Maximum=".9" TickFrequency="0.05"
-                                    Value="{Binding StretchHistogramMin}"    />
-                                <TextBlock Grid.Column="1" Margin="3" Text="{Binding StretchHistogramMin}"/>
+                                    Grid.Column="0" Margin="3" Minimum="0" Maximum=".9" TickFrequency="0.1" SmallChange="0.1"
+                                    Value="{Binding StretchHistogramMin}" IsSnapToTickEnabled="True"   />
+                                    <TextBlock Grid.Column="1" Margin="3" Text="{Binding StretchHistogramMin, StringFormat=N1}"/>
                             </Grid>
                             <TextBlock
                                   Grid.Row="7" Grid.Column="0" Margin="3" VerticalAlignment="Center"
@@ -393,9 +394,9 @@
                                     <ColumnDefinition Width="30"/>
                                 </Grid.ColumnDefinitions>
                                 <Slider
-                                    Grid.Column="0" Margin="3" Minimum="0.1" Maximum="1" TickFrequency="0.05"
-                                    Value="{Binding StretchHistogramMax}" />
-                                <TextBlock Grid.Column="1" Margin="3" Text="{Binding StretchHistogramMax}"/>
+                                    Grid.Column="0" Margin="3" Minimum="0.1" Maximum="1" TickFrequency="0.1" SmallChange="0.1"
+                                    Value="{Binding StretchHistogramMax}" IsSnapToTickEnabled="True" />
+                                    <TextBlock Grid.Column="1" Margin="3" Text="{Binding StretchHistogramMax, StringFormat=N1}"/>
                             </Grid>
                             <Button
                                   Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="2" Margin="3" Content="Stretch Histogram"
@@ -568,10 +569,10 @@
                                 Text="{Binding LakesPerTile, UpdateSourceTrigger=PropertyChanged}"/>
                             <TextBlock
                                 Grid.Row="1" Grid.Column="0" Margin="3"
-                                Text="Lake Vol. Multiplier" />
+                                Text="Lake Area Multi." />
                             <TextBox
                                 Grid.Row="1" Grid.Column="1" Margin="3"
-                                Text="{Binding LakeVolumeMultiplier}"/>
+                                Text="{Binding LakeAreaMultiplier}" ToolTip="Average lake size is 3000. Multiply area with this factor."/>
                             <TextBlock
                                 Grid.Row="2" Grid.Column="0" Margin="3"
                                 Text="Mat. Source"   />
@@ -599,7 +600,7 @@
                                 </StackPanel>
                                 <Button
                                     Grid.Row="6" Grid.Column="0"  Margin="3" Grid.ColumnSpan="2"
-                                    Content="Add Lakes"
+                                    Content="Add Lakes Automatically" ToolTip="Uses water simulation to check where the most rain accumulates and places lakes there."
                                     Command="{Binding AddLakesCommand}"/>
                                 <Button
                                     Grid.Row="7" Grid.Column="0" Margin="3" Grid.ColumnSpan="2"
@@ -620,6 +621,8 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <Grid
                         Grid.Row="0"
@@ -629,8 +632,22 @@
                             Height="40" BorderThickness="1" BorderBrush="Black"/>
                         <TextBlock Grid.Row="0" Text="{Binding Progress, StringFormat={}{0}%}" Margin="10" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Grid>
-                    <Button Grid.Row="1" Margin="10,0,10,10" Content="Cancel"/>
+                    <Button Grid.Row="1" Margin="10,0,10,10" Content="Cancel" Command="{Binding AbortCommand}" />
                     <TextBlock Grid.Row="2" Margin="5,10,5,10" Text="{Binding BusyText}" HorizontalAlignment="Center" TextAlignment="Center" />
+                    <Grid
+                        Grid.Row="3"
+                        Visibility="{Binding AddingLake, Converter={StaticResource BoolVis}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Slider
+                            Grid.Column="0" Minimum="1000" Maximum="500000" TickFrequency="1000"
+                            SmallChange="1000"
+                            Value="{Binding MaxLakeFillSingleClick}" Margin="2"/>
+                        <TextBlock Grid.Column="1" Width="50" Text="{Binding MaxLakeFillSingleClick}" Margin="3"/>
+                    </Grid>
+                    <Button Grid.Row="4" Margin="10,10,10,10" Content="Confirm" Command="{Binding ConfirmCommand}" Visibility="{Binding AddingLake, Converter={StaticResource BoolVis}}" />
                 </Grid>
             </Grid>
             <GroupBox
@@ -645,12 +662,12 @@
                         <Image x:Name="TLeft" RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="6144" Canvas.Top="2048" Source="{Binding TileLeft}" />
                         <Image x:Name="TDown" RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="4096" Source="{Binding TileDown}" />
 
-                        <Image Opacity=".8" RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="0" Canvas.Top="0" Source="{Binding OverlayBitmapUp}" />
-                        <Image Opacity=".8" RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="0" Canvas.Top="2048" Source="{Binding OverlayBitmapFront}" />
-                        <Image Opacity=".8" RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="2048" Canvas.Top="2048" Source="{Binding OverlayBitmapRight}"  />
-                        <Image Opacity=".8" RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="2048" Source="{Binding OverlayBitmapBack}"  />
-                        <Image Opacity=".8" RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="6144" Canvas.Top="2048" Source="{Binding OverlayBitmapLeft}" />
-                        <Image Opacity=".8" RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="4096" Source="{Binding OverlayBitmapDown}" />
+                        <Image Opacity=".8" RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="0" Canvas.Top="0" Source="{Binding OverlayBitmapUp}" Visibility="{Binding ShowOverlays, Converter={StaticResource BoolVis}}" />
+                        <Image Opacity=".8" RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="0" Canvas.Top="2048" Source="{Binding OverlayBitmapFront}" Visibility="{Binding ShowOverlays, Converter={StaticResource BoolVis}}" />
+                        <Image Opacity=".8" RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="2048" Canvas.Top="2048" Source="{Binding OverlayBitmapRight}" Visibility="{Binding ShowOverlays, Converter={StaticResource BoolVis}}" />
+                        <Image Opacity=".8" RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="2048" Source="{Binding OverlayBitmapBack}" Visibility="{Binding ShowOverlays, Converter={StaticResource BoolVis}}" />
+                        <Image Opacity=".8" RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="6144" Canvas.Top="2048" Source="{Binding OverlayBitmapLeft}" Visibility="{Binding ShowOverlays, Converter={StaticResource BoolVis}}" />
+                        <Image Opacity=".8" RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="4096" Source="{Binding OverlayBitmapDown}" Visibility="{Binding ShowOverlays, Converter={StaticResource BoolVis}}" />
 
                         <Border
                             Canvas.Top="512" Canvas.Left="512" Width="512" Height="512" BorderThickness="5" BorderBrush="Red"
@@ -661,6 +678,11 @@
                     </Canvas>
                 </Border>
             </GroupBox>
+            <Border
+                Grid.Column="1" Margin="3,3,15,3" HorizontalAlignment="Right" VerticalAlignment="Top"
+                Background="White">
+                <CheckBox Content="Show Overlays" Margin="1" IsChecked="{Binding ShowOverlays}" />
+            </Border>
 
         </Grid>
     </Grid>
