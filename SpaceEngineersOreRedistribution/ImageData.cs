@@ -12,6 +12,7 @@ using System.Windows.Media.Imaging;
 using System.Windows;
 using SixLabors.ImageSharp.Formats.Png;
 using System.Threading;
+using SpaceEngineersToolsShared;
 
 namespace SpaceEngineersOreRedistribution
 {

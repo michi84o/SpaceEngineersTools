@@ -12,7 +12,6 @@ namespace SpaceEngineersOreRedistribution
 {
     public class Ore3dViewModel : PropChangeNotifier
     {
-        public event PropertyChangedEventHandler PropertyChanged;
         public ObservableCollection<ModelVisual3D> Cuboids { get; } = new ObservableCollection<ModelVisual3D>();
 
         int _rectSize = 20;

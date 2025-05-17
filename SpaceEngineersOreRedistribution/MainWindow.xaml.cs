@@ -1,5 +1,6 @@
 ﻿using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using SpaceEngineersToolsShared;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

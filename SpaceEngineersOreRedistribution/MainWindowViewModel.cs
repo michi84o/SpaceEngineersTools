@@ -1,8 +1,8 @@
 ﻿using Microsoft.Win32;
-using PlanetCreator;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.ColorSpaces;
 using SixLabors.ImageSharp.PixelFormats;
+using SpaceEngineersToolsShared;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -1159,7 +1159,7 @@ namespace SpaceEngineersOreRedistribution
                         if (!allBiomes.Contains(val))
                             val = -1; // Count how many pixels don't have biome def
 
-                        var point = CoordinateHelper.GetNormalizedSphereCoordinates(face, x, y);
+                        var point = CoordinateHelper.GetNormalizedSphereCoordinates(face, x, y); // Based on 2048*2048!!
                         var latitude = CoordinateHelper.ToLongitudeLatitude(point).latitude; // -90 to 90
                         var bucket = GetLatitudeBucket(latitude);
                         if (!biomeDic.ContainsKey(bucket)) { biomeDic[bucket] = new(); }

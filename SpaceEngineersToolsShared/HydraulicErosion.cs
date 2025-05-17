@@ -143,26 +143,25 @@ namespace SpaceEngineersToolsShared
             PointD pos = new();
             PointD dir = new();
 
-
             lock (_rnd)
             {
                 if (!_debugMode)
                 {
-                    pos.X = _rnd.NextDouble() * 2047;
-                    pos.Y = _rnd.NextDouble() * 2047;
+                    pos.X = _rnd.NextDouble() * (_tileWidth - 1);
+                    pos.Y = _rnd.NextDouble() * (_tileWidth - 1);
                     face = _faceValues[_rnd.Next(0, _faceValues.Length)];
                 }
                 else
                 {
                     if (_limitedDebugMode)
                     {
-                        pos.X = _rnd.NextDouble() * 512 + 512;
-                        pos.Y = _rnd.NextDouble() * 512 + 512;
+                        pos.X = _rnd.NextDouble() * (_tileWidth / 4) + (_tileWidth / 4);
+                        pos.Y = _rnd.NextDouble() * (_tileWidth / 4) + (_tileWidth / 4);
                     }
                     else
                     {
-                        pos.X = _rnd.NextDouble() * 2047;
-                        pos.Y = _rnd.NextDouble() * 2047;
+                        pos.X = _rnd.NextDouble() * (_tileWidth - 1);
+                        pos.Y = _rnd.NextDouble() * (_tileWidth - 1);
                     }
                     face = _debugFace ?? CubeMapFace.Back;
                 }
@@ -445,22 +444,22 @@ namespace SpaceEngineersToolsShared
                 int dy = 0;
                 bool triplet = false;
                 if (pt.PosX == 0 && pt.PosY > 0) dx = -1;
-                else if (pt.PosX == 2047 && pt.PosY > 0) dx = 1;
+                else if (pt.PosX == (_tileWidth-1) && pt.PosY > 0) dx = 1;
                 else if (pt.PosY == 0 && pt.PosX > 0) dy = -1;
-                else if (pt.PosY == 2047 && pt.PosX > 0) dy = 1;
+                else if (pt.PosY == (_tileWidth - 1) && pt.PosX > 0) dy = 1;
                 else if (pt.PosX == 0 && pt.PosY == 0)
                 {
                     triplet = true; dx = -1; dy = -1;
                 }
-                else if (pt.PosX == 2047 && pt.PosY == 0)
+                else if (pt.PosX == (_tileWidth - 1) && pt.PosY == 0)
                 {
                     triplet = true; dx = 1; dy = -1;
                 }
-                else if (pt.PosX == 0 && pt.PosY == 2047)
+                else if (pt.PosX == 0 && pt.PosY == (_tileWidth - 1))
                 {
                     triplet = true; dx = -1; dy = 1;
                 }
-                else if (pt.PosX == 2047 && pt.PosY == 2047)
+                else if (pt.PosX == (_tileWidth - 1) && pt.PosY == (_tileWidth - 1))
                 {
                     triplet = true; dx = 1; dy = 1;
                 }

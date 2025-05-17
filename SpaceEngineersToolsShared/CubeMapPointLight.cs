@@ -123,6 +123,7 @@ namespace SpaceEngineersToolsShared
                                Face = CubeMapFace.Left,
                                X = currentX,
                                Y = currentY,
+                               TileWidth= origin.TileWidth
                             }, dy, 0);
                     case CubeMapFace.Left:
                         // East of 'Left' is 'Front'

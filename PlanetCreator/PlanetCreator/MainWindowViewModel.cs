@@ -1208,14 +1208,22 @@ namespace PlanetCreator
                 {
                     gen.InitErosion(UseSedimentLayers, _cts.Token);
                     int iterationCount = 0;
+                    int iterations = ErosionIterations;
+                    if (PreviewMode)
+                        iterations /= 6;
+                    if (LimitedPreview)
+                    {
+                        iterations /= 16;
+                    }
+
                     Task.Run(async () =>
                     {
-                        while (IsBusy && !_cts.Token.IsCancellationRequested && iterationCount < ErosionIterations)
+                        while (IsBusy && !_cts.Token.IsCancellationRequested && iterationCount < iterations)
                         {
                             try
                             {
                                 await Task.Delay(100, _cts.Token);
-                                Progress = (int)(.5 + (100.0 * iterationCount) / ErosionIterations);
+                                Progress = (int)(.5 + (100.0 * iterationCount) / iterations);
                             }
                             catch
                             {
@@ -1224,7 +1232,7 @@ namespace PlanetCreator
                             }
                         }
                     });
-                    Parallel.For(0, ErosionIterations, gen.POptions(_cts.Token), pit =>
+                    Parallel.For(0, iterations, gen.POptions(_cts.Token), pit =>
                     {
                         gen.Erode(_cts.Token);
                         Interlocked.Increment(ref iterationCount);
