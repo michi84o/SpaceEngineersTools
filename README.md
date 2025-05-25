@@ -1,7 +1,5 @@
 # SpaceEngineersTools
 
-Warning, all my tools that handle planet data files only support 2048x2048 sized images!
-
 ## SpaceEngineersOreRedistribution:
 This is a viewer for the planet definition files, specifically ore.
 
