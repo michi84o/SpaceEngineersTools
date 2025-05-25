@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Xml.Linq;
+using SpaceEngineersToolsShared;
 
 namespace SpaceEngineersOreRedistribution
 {

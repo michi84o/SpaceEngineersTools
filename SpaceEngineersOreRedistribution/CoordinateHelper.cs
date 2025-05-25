@@ -10,10 +10,9 @@ namespace SpaceEngineersOreRedistribution
 {
     public static class CoordinateHelper
     {
-        public static Point3D GetNormalizedSphereCoordinates(CubeMapFace face, int x, int y)
+        public static Point3D GetNormalizedSphereCoordinates(CubeMapFace face, int x, int y, double cubeWidth)
         {
             Point3D origin = new Point3D();
-            double cubeWidth = 2048;
 
             // It makes sense if you draw a picture. See below
             double offset = (cubeWidth - 1) / 2.0;

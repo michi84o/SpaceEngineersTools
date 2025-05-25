@@ -47,7 +47,6 @@ namespace PlanetCreator
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             ViewModel.PropertyChanged += ViewModel_PropertyChanged;
-            ViewModel.LoadPictures();
         }
 
         private void ViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)

@@ -134,6 +134,8 @@ namespace PlanetCreator
                     OverlayBitmapBack = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
                     OnPropertyChanged(nameof(OverlayBitmapBack));
                 }
+
+                LoadPictures();
             }
         }, o => !IsBusy);
 
@@ -1197,6 +1199,12 @@ namespace PlanetCreator
 
         });
 
+        bool _enableHydraulicErosionDebugOverlay;
+        public bool EnableHydraulicErosionDebugOverlay
+        {
+            get => _enableHydraulicErosionDebugOverlay;
+            set => SetProp(ref _enableHydraulicErosionDebugOverlay, value);
+        }
         public ICommand ErodeHydraulicCommand => new RelayCommand(o =>
         {
             SaveBackup(AutoBackupName);
@@ -1206,7 +1214,7 @@ namespace PlanetCreator
             {
                 try
                 {
-                    gen.InitErosion(UseSedimentLayers, _cts.Token);
+                    gen.InitErosion(UseSedimentLayers, _cts.Token, EnableHydraulicErosionDebugOverlay);
                     int iterationCount = 0;
                     int iterations = ErosionIterations;
                     if (PreviewMode)

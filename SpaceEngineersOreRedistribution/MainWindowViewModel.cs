@@ -30,6 +30,45 @@ namespace SpaceEngineersOreRedistribution
 {
     internal class MainWindowViewModel : PropChangeNotifier
     {
+        public List<int> TileWidths { get; } = new() { 512, 1024, 2048, 4096, 8192 };
+        int _tileWidth = 2048;
+        public int TileWidth
+        {
+            get => _tileWidth;
+            set
+            {
+                if (value == _tileWidth) return;
+
+                if (value > 2048)
+                {
+                    MessageBox.Show("Warning using tile widths above 2048 causes lighting glitches and bad server performance in SE1!", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+
+                if (PlanetDefinitions.Count > 0)
+                {
+                    var dlgRes = MessageBox.Show(
+                        "Changing the tile width will unload all planet definitions. Continue?"
+                        , "Warning", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+                    if (dlgRes != MessageBoxResult.OK)
+                    {
+                        // Reset to previous value
+                        Application.Current.Dispatcher.InvokeAsync(()=>{ OnPropertyChanged(); });
+                        return;
+                    }
+                    SelectedPlanetDefinition = null;
+                    PlanetDefinitions.Clear();
+                    TileUp = null;
+                    TileFront = null;
+                    TileRight = null;
+                    TileBack = null;
+                    TileLeft = null;
+                    TileDown = null;
+                }
+                _tileWidth = value;
+                OnPropertyChanged();
+            }
+        }
+
         public ObservableCollection<PlanetDefinition> PlanetDefinitions { get; } = new();
 
         public ObservableCollection<OreDistributionStatViewModel> OreTypes { get; } = new();
@@ -150,10 +189,11 @@ namespace SpaceEngineersOreRedistribution
                         Parallel.ForEach(_images.Values, img =>
                         {
                             if (img == null) return;
-                            for (int x = 0; x < 2048; ++x)
-                                for (int y = 0; y < 2048; ++y)
+                            for (int x = 0; x < TileWidth; ++x)
+                                for (int y = 0; y < TileWidth; ++y)
                                 {
                                     var blue = img.B[x, y];
+                                    if (blue == 255) continue; // No ore here
                                     var mapping = value.OreMappings.FirstOrDefault(x => x.Value == blue);
                                     if (mapping != null)
                                     {
@@ -635,7 +675,7 @@ namespace SpaceEngineersOreRedistribution
             var dir = Path.GetDirectoryName(_lastOpenedFile);
             var imageDir = Path.Combine(dir, "PlanetDataFiles", SelectedPlanetDefinition.Name);
             if (!Directory.Exists(imageDir)) return null;
-            return ImageData.Create(imageDir, face, token);
+            return ImageData.Create(imageDir, face, TileWidth, token);
         }
 
         Dictionary<CubeMapFace, ImageData> _materialMaps = new();
@@ -740,17 +780,17 @@ namespace SpaceEngineersOreRedistribution
                     overridefiles = true;
                 }
 
-                var image = new ImageData(key);
+                var image = new ImageData(key, TileWidth);
 
                 // Clear ores: Blue = 255
-                Parallel.For(0, 2048, x =>
+                Parallel.For(0, TileWidth, x =>
                 {
-                    Parallel.For(0, 2048, y =>
+                    for (int y = 0; y < TileWidth; ++y)
                     {
                         image.R[x, y] = value.R[x, y];
                         image.G[x, y] = value.G[x, y];
                         image.B[x, y] = 255;
-                    });
+                    }
                 });
 
                 int spawnRate = setup.ViewModel.OreSpawnRate; // Default 3000
@@ -760,9 +800,9 @@ namespace SpaceEngineersOreRedistribution
                 double prop = 1.0 / spawnRate;//(3136);
                 double nBaseMin = 0.72; // This is just a random number I picked
                 double nBaseMax = nBaseMin + prop;
-                for (int x = 0; x < 2048; ++x)
+                for (int x = 0; x < TileWidth; ++x)
                 {
-                    for (int y = 0; y < 2048; ++y)
+                    for (int y = 0; y < TileWidth; ++y)
                     {
                         // Check if ore spawns at this location
                         var r = rnd.NextDouble();
@@ -853,7 +893,7 @@ namespace SpaceEngineersOreRedistribution
                         var mappings = mappingsDictionary[info.Name];
 
                         HashSet<OreToDraw> drawnOre = new();
-                        drawnOre.Add(new OreToDraw { X = x, Y = y, Value = mappings[defaultDepthIndex].Value });
+                        drawnOre.Add(new OreToDraw(TileWidth) { X = x, Y = y, Value = mappings[defaultDepthIndex].Value });
                         int lastDepthIndex = defaultDepthIndex;
                         int lastX = x;
                         int lastY = y;
@@ -879,7 +919,7 @@ namespace SpaceEngineersOreRedistribution
                         for (int i=1;i<spawnSize;++i) // We already added one pixel at this point, so start with 1
                         {
                             var direction = rnd.Next(4);
-                            var nextOreToDraw = new OreToDraw();
+                            var nextOreToDraw = new OreToDraw(TileWidth);
                             // Check if that pixel is already painted:
                             int directionTries = 0;
                             bool foundFreePixel = false;
@@ -1061,6 +1101,11 @@ namespace SpaceEngineersOreRedistribution
         class OreToDraw
         {
             int _x,_y;
+            int _tileWidth = 2048;
+            public OreToDraw(int tileWidth)
+            {
+                _tileWidth = tileWidth;
+            }
 
             public int X
             {
@@ -1068,7 +1113,7 @@ namespace SpaceEngineersOreRedistribution
                 set
                 {
                     if (value < 0) _x = 0;
-                    else if (value > 2047) _x = 2047;
+                    else if (value > (_tileWidth - 1)) _x = (_tileWidth - 1);
                     else _x = value;
                 }
             }
@@ -1078,7 +1123,7 @@ namespace SpaceEngineersOreRedistribution
                 set
                 {
                     if (value < 0) _y = 0;
-                    else if (value > 2047) _y = 2047;
+                    else if (value > (_tileWidth - 1)) _y = (_tileWidth - 1);
                     else _y = value;
                 }
             }
@@ -1108,26 +1153,40 @@ namespace SpaceEngineersOreRedistribution
             foreach (var face in Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>())
             {
                 var faceName = face.ToString().ToLower();
-                dynamic material = SixLabors.ImageSharp.Image.Load(Path.Combine(imageDir, faceName + "_mat.png"));
-                var addImage = new SixLabors.ImageSharp.Image<Rgba32>(2048, 2048);
-                for (int x = 0; x < 2048; ++x)
-                    for (int y = 0; y < 2048; ++y)
+                var materialImg = SixLabors.ImageSharp.Image.Load(Path.Combine(imageDir, faceName + "_mat.png"));
+                var material = materialImg as Image<Rgb24>;
+                if (material == null)
+                {
+                    material = materialImg.CloneAs<Rgb24>();
+                    materialImg.Dispose(); // Dispose original image, we don't need it anymore
+                }
+                var w = material.Width;
+                var h = material.Height;
+                var addImage = new SixLabors.ImageSharp.Image<Rgba32>(w, h);
+                material.ProcessPixelRows(row =>
+                {
+                    for (int y = 0; y < h; ++y)
                     {
-                        // Spaced that have ore must have red value of 144. All other rgb values are 0.
-                        var blue = material[x, y].B;
-                        if (blue == 255)
-                            addImage[x, y] = new Rgba32(0, 0, 0);
-                        else
-                            addImage[x, y] = new Rgba32(144, 0, 0);
+                        var span = row.GetRowSpan(y);
+                        for (int x = 0; x < w; ++x)
+                        {
+                            var blue = span[x].B;
+                            if (blue == 255)
+                                addImage[x, y] = new Rgba32(0, 0, 0);
+                            else
+                                addImage[x, y] = new Rgba32(144, 0, 0);
+                        }
                     }
+                });
                 addImage.SaveAsPng(Path.Combine(imageDir, faceName + "_add.png"));
+                material.Dispose();
             }
             MessageBox.Show("Finished");
         }, o=> SelectedPlanetDefinition != null);
 
         public ICommand RewriteBiomesCommand => new RelayCommand(o =>
         {
-            var msgRes = MessageBox.Show("This will override the biomes of the currently selected planet.\r\nOnly recommended for EarthLike and Alien\r\nContinue?", "Warning", MessageBoxButton.OKCancel);
+            var msgRes = MessageBox.Show("This will override the biomes of the currently selected planet and save the files as '*_mat2.png'.\r\nOnly recommended for EarthLike and Alien\r\nThe tile width of the original files is used.\r\nContinue?", "Warning", MessageBoxButton.OKCancel);
             if (msgRes != MessageBoxResult.OK) return;
 
             var dir = Path.GetDirectoryName(_lastOpenedFile);
@@ -1148,26 +1207,40 @@ namespace SpaceEngineersOreRedistribution
             // Analyze existing files by latitude
             // Remember all Biome values by number and quantity
             Dictionary<int, Dictionary<int, int>> biomeDic = new();
+            int tileWidth = 2048;
             foreach (var face in Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>())
             {
                 var faceName = face.ToString().ToLower();
-                dynamic image = SixLabors.ImageSharp.Image.Load(Path.Combine(imageDir, faceName + "_mat.png"));
-                for (int x = 0; x < 2048; ++x)
-                    for (int y = 0; y < 2048; ++y)
+                var materialImg = SixLabors.ImageSharp.Image.Load(Path.Combine(imageDir, faceName + "_mat.png"));
+                var material = materialImg as Image<Rgb24>;
+                if (material == null)
+                {
+                    material = materialImg.CloneAs<Rgb24>();
+                    materialImg.Dispose(); // Dispose original image, we don't need it anymore
+                }
+                tileWidth = material.Width;
+                material.ProcessPixelRows(row =>
+                {
+                    for (int y = 0; y < tileWidth; ++y)
                     {
-                       int val = image[x, y].G;
-                        if (!allBiomes.Contains(val))
-                            val = -1; // Count how many pixels don't have biome def
+                        var span = row.GetRowSpan(y);
+                        for (int x = 0; x < tileWidth; ++x)
+                        {
+                            int val = span[x].G;
+                            if (!allBiomes.Contains(val))
+                                val = -1; // Count how many pixels don't have biome def
 
-                        var point = CoordinateHelper.GetNormalizedSphereCoordinates(face, x, y); // Based on 2048*2048!!
-                        var latitude = CoordinateHelper.ToLongitudeLatitude(point).latitude; // -90 to 90
-                        var bucket = GetLatitudeBucket(latitude);
-                        if (!biomeDic.ContainsKey(bucket)) { biomeDic[bucket] = new(); }
-                        if (!biomeDic[bucket].ContainsKey(val))
-                            biomeDic[bucket][val] = 1;
-                        else
-                            biomeDic[bucket][val]++;
+                            var point = CoordinateHelper.GetNormalizedSphereCoordinates(face, x, y, tileWidth); // Based on tileWidth*tileWidth!!
+                            var latitude = CoordinateHelper.ToLongitudeLatitude(point).latitude; // -90 to 90
+                            var bucket = GetLatitudeBucket(latitude);
+                            if (!biomeDic.ContainsKey(bucket)) { biomeDic[bucket] = new(); }
+                            if (!biomeDic[bucket].ContainsKey(val))
+                                biomeDic[bucket][val] = 1;
+                            else
+                                biomeDic[bucket][val]++;
+                        }
                     }
+                });
             }
 
             // EarthLike: +- 5° has only 113 + 85, ignore others
@@ -1177,7 +1250,7 @@ namespace SpaceEngineersOreRedistribution
             }
 
             // Generate new biome map
-            byte[] planetSurface = new byte[2048 * 2048 * 6];
+            byte[] planetSurface = new byte[tileWidth * tileWidth * 6];
 
             int surfaceBiomeCount = 0;
             var random = new Random(0);
@@ -1205,8 +1278,8 @@ namespace SpaceEngineersOreRedistribution
             while (surfaceBiomeCount < planetSurface.Length * seedPercentage)
             {
                 var index = random.NextTS(planetSurface.Length);
-                var coord = PlanetSurfaceToCoordinates(index);
-                var point = CoordinateHelper.GetNormalizedSphereCoordinates(coord.face, coord.x, coord.y);
+                var coord = PlanetSurfaceToCoordinates(index, tileWidth);
+                var point = CoordinateHelper.GetNormalizedSphereCoordinates(coord.face, coord.x, coord.y, tileWidth);
                 var latitude = CoordinateHelper.ToLongitudeLatitude(point).latitude; // -90 to 90
                 var bucket = GetLatitudeBucket(latitude);
                 var dic = biomeDic[bucket];
@@ -1236,21 +1309,21 @@ namespace SpaceEngineersOreRedistribution
                             return; // Seed got destroyed
                     }
 
-                    var coords = PlanetSurfaceToCoordinates(seed.surfaceIndex);
-                    var pt = new CubeMapPointLight { Face = coords.face, X = coords.x, Y = coords.y };
+                    var coords = PlanetSurfaceToCoordinates(seed.surfaceIndex, tileWidth);
+                    var pt = new CubeMapPointLight { Face = coords.face, X = coords.x, Y = coords.y, TileWidth=(ushort)tileWidth };
                     int[] nmap = new int[4];
                     // Get all four neigbors
                     var nUp = CubeMapPointLight.GetPointRelativeTo(pt, 0, 1);
-                    var indexUp = CoordinatesToPlanetSurface(nUp.Face, nUp.X, nUp.Y);
+                    var indexUp = CoordinatesToPlanetSurface(nUp.Face, nUp.X, nUp.Y, tileWidth);
                     nmap[0] = planetSurface[indexUp];
                     var nDown = CubeMapPointLight.GetPointRelativeTo(pt, 0, -1);
-                    var indexDown = CoordinatesToPlanetSurface(nDown.Face, nDown.X, nDown.Y);
+                    var indexDown = CoordinatesToPlanetSurface(nDown.Face, nDown.X, nDown.Y, tileWidth);
                     nmap[1] = planetSurface[indexDown];
                     var nLeft = CubeMapPointLight.GetPointRelativeTo(pt, -1, 0);
-                    var indexLeft = CoordinatesToPlanetSurface(nLeft.Face, nLeft.X, nLeft.Y);
+                    var indexLeft = CoordinatesToPlanetSurface(nLeft.Face, nLeft.X, nLeft.Y, tileWidth);
                     nmap[2] = planetSurface[indexLeft];
                     var nRight = CubeMapPointLight.GetPointRelativeTo(pt, 1, 0);
-                    var indexRight = CoordinatesToPlanetSurface(nRight.Face, nRight.X, nRight.Y);
+                    var indexRight = CoordinatesToPlanetSurface(nRight.Face, nRight.X, nRight.Y, tileWidth);
                     nmap[3] = planetSurface[indexRight];
 
                     Func<int, int> NeighborMapIndexToSurfaceMapIndex = (nIndex) =>
@@ -1283,33 +1356,6 @@ namespace SpaceEngineersOreRedistribution
                         var growTo = emptyNeighbors[random.NextTS(emptyNeighbors.Count)];
                         placeBiome(NeighborMapIndexToSurfaceMapIndex(growTo), seed.value);
                     }
-                    // THIS DID NOT WORK PROPERLY
-                    // Grow into other biome if same neighbor count is larger than that other biomes neighbor count
-                    //else if (differentNeighbors.Count > 0)
-                    //{
-                    //    int power = 4 - differentNeighbors.Count;
-                    //    if (power < 2) return;
-
-                    //    // Check how many distinct neighbors we have
-                    //    Dictionary<int, int> neighborCounts = new(); // Key=Biome, Value=Count
-                    //    foreach (var neighbor in differentNeighbors)
-                    //    {
-                    //        var neighborVal = nmap[neighbor];
-                    //        if (!neighborCounts.ContainsKey(neighborVal)) neighborCounts[neighborVal] = 1;
-                    //        else neighborCounts[neighborVal]++;
-                    //    }
-                    //    var weakNeighbors = neighborCounts.Where(o => o.Value < power).ToList();
-                    //    if (weakNeighbors.Count > 0)
-                    //    {
-                    //        weakNeighbors.Sort((a, b) => a.Value.CompareTo(b.Value));
-                    //        var weakNeighborKey = weakNeighbors.First().Key;
-                    //        List<int> neighborIndexes = new();
-                    //        for (int i = 0; i < 4; ++i)
-                    //            if (nmap[i] == weakNeighborKey) neighborIndexes.Add(i);
-                    //        var growTo = neighborIndexes[random.NextTS(neighborIndexes.Count)];
-                    //        placeBiome(NeighborMapIndexToSurfaceMapIndex(growTo), seed.value);
-                    //    }
-                    //}
                 });
             }
 
@@ -1317,7 +1363,7 @@ namespace SpaceEngineersOreRedistribution
             for (int i = 0; i < planetSurface.Length; ++i)
             {
                 if (planetSurface[i] != 0) continue;
-                var coords = PlanetSurfaceToCoordinates(i);
+                var coords = PlanetSurfaceToCoordinates(i, tileWidth);
 
                 var neigbors = new CubeMapPointLight[]
                 {
@@ -1332,17 +1378,17 @@ namespace SpaceEngineersOreRedistribution
                 };
                 var neighborsWithValue = neigbors.Where(x =>
                 {
-                    var index = CoordinatesToPlanetSurface(x.Face, x.X, x.Y);
+                    var index = CoordinatesToPlanetSurface(x.Face, x.X, x.Y, tileWidth);
                     var value = planetSurface[index];
                     return value != 0;
                 }).ToList();
                 Debug.Assert(neighborsWithValue.Count > 0);
                 var randomNeighbor = neighborsWithValue[random.NextTS(neighborsWithValue.Count)];
-                var indexOfRnd = CoordinatesToPlanetSurface(randomNeighbor.Face, randomNeighbor.X, randomNeighbor.Y);
+                var indexOfRnd = CoordinatesToPlanetSurface(randomNeighbor.Face, randomNeighbor.X, randomNeighbor.Y, tileWidth);
                 var value = planetSurface[indexOfRnd];
                 foreach (var x in neigbors)
                 {
-                    var index = CoordinatesToPlanetSurface(x.Face, x.X, x.Y);
+                    var index = CoordinatesToPlanetSurface(x.Face, x.X, x.Y, tileWidth);
                     if (planetSurface[index] == 0)
                     {
                         planetSurface[index] = value;
@@ -1356,15 +1402,29 @@ namespace SpaceEngineersOreRedistribution
             foreach (var face in Enum.GetValues(typeof(CubeMapFace)).Cast<CubeMapFace>())
             {
                 var faceName = face.ToString().ToLower();
-                var image = new SixLabors.ImageSharp.Image<Rgba32>(2048,2048);
-                dynamic source = SixLabors.ImageSharp.Image.Load(Path.Combine(imageDir, faceName + "_mat.png"));
-                for (int x = 0; x < 2048; ++x)
-                    for (int y = 0; y < 2048; ++y)
+                var image = new SixLabors.ImageSharp.Image<Rgb24>(tileWidth, tileWidth);
+                var materialImg = SixLabors.ImageSharp.Image.Load(Path.Combine(imageDir, faceName + "_mat.png"));
+                var material = materialImg as Image<Rgb24>;
+                if (material == null)
+                {
+                    material = materialImg.CloneAs<Rgb24>();
+                    materialImg.Dispose(); // Dispose original image, we don't need it anymore
+                }
+                image.ProcessPixelRows(row =>
+                {
+                    for (int y = 0; y < tileWidth; ++y)
                     {
-                        var surfaceVal = planetSurface[CoordinatesToPlanetSurface(face, x, y)];
-                        image[x, y] = new Rgba32(surfaceVal /*source[x,y].R*/, surfaceVal, surfaceVal /*source[x,y].B*/);
+                        var span = row.GetRowSpan(y);
+                        for (int x = 0; x < tileWidth; ++x)
+                        {
+                            var surfaceVal = planetSurface[CoordinatesToPlanetSurface(face, x, y, tileWidth)];
+                            span[x] = new Rgb24(material[x, y].R, surfaceVal, material[x, y].B);
+                        }
                     }
+                });
                 image.SaveAsPng(Path.Combine(imageDir, faceName + "_mat2.png"));
+                material.Dispose();
+                image.Dispose();
             }
 
             MessageBox.Show("Finished. Files were saved as '*_mat2.png' to preserve the original files.");
@@ -1398,19 +1458,20 @@ namespace SpaceEngineersOreRedistribution
             return kvps[0].Key;
         }
 
-        (CubeMapFace face, int x, int y) PlanetSurfaceToCoordinates(int surfaceIndex)
+        (CubeMapFace face, int x, int y) PlanetSurfaceToCoordinates(int surfaceIndex, int tileWidth)
         {
-            var div = surfaceIndex / (2048*2048);
-            var start = 2048 * 2048 * div;
-            var posRel = surfaceIndex % (2048*2048);
-            var y = posRel / 2048;
-            var x = surfaceIndex % 2048;
+            var twSquared = tileWidth * tileWidth;
+            var div = surfaceIndex / (twSquared);
+            var start = twSquared * div;
+            var posRel = surfaceIndex % (twSquared);
+            var y = posRel / tileWidth;
+            var x = surfaceIndex % tileWidth;
             return ((CubeMapFace)div, x, y);
         }
 
-        int CoordinatesToPlanetSurface(CubeMapFace face, int x, int y)
+        int CoordinatesToPlanetSurface(CubeMapFace face, int x, int y, int tileWidth)
         {
-            return (int)face * 2048 * 2048 + x + y * 2048;
+            return (int)face * tileWidth * tileWidth + x + y * tileWidth;
         }
 
         // Turn latitude values into dictionary keys

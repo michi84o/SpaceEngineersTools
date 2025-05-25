@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
-namespace SpaceEngineersOreRedistribution
+namespace SpaceEngineersToolsShared
 {
     // <Ore Value="200" Type="Iron_02" Start="3" Depth="7" TargetColor="#616c83" ColorInfluence="15"/>
     public class OreMapping : PropChangeNotifier

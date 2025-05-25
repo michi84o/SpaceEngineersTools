@@ -72,7 +72,7 @@ namespace SpaceEngineersToolsShared
         public HydraulicErosion(Random rnd, Dictionary<CubeMapFace, double[,]> faces,
             bool debugMode = false, bool limitedDebugMode = false, CubeMapFace? debugFace = null,
             Dictionary<CubeMapFace, byte[,]> sedimentLayerIndexes = null,
-            List<ushort[]> sedimentLayers = null)
+            List<ushort[]> sedimentLayers = null, bool enableDebugOverlay = false)
         {
             UpdateEvaporatePart();
             _rnd = rnd;
@@ -94,11 +94,25 @@ namespace SpaceEngineersToolsShared
                 _sedimentLayerIndexes = sedimentLayerIndexes;
                 _sedimentLayers = sedimentLayers;
             }
+
+            if (enableDebugOverlay)
+            {
+                DebugOverlayRed = new Dictionary<CubeMapFace, double[,]>();
+                DebugOverlayGreen = new Dictionary<CubeMapFace, double[,]>();
+                DebugOverlayBlue = new Dictionary<CubeMapFace, double[,]>();
+
+                foreach (var f in faces)
+                {
+                    DebugOverlayRed[f.Key] = new double[_tileWidth, _tileWidth];
+                    DebugOverlayGreen[f.Key] = new double[_tileWidth, _tileWidth];
+                    DebugOverlayBlue[f.Key] = new double[_tileWidth, _tileWidth];
+                }
+            }
         }
 
-        //public double[,] DebugTileWaterFlow { get; set; }
-        //public double[,] DebugTileErode { get; set; }
-        //public double[,] DebugTileDeposit { get; set; }
+        public Dictionary<CubeMapFace, double[,]> DebugOverlayRed;
+        public Dictionary<CubeMapFace, double[,]> DebugOverlayGreen;
+        public Dictionary<CubeMapFace, double[,]> DebugOverlayBlue;
 
         public void Erode(CancellationToken token,
             PointD? startPoint = null,
@@ -176,6 +190,11 @@ namespace SpaceEngineersToolsShared
                 face = startPointFace.Value;
             }
 
+            if (DebugOverlayRed != null)
+            {
+                DebugOverlayRed[face][(int)pos.X, (int)pos.Y] = 1d;
+            }
+
             // Code based on Sebastian Lague
             for (int i = 0; i < maxDropletLifetime; ++i)
             {
@@ -198,14 +217,19 @@ namespace SpaceEngineersToolsShared
                 PointD posOld = pos;
                 pos += dir;
 
+                var posI = pos.ToIntegerPoint();
+                var posOldI = posOld.ToIntegerPoint();
+
                 // Stop simulating droplet if it's not moving
                 if (dir.X == 0 && dir.Y == 0)
                 {
+                    if (DebugOverlayGreen != null && DebugOverlayRed?[face][posI.X, posI.Y] == 0)
+                    {
+                        DebugOverlayBlue[face][posI.X, posI.Y] = 0;
+                        DebugOverlayGreen[face][posI.X, posI.Y] = 1;
+                    }
                     break;
                 }
-
-                var posI = pos.ToIntegerPoint();
-                var posOldI = posOld.ToIntegerPoint();
 
                 if (posI.X >= _tileWidth || posI.X < 0 || posI.Y >= _tileWidth || posI.Y < 0)
                 {
@@ -241,11 +265,11 @@ namespace SpaceEngineersToolsShared
                 // Calculate the droplet's sediment capacity (higher when moving fast down a slope and contains lots of water)
                 double sedimentCapacity = Math.Max(-deltaHeight * speed * waterModified * sedimentCapacityFactor, minSedimentCapacity);
 
+                if (DebugOverlayBlue != null && DebugOverlayRed?[face][posI.X, posI.Y] == 0 &&  DebugOverlayGreen?[face][posI.X, posI.Y] == 0)
+                {
 
-                //if (_debugMode && DebugTileWaterFlow != null)
-                //{
-                //    DebugTileWaterFlow[posOldI.X, posOldI.Y] = waterModified;
-                //}
+                    DebugOverlayBlue[face][posI.X, posI.Y] = waterModified;
+                }
 
                 // If carrying more sediment than capacity, or if flowing uphill:
                 var oldPoint = new CubeMapPoint(_faces, posOldI.X, posOldI.Y, faceOld);
@@ -253,9 +277,6 @@ namespace SpaceEngineersToolsShared
                 {
                     // If moving uphill (deltaHeight > 0) try fill up to the current height, otherwise deposit a fraction of the excess sediment
                     double amountToDeposit = (deltaHeight > 0) ? Math.Min(deltaHeight, sediment) : (sediment - sedimentCapacity) * depositSpeed;
-
-                    //if (_debugMode)
-                    //    DebugTileDeposit[posOldI.X, posOldI.Y] = amountToDeposit;
 
                     if (amountToDeposit != 0)
                     {
@@ -296,6 +317,15 @@ namespace SpaceEngineersToolsShared
                     speed = Math.Sqrt(speedSquared + gravityDelta);
                 water *= (1 - evaporateSpeed);
 
+                if (i == maxDropletLifetime - 1)
+                {
+                    if (DebugOverlayGreen != null && DebugOverlayRed?[face][posI.X, posI.Y] == 0)
+                    {
+                        DebugOverlayBlue[face][posI.X, posI.Y] = 0;
+                        DebugOverlayGreen[face][posI.X, posI.Y] = 1;
+                    }
+                    break;
+                }
             }
         }
 

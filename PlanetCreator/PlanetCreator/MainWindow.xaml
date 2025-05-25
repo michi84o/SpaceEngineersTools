@@ -455,90 +455,95 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
+                                </Grid.RowDefinitions>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock
-                                Grid.Row="0" Grid.Column="0" Margin="3"
-                                Text="Iterations" />
-                            <TextBox
-                                Grid.Row="0" Grid.Column="1" Margin="3"
-                                Text="{Binding ErosionIterations}"/>
-                            <TextBlock
-                                Grid.Row="1" Grid.Column="0" Margin="3"
-                                Text="Droplet Lifetime" />
-                            <TextBox
-                                Grid.Row="1" Grid.Column="1" Margin="3"
-                                Text="{Binding ErosionMaxDropletLifeTime}"/>
-                            <TextBlock
-                                Grid.Row="2" Grid.Column="0" Margin="3"
-                                Text="Intertia" />
-                            <TextBox
-                                Grid.Row="2" Grid.Column="1" Margin="3"
-                                Text="{Binding ErosionInteria}"/>
-                            <TextBlock
-                                Grid.Row="3" Grid.Column="0" Margin="3"
-                                Text="Sediment Cap. Factor" />
-                            <TextBox
-                                Grid.Row="3" Grid.Column="1" Margin="3"
-                                Text="{Binding ErosionSedimentCapacityFactor}"/>
-                            <TextBlock
-                                Grid.Row="4" Grid.Column="0" Margin="3"
-                                Text="Erode Speed" />
-                            <TextBox
-                                Grid.Row="4" Grid.Column="1" Margin="3"
-                                Text="{Binding ErosionErodeSpeed}"/>
-                            <TextBlock
-                                Grid.Row="5" Grid.Column="0" Margin="3"
-                                Text="Deposit Speed" />
-                            <TextBox
-                                Grid.Row="5" Grid.Column="1" Margin="3"
-                                Text="{Binding ErosionDepositSpeed}"/>
-                            <TextBlock
-                                Grid.Row="6" Grid.Column="0" Margin="3"
-                                Text="Erode Brush Radius" />
-                            <TextBox
-                                Grid.Row="6" Grid.Column="1" Margin="3"
-                                Text="{Binding ErosionErodeBrush}"/>
-                            <TextBlock
-                                Grid.Row="7" Grid.Column="0" Margin="5,5,5,1"
-                                Text="Deposit Brush Radius" />
-                            <TextBox
-                                Grid.Row="7" Grid.Column="1" Margin="5,5,5,1"
-                                Text="{Binding ErosionDepositBrush}"/>
-                            <TextBlock
-                                Grid.Row="8" Grid.Column="0" Margin="3"
-                                Text="Brush Pointiness" />
-                            <TextBox
-                                Grid.Row="8" Grid.Column="1" Margin="3"
-                                Text="{Binding BrushPointiness}"/>
-                            <TextBlock
-                                Grid.Row="9" Grid.Column="0" Margin="3"
-                                Text="Gravity" />
-                            <TextBox
-                                Grid.Row="9" Grid.Column="1" Margin="3"
-                                Text="{Binding Gravity}"/>
-                            <TextBlock
-                                Grid.Row="10" Grid.Column="0" Margin="3"
-                                Text="Evaporate Speed" />
-                            <TextBox
-                                Grid.Row="10" Grid.Column="1" Margin="3"
-                                Text="{Binding EvaporateSpeed}"/>
+                                <TextBlock
+                                    Grid.Row="0" Grid.Column="0" Margin="3"
+                                    Text="Iterations" />
+                                <TextBox
+                                    Grid.Row="0" Grid.Column="1" Margin="3"
+                                    Text="{Binding ErosionIterations}"/>
+                                <TextBlock
+                                    Grid.Row="1" Grid.Column="0" Margin="3"
+                                    Text="Droplet Lifetime" />
+                                <TextBox
+                                    Grid.Row="1" Grid.Column="1" Margin="3"
+                                    Text="{Binding ErosionMaxDropletLifeTime}"/>
+                                <TextBlock
+                                    Grid.Row="2" Grid.Column="0" Margin="3"
+                                    Text="Intertia" />
+                                <TextBox
+                                    Grid.Row="2" Grid.Column="1" Margin="3"
+                                    Text="{Binding ErosionInteria}"/>
+                                <TextBlock
+                                    Grid.Row="3" Grid.Column="0" Margin="3"
+                                    Text="Sediment Cap. Factor" />
+                                <TextBox
+                                    Grid.Row="3" Grid.Column="1" Margin="3"
+                                    Text="{Binding ErosionSedimentCapacityFactor}"/>
+                                <TextBlock
+                                    Grid.Row="4" Grid.Column="0" Margin="3"
+                                    Text="Erode Speed" />
+                                <TextBox
+                                    Grid.Row="4" Grid.Column="1" Margin="3"
+                                    Text="{Binding ErosionErodeSpeed}"/>
+                                <TextBlock
+                                    Grid.Row="5" Grid.Column="0" Margin="3"
+                                    Text="Deposit Speed" />
+                                <TextBox
+                                    Grid.Row="5" Grid.Column="1" Margin="3"
+                                    Text="{Binding ErosionDepositSpeed}"/>
+                                <TextBlock
+                                    Grid.Row="6" Grid.Column="0" Margin="3"
+                                    Text="Erode Brush Radius" />
+                                <TextBox
+                                    Grid.Row="6" Grid.Column="1" Margin="3"
+                                    Text="{Binding ErosionErodeBrush}"/>
+                                <TextBlock
+                                    Grid.Row="7" Grid.Column="0" Margin="5,5,5,1"
+                                    Text="Deposit Brush Radius" />
+                                <TextBox
+                                    Grid.Row="7" Grid.Column="1" Margin="5,5,5,1"
+                                    Text="{Binding ErosionDepositBrush}"/>
+                                <TextBlock
+                                    Grid.Row="8" Grid.Column="0" Margin="3"
+                                    Text="Brush Pointiness" />
+                                <TextBox
+                                    Grid.Row="8" Grid.Column="1" Margin="3"
+                                    Text="{Binding BrushPointiness}"/>
+                                <TextBlock
+                                    Grid.Row="9" Grid.Column="0" Margin="3"
+                                    Text="Gravity" />
+                                <TextBox
+                                    Grid.Row="9" Grid.Column="1" Margin="3"
+                                    Text="{Binding Gravity}"/>
+                                <TextBlock
+                                    Grid.Row="10" Grid.Column="0" Margin="3"
+                                    Text="Evaporate Speed" />
+                                <TextBox
+                                    Grid.Row="10" Grid.Column="1" Margin="3"
+                                    Text="{Binding EvaporateSpeed}"/>
                                 <TextBlock
                                      Grid.Row="11" Grid.Column="0" Margin="3"
                                      Text="Use Sediments" VerticalAlignment="Center" />
                                 <CheckBox Grid.Row="11" Grid.Column="1" Margin="3" IsChecked="{Binding UseSedimentLayers}"/>
+                                <TextBlock
+                                     Grid.Row="12" Grid.Column="0" Margin="3"
+                                     Text="Debug Overlay" VerticalAlignment="Center" />
+                                <CheckBox Grid.Row="12" Grid.Column="1" Margin="3" IsChecked="{Binding EnableHydraulicErosionDebugOverlay}"/>
                                 <Button
-                                    Grid.Column="0" Grid.Row="12" Margin="3" Grid.ColumnSpan="2"
+                                    Grid.Column="0" Grid.Row="13" Margin="3" Grid.ColumnSpan="2"
                                     Content="Erode"
                                     Command="{Binding ErodeHydraulicCommand}"/>
                             </Grid>

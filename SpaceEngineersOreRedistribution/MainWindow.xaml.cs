@@ -238,7 +238,7 @@ namespace SpaceEngineersOreRedistribution
                             for (int y = 0; y < 2048; ++y)
                             {
                                 // Latitude lines
-                                var point = CoordinateHelper.GetNormalizedSphereCoordinates(face, x, y);
+                                var point = CoordinateHelper.GetNormalizedSphereCoordinates(face, x, y,2048);
                                 var lolat = CoordinateHelper.ToLongitudeLatitude(point);
                                 var latAbs = Math.Abs(lolat.latitude);
                                 var rest = latAbs % 5;

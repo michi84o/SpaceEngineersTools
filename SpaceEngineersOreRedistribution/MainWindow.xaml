@@ -44,6 +44,8 @@
             <MenuItem Header="-" Command="{Binding MinusCommand}"/>
             <MenuItem Header="+" Command="{Binding PlusCommand}"/>
             <!--<MenuItem Header="Calculate Ore Amount" Command="{Binding CalcOreAmountCommand}"/>-->
+            <TextBlock Text="Tile Width:" IsHitTestVisible="False" IsEnabled="False"/>
+            <ComboBox Width="60" ItemsSource="{Binding TileWidths}" SelectedItem="{Binding TileWidth}"/>
         </Menu>
         <GroupBox
             Grid.Row="1" Grid.Column="0" MinWidth="150" Header="Planets" Margin="3">

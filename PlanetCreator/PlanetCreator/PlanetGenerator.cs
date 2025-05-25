@@ -816,8 +816,10 @@ namespace PlanetCreator
         }
 
         HydraulicErosion _hyd;
-        public void InitErosion(bool useSediments, CancellationToken token)
+        bool _enableErosionDebugOverlay;
+        public void InitErosion(bool useSediments, CancellationToken token, bool enableErosionDebugOverlay = false)
         {
+            _enableErosionDebugOverlay = enableErosionDebugOverlay;
             var faces = LoadHeightMaps(token);
             Dictionary<CubeMapFace, byte[,]> sedimentLayerIndexes = null;
             List<ushort[]> sedimentLayers = null;
@@ -901,7 +903,7 @@ namespace PlanetCreator
 
             _hyd = new HydraulicErosion(
             new Random() /* keep seed random */ , faces, DebugMode, LimitedDebugMode, PreviewFace,
-            sedimentLayerIndexes, sedimentLayers);
+            sedimentLayerIndexes, sedimentLayers,enableErosionDebugOverlay);
         }
         public void Erode(CancellationToken token)
         {
@@ -912,6 +914,35 @@ namespace PlanetCreator
             if (!DebugMode)
                 EdgeFixer.MakeSeamless(_hyd.Faces, token);
             SaveFaces(_hyd.Faces, token);
+
+            if (!_enableErosionDebugOverlay || _hyd.DebugOverlayRed == null) return;
+
+            // Normalize debug overlays
+            Normalize(_hyd.DebugOverlayRed.Values.ToList(), token, 0, 255);
+            Normalize(_hyd.DebugOverlayGreen.Values.ToList(), token, 0, 255);
+            Normalize(_hyd.DebugOverlayBlue.Values.ToList(), token, 0, 255);
+
+            Dictionary<CubeMapFace, byte[,]> red = new();
+            Dictionary<CubeMapFace, byte[,]> green = new();
+            Dictionary<CubeMapFace, byte[,]> blue = new();
+
+            foreach (var kv in _hyd.DebugOverlayRed)
+            {
+                red[kv.Key] = new byte[TileWidth, TileWidth];
+                green[kv.Key] = new byte[TileWidth, TileWidth];
+                blue[kv.Key] = new byte[TileWidth, TileWidth];
+                Parallel.For(0, TileWidth, POptions(token), x =>
+                {
+                    for (int y = 0; y < TileWidth; ++y)
+                    {
+                        red[kv.Key][x, y] = (byte)kv.Value[x, y];
+                        green[kv.Key][x, y] = (byte)_hyd.DebugOverlayGreen[kv.Key][x, y];
+                        blue[kv.Key][x, y] = (byte)_hyd.DebugOverlayBlue[kv.Key][x, y];
+                    }
+                });
+            }
+
+            SaveOverlays(red, green, blue);
         }
 
         public IDebugOverlay DebugOverlay;
@@ -1031,12 +1062,11 @@ namespace PlanetCreator
         }
 
         // Currently only used for lakes
-        void SaveMaterialMaps(Dictionary<CubeMapFace, Image<Rgb24>> maps, byte redOverlayValue, Dictionary<CubeMapFace, byte[,]> debugLayerGreen = null, Dictionary<CubeMapFace, byte[,]> debugLayerBlue = null)
+        void SaveMaterialMaps(Dictionary<CubeMapFace, Image<Rgb24>> maps, byte redOverlayValue)
         {
             foreach (var kv in maps)
             {
                 kv.Value.SaveAsPng(Path.Combine(WorkingDirectory, (kv.Key + "_mat.png").ToLower()));
-                var overlayFileName = Path.Combine(WorkingDirectory, (kv.Key + "_overlay.png").ToLower());
                 Image<Rgba32> overlayImage;
                 overlayImage = kv.Value.CloneAs<Rgba32>();
                 overlayImage.ProcessPixelRows(rows =>
@@ -1052,18 +1082,74 @@ namespace PlanetCreator
                                 pixelRow[x].R = 0;
                                 pixelRow[x].A = 0;
                             }
-                            if (debugLayerGreen != null)
-                                pixelRow[x].G = debugLayerGreen[kv.Key][x,y];
-                            else pixelRow[x].G = 0;
-                            if (debugLayerBlue != null)
-                                pixelRow[x].B = debugLayerBlue[kv.Key][x, y];
-                            else
-                                pixelRow[x].B = 0;
+                            pixelRow[x].G = 0;
+                            pixelRow[x].B = 0;
                         }
                     }
                 });
                 overlayImage.SaveAsPng(Path.Combine(WorkingDirectory, (kv.Key + "_overlay.png").ToLower()), new PngEncoder { ColorType = PngColorType.RgbWithAlpha });
             }
+        }
+
+        void SaveOverlays(Dictionary<CubeMapFace, byte[,]> red = null, Dictionary<CubeMapFace, byte[,]> green = null, Dictionary<CubeMapFace, byte[,]> blue = null, bool keepExistingIfNull = true, byte alpha = 150)
+        {
+            HashSet<CubeMapFace> faces = new();
+            if (red != null) faces.UnionWith(red.Keys);
+            if (green != null) faces.UnionWith(green.Keys);
+            if (blue != null) faces.UnionWith(blue.Keys);
+
+            try
+            {
+                foreach (var face in faces)
+                {
+                    var fileName = Path.Combine(WorkingDirectory, (face + "_overlay.png").ToLower());
+                    Image<Rgba32> image;
+                    if (keepExistingIfNull && (red == null || green == null || blue == null) && File.Exists(fileName))
+                    {
+                        var img = Image.Load(fileName);
+                        if (img is Image<Rgba32> img2)
+                            image = img2;
+                        else
+                            image = img.CloneAs<Rgba32>();
+                    }
+                    else
+                        image = new Image<Rgba32>(TileWidth, TileWidth);
+
+                    byte[,] redChannel = red?[face];
+                    byte[,] greenChannel = green?[face];
+                    byte[,] blueChannel = blue?[face];
+
+                    image.ProcessPixelRows(rows =>
+                    {
+                        for (int y = 0; y < rows.Height; y++)
+                        {
+                            Span<Rgba32> pixelRow = rows.GetRowSpan(y);
+                            for (int x = 0; x < pixelRow.Length; x++)
+                            {
+                                bool transparent = true;
+                                if (redChannel != null)
+                                {
+                                    pixelRow[x].R = redChannel[x, y];
+                                    if (redChannel[x, y] != 0) transparent = false;
+                                }
+                                if (greenChannel != null)
+                                {
+                                    pixelRow[x].G = greenChannel[x, y];
+                                    if (greenChannel[x, y] != 0) transparent = false;
+                                }
+                                if (blueChannel != null)
+                                {
+                                    pixelRow[x].B = blueChannel[x, y];
+                                    if (blueChannel[x, y] != 0) transparent = false;
+                                }
+                                pixelRow[x].A = transparent ? (byte)0 : alpha;
+                            }
+                        }
+                    });
+                    image.SaveAsPng(Path.Combine(WorkingDirectory, (face + "_overlay.png").ToLower()), new PngEncoder { ColorType = PngColorType.RgbWithAlpha });
+                }
+            }
+            catch { return; }
         }
 
         string AskForMaterialSource(string materialSource)

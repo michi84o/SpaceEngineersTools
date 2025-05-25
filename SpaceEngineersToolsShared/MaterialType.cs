@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SpaceEngineersOreRedistribution
+namespace SpaceEngineersToolsShared
 {
     // Only used for the Environment Item List display.
     public class MaterialType

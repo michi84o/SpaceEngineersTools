@@ -1,18 +1,21 @@
-﻿using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp;
+﻿using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.ColorSpaces;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+using SpaceEngineersToolsShared;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Media.Imaging;
-using System.Windows;
-using SixLabors.ImageSharp.Formats.Png;
 using System.Threading;
-using SpaceEngineersToolsShared;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Media.Imaging;
 
 namespace SpaceEngineersOreRedistribution
 {
@@ -29,7 +32,7 @@ namespace SpaceEngineersOreRedistribution
         public byte[,] HGrad { get; private set; }
 
 
-        public static ImageData Create(string directory, CubeMapFace face, CancellationToken token)
+        public static ImageData Create(string directory, CubeMapFace face, int tileWidth, CancellationToken token)
         {
             string materialMapFile = Path.Combine(directory, face.ToString().ToLowerInvariant()+"_mat.png");
             string heightMapFile = Path.Combine(directory, face.ToString().ToLowerInvariant() + ".png");
@@ -57,104 +60,116 @@ namespace SpaceEngineersOreRedistribution
             if (!skipHeightMap && img2 is Image<L16>) hMap = (Image<L16>)img2;
             else
             {
-                hMap = new SixLabors.ImageSharp.Image<L16>(2048, 2048); // img1.CloneAs<L16>();
+                hMap = new SixLabors.ImageSharp.Image<L16>(tileWidth, tileWidth); // img1.CloneAs<L16>();
                 img2?.Dispose();
             }
 
-            if (matMap.Width != 2048 || hMap.Width != 2048)
+            if (matMap.Width != tileWidth)
             {
-                matMap.Dispose();
-                hMap.Dispose();
-                MessageBox.Show("Sorry! Only images with 2048 pixels are supported!");
-                return null;
+                if (face == CubeMapFace.Back && matMap.Width > tileWidth)
+                    MessageBox.Show("Loaded material maps larger than selected tile width!\r\nPossible loss of data due to downscaling!","Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                matMap.Mutate(k => k.Resize(tileWidth, tileWidth, KnownResamplers.NearestNeighbor));
+            }
+            if (hMap.Width != tileWidth)
+            {
+                hMap.Mutate(k => k.Resize(tileWidth, tileWidth, KnownResamplers.Triangle));
             }
 
             if (token.IsCancellationRequested) return null;
-            var retval = new ImageData(face);
-            Parallel.For(0, 2048, x =>
+            var retval = new ImageData(face, tileWidth);
+            Task t1 = Task.Run(() =>
             {
-                Parallel.For(0, 2048, y =>
+                matMap.ProcessPixelRows(row =>
                 {
-                    if (token.IsCancellationRequested) return;
-                    var pixVal = matMap[x, y];
-                    retval.G[x, y] = pixVal.G;
-                    retval.R[x, y] = pixVal.R;
-                    retval.B[x, y] = pixVal.B;
+                    for (var y = 0; y < tileWidth; ++y)
+                    {
+                        if (token.IsCancellationRequested) return;
+                        Span<Rgb24> pixelMRow = row.GetRowSpan(y);
+                        for (var x = 0; x < matMap.Width; ++x)
+                        {
+                            var pixVal = pixelMRow[x];
+                            retval.G[x, y] = pixVal.G;
+                            retval.R[x, y] = pixVal.R;
+                            retval.B[x, y] = pixVal.B;
 
-                    var hPixVal = hMap[x, y];
-                    retval.H[x, y] = (byte)(255.0 * hPixVal.PackedValue / 65535.0 + .5);
+                        }
+                    }
                 });
             });
-            // Gradients
-            Parallel.For(1, 2047, x =>
+
+            /*
+             On a 100km planet, the height map difference between 0 and 65535 is 6.51km.
+             On a 20km planet, the height map difference between 0 and 65535 is 1.3km.
+             Max Diff Formula in meters: 65535 * radius(km) / 1000
+             In other words, height diff per pixel in meter is planet diameter in meters divided by one million.
+            */
+            int numOfPixels = 6 * (tileWidth * tileWidth);
+            int planetRadius = 100000; // 100km planet radius
+            double averageAreaPerPixel = 4 * Math.PI * planetRadius * planetRadius * 1.0 / numOfPixels; // in m^2
+            double averageWidthPerPixel = Math.Sqrt(averageAreaPerPixel); // in m
+            double averageHeightPerPixel = planetRadius / 1000000d; // 10 centimeter
+
+            Task t2 = Task.Run(() =>
             {
-                Parallel.For(1, 2047, y =>
+                hMap.ProcessPixelRows(hrow =>
                 {
-                    if (token.IsCancellationRequested) return;
-                    // Old Code: Just calc diff
-                    //List<int> neighbors = new()
-                    //{
-                    //    hMap[x - 1, y].PackedValue,
-                    //    hMap[x + 1, y].PackedValue,
-                    //    hMap[x, y - 1].PackedValue,
-                    //    hMap[x, y + 1].PackedValue
-                    //};
-                    //var currentPixel = hMap[x, y].PackedValue;
-                    //int maxGradient = 0;
-                    //foreach (var n in neighbors)
-                    //{
-                    //    var gradient = Math.Abs(currentPixel - n);
-                    //    if (gradient > maxGradient) maxGradient = gradient;
-                    //}
-                    //maxGradient *= 20;
-                    //if (maxGradient > 65535) maxGradient = 65535;
-                    //retval.HGrad[x, y] = (byte)(255.0 * maxGradient / 65535.0 + 0.5);
+                    for (var y = 0; y < tileWidth; y++)
+                    {
+                        if (token.IsCancellationRequested) return;
+                        Span<L16> pixelHRow = hrow.GetRowSpan(y);
+                        Span<L16> pixelHRow2 = default;
+                        if (y > 0)
+                            pixelHRow2 = hrow.GetRowSpan(y - 1); ;
+                        for (var x = 0; x < matMap.Width; ++x)
+                        {
+                            var curentVal = pixelHRow[x].PackedValue;
+                            retval.H[x, y] = (byte)(255.0 * curentVal / 65535.0 + .5);
 
-                    // New Code: Calc degrees TODO: Not working
-                    double dh = hMap[x - 1, y].PackedValue - hMap[x, y].PackedValue;
-                    double dv = hMap[x, y - 1].PackedValue - hMap[x, y].PackedValue;
+                            if (y > 0 && x > 0)
+                            {
+                                var valAbove = pixelHRow2[x].PackedValue;
+                                var valLeft = pixelHRow[x - 1].PackedValue;
+                                var normal = My3dHelper.CalcNormal(
+                                    new System.Windows.Media.Media3D.Point3D(
+                                        -1 * averageWidthPerPixel,
+                                        0,
+                                        valLeft * averageHeightPerPixel),
+                                    new System.Windows.Media.Media3D.Point3D(
+                                        0,
+                                        -1 * averageWidthPerPixel,
+                                        valAbove * averageHeightPerPixel),
+                                    new System.Windows.Media.Media3D.Point3D(
+                                        x,
+                                        y,
+                                        curentVal * averageHeightPerPixel));
 
-                    var pixelWidthMeter = 100000.0 / (2048 * 4); // 100km planet;
-                    // 1 pixel = 12m ?
-                    var verticalPixelWidthMeter = 3*655.35 / 65535; // 3cm?
+                                if (normal.Z < 0)
+                                    normal *= -1;
 
-                    var normal = My3dHelper.CalcNormal(
-                        new System.Windows.Media.Media3D.Point3D(
-                            -1 * pixelWidthMeter,
-                            0,
-                            hMap[x - 1, y].PackedValue * verticalPixelWidthMeter),
-                        new System.Windows.Media.Media3D.Point3D(
-                            0 ,
-                            -1 * pixelWidthMeter,
-                            hMap[x, y - 1].PackedValue * verticalPixelWidthMeter),
-                        new System.Windows.Media.Media3D.Point3D(
-                            x,
-                            y,
-                            hMap[x, y].PackedValue * verticalPixelWidthMeter));
-
-                    if (normal.Z < 0)
-                        normal *= -1;
-
-                    var angle = Math.Atan(normal.Z / Math.Sqrt(normal.X * normal.X + normal.Y * normal.Y));
-                    double slopeAngleDeg = angle * 180 / Math.PI;
-
-                    retval.HGrad[x, y] = (byte)(255 - slopeAngleDeg * 255.0 / 90); // Scale to 8-bit
-
+                                var angle = Math.Atan(normal.Z / Math.Sqrt(normal.X * normal.X + normal.Y * normal.Y));
+                                double slopeAngleDeg = angle * 180 / Math.PI;
+                                retval.HGrad[x, y] = (byte)(255 - slopeAngleDeg * 255.0 / 90); // Scale to 8-bit
+                            }
+                        }
+                    }
                 });
             });
+            Task.WaitAll(t1, t2);
             matMap.Dispose();
             hMap.Dispose();
             return retval;
         }
 
-        public ImageData(CubeMapFace face)
+        public int TileWidth { get; }
+        public ImageData(CubeMapFace face, int tileWidth)
         {
             Face = face;
-            G = new byte[2048, 2048];
-            R = new byte[2048, 2048];
-            B = new byte[2048, 2048];
-            H = new byte[2048, 2048];
-            HGrad = new byte[2048, 2048];
+            G = new byte[tileWidth, tileWidth];
+            R = new byte[tileWidth, tileWidth];
+            B = new byte[tileWidth, tileWidth];
+            H = new byte[tileWidth, tileWidth];
+            HGrad = new byte[tileWidth, tileWidth];
+            TileWidth = tileWidth;
         }
 
         public void Dispose()
@@ -166,10 +181,10 @@ namespace SpaceEngineersOreRedistribution
         public BitmapImage CreateBitmapImage(bool heightMap, bool ore, bool complexMaterials, int? selectedComplexMaterial, List<OreMapping> oreMappings, bool biomes, int? selectedBiome)
         {
             using MemoryStream memory = new MemoryStream();
-            var image = new Image<Rgb24>(2048, 2048);
-            Parallel.For(0, 2048, x =>
+            var image = new Image<Rgb24>(TileWidth, TileWidth);
+            Parallel.For(0, TileWidth, x =>
             {
-                Parallel.For(0, 2048, y =>
+                for (var y = 0; y < TileWidth; y++)
                 {
                     byte r, g, b;
                     // Gray background
@@ -230,9 +245,8 @@ namespace SpaceEngineersOreRedistribution
                         }
                     }
 
-                    image[x, y] = new Rgb24(r,g,b);
-                    //image[x, y] = new Rgb24(R[x, y], G[x, y], B[x, y]);
-                });
+                    image[x, y] = new Rgb24(r,g,b); // TODO: Use Span<Rgb24> for performance
+                }
             });
             image.SaveAsBmp(memory);
             memory.Position = 0;
@@ -246,13 +260,17 @@ namespace SpaceEngineersOreRedistribution
 
         public bool SaveMaterialMap(string filename)
         {
-            var image = new Image<Rgb24>(2048, 2048);
-            Parallel.For(0, 2048, x =>
+            var image = new Image<Rgb24>(TileWidth, TileWidth);
+            image.ProcessPixelRows(row =>
             {
-                Parallel.For(0, 2048, y =>
-                {
-                    image[x, y] = new Rgb24(R[x, y], G[x, y], B[x, y]);
-                });
+                    for (var y = 0; y < TileWidth; ++y)
+                    {
+                        Span<Rgb24> pixelRow = row.GetRowSpan(y);
+                        for (var x = 0; x < TileWidth; ++x)
+                        {
+                            pixelRow[x] = new Rgb24(R[x, y], G[x, y], B[x, y]);
+                        }
+                }
             });
             try
             {

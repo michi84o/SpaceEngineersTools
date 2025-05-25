@@ -120,7 +120,7 @@ namespace SpaceEngineersOreRedistribution
             ViewModel.Radius = size * 1.2 * My3dHelper.BaseUnit;
         }
 
-        private void Cuboids_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        private void Cuboids_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
             // TODO: Can be done more effective. Analyse what changed.
             MyViewPort.Children.Clear();
