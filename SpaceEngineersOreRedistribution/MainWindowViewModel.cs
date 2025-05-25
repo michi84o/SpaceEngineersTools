@@ -613,6 +613,44 @@ namespace SpaceEngineersOreRedistribution
             set => SetProp(ref _tileDown, value);
         }
 
+        WriteableBitmap _tileUpOverlay;
+        public WriteableBitmap TileUpOverlay
+        {
+            get => _tileUpOverlay;
+            set => SetProp(ref _tileUpOverlay, value);
+        }
+        WriteableBitmap _tileFrontOverlay;
+        public WriteableBitmap TileFrontOverlay
+        {
+            get => _tileFrontOverlay;
+            set => SetProp(ref _tileFrontOverlay, value);
+        }
+        WriteableBitmap _tileRightOverlay;
+        public WriteableBitmap TileRightOverlay
+        {
+            get => _tileRightOverlay;
+            set => SetProp(ref _tileRightOverlay, value);
+        }
+        WriteableBitmap _tileBackOverlay;
+        public WriteableBitmap TileBackOverlay
+        {
+            get => _tileBackOverlay;
+            set => SetProp(ref _tileBackOverlay, value);
+        }
+        WriteableBitmap _tileLeftOverlay;
+        public WriteableBitmap TileLeftOverlay
+        {
+            get => _tileLeftOverlay;
+            set => SetProp(ref _tileLeftOverlay, value);
+        }
+        WriteableBitmap _tileDownOverlay;
+        public WriteableBitmap TileDownOverlay
+        {
+            get => _tileDownOverlay;
+            set => SetProp(ref _tileDownOverlay, value);
+        }
+
+
         int _oreInspectorSize = 20;
         public int OreInspectorSize
         {

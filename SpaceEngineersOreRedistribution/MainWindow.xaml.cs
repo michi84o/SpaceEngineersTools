@@ -308,6 +308,14 @@ namespace SpaceEngineersOreRedistribution
 
             }
         }
+        private void Hyperlink_Click(object sender, RoutedEventArgs e)
+        {
+            var sInfo = new System.Diagnostics.ProcessStartInfo("https://github.com/michi84o/SpaceEngineersTools")
+            {
+                UseShellExecute = true,
+            };
+            System.Diagnostics.Process.Start(sInfo);
+        }
 
 
     }

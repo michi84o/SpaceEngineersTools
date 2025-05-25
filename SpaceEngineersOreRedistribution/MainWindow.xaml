@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SpaceEngineersOreRedistribution"
         mc:Ignorable="d"
-        Title="SE Ore Redistribution v1.7.1" Height="450" Width="1000">
+        Title="SE Ore Redistribution v1.9.2" Height="450" Width="1000">
     <Window.DataContext>
         <local:MainWindowViewModel x:Name="ViewModel"/>
     </Window.DataContext>
@@ -46,6 +46,7 @@
             <!--<MenuItem Header="Calculate Ore Amount" Command="{Binding CalcOreAmountCommand}"/>-->
             <TextBlock Text="Tile Width:" IsHitTestVisible="False" IsEnabled="False"/>
             <ComboBox Width="60" ItemsSource="{Binding TileWidths}" SelectedItem="{Binding TileWidth}"/>
+            <Hyperlink Click="Hyperlink_Click">github.com/michi84o/SpaceEngineersTools</Hyperlink>
         </Menu>
         <GroupBox
             Grid.Row="1" Grid.Column="0" MinWidth="150" Header="Planets" Margin="3">
@@ -209,6 +210,14 @@
                     <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="2048" Source="{Binding TileBack}"/>
                     <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="6144" Canvas.Top="2048" Source="{Binding TileLeft}"/>
                     <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="4096" Source="{Binding TileDown}"/>
+
+                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="0" Canvas.Top="0" Source="{Binding TileUpOverlay}" Opacity=".8" />
+                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="0" Canvas.Top="2048" Source="{Binding TileFrontOverlay}" Opacity=".8"/>
+                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="2048" Canvas.Top="2048" Source="{Binding TileRightOverlay}" Opacity=".8" />
+                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="2048" Source="{Binding TileBackOverlay}" Opacity=".8"/>
+                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="6144" Canvas.Top="2048" Source="{Binding TileLeftOverlay}" Opacity=".8"/>
+                    <Image RenderOptions.BitmapScalingMode="NearestNeighbor" Width="2048" Height="2048" Canvas.Left="4096" Canvas.Top="4096" Source="{Binding TileDownOverlay}" Opacity=".8"/>
+
                     <Rectangle x:Name="OreInspectorRect"  Stroke="Violet" StrokeThickness="1" Width="{Binding OreInspectorSize}" Height="{Binding OreInspectorSize}" Visibility="Collapsed"/>
                 </Canvas>
             </Border>
