@@ -1,5 +1,19 @@
 # SpaceEngineersTools
 
+These are my tools I wrote for Space Engineers. Most of them are for modding planets.
+Here are some highlights:
+
+* Ore Redistribution
+  * Automatically generate ore patches for the blue material layer
+  * Automatically regenerate biome map for the green material layer
+* Planet Generator
+  * Fix seams of height map tiles
+  * Automatically generate height maps
+  * Apply hydraulic erosion to height maps
+  * Automatically or manually add lakes for the red material layer
+* Complex Material Viewer
+  * Autogenerate climate zones for the red material layer
+
 ## SpaceEngineersOreRedistribution:
 This is a viewer for the planet definition files, specifically ore.
 
