@@ -511,10 +511,10 @@
                                     Grid.Row="6" Grid.Column="1" Margin="3"
                                     Text="{Binding ErosionErodeBrush}"/>
                                 <TextBlock
-                                    Grid.Row="7" Grid.Column="0" Margin="5,5,5,1"
+                                    Grid.Row="7" Grid.Column="0" Margin="3"
                                     Text="Deposit Brush Radius" />
                                 <TextBox
-                                    Grid.Row="7" Grid.Column="1" Margin="5,5,5,1"
+                                    Grid.Row="7" Grid.Column="1" Margin="3"
                                     Text="{Binding ErosionDepositBrush}"/>
                                 <TextBlock
                                     Grid.Row="8" Grid.Column="0" Margin="3"
