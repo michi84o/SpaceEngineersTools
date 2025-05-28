@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PlanetCreator"
         mc:Ignorable="d"
-        Title="Planet Creator" Width="1080" MaxHeight="2160" Height="600" >
+        Title="Planet Creator 1.9.3" Width="1080" MaxHeight="2160" >
     <Window.DataContext>
         <local:MainWindowViewModel x:Name="ViewModel"/>
     </Window.DataContext>

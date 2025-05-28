@@ -26,7 +26,7 @@ namespace PlanetCreator
         public MainWindow()
         {
             InitializeComponent();
-            Height = 1080;
+            Height = 850;
             ImageView.MouseWheel += ImageView_MouseWheel;
             BorderView.MouseLeftButtonDown += ImageView_MouseLeftButtonDown; ;
             BorderView.MouseLeftButtonUp += ImageView_MouseLeftButtonUp; ;
@@ -136,6 +136,13 @@ namespace PlanetCreator
                 }
                 CurvePreviewCanvas.Children.Clear();
                 ShowPreviewCanvas(points, Brushes.Yellow);
+            }
+
+            if (e.PropertyName == nameof(ViewModel.StretchHistogramMin) ||
+                e.PropertyName == nameof(ViewModel.StretchHistogramMax))
+            {
+                List<Point> points = new() { new(0, 100-ViewModel.StretchHistogramMin*100), new (100, 100-ViewModel.StretchHistogramMax*100) };
+                ShowPreviewCanvas(points);
             }
 
             if (e.PropertyName == nameof(ViewModel.PreviewMode) ||
