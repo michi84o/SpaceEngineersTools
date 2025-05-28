@@ -789,6 +789,19 @@ namespace PlanetCreator
             set => SetProp(ref _equatorFlatWidth, value);
         }
 
+        int _equatorMaxHeight = 100; // 0 - 100%
+        public int EquatorMaxHeight
+        {
+            get => _equatorMaxHeight;
+            set => SetProp(ref _equatorMaxHeight, value);
+        }
+        int _equatorHeightRoundness = 20; // 10-60 * 1/10
+        public int EquatorHeightRoundness
+        {
+            get => _equatorHeightRoundness;
+            set => SetProp(ref _equatorHeightRoundness, value);
+        }
+
         int _erosionIterations = 2500000;
         public int ErosionIterations
         {
@@ -1141,6 +1154,23 @@ namespace PlanetCreator
                     var gen = GetGenerator();
                     gen.ExponentialStretch(ExponentialFlattenStrength,
                         FlattenEquator ? EquatorFlatWidth : -1, _cts.Token);
+                    LoadPictures();
+                }
+                finally
+                { IsBusy = false; }
+            });
+        });
+
+        public ICommand EquatorLowerCommand => new RelayCommand(o =>
+        {
+            SaveBackup(AutoBackupName);
+            IsBusy = true;
+            Task.Run(() =>
+            {
+                try
+                {
+                    var gen = GetGenerator();
+                    gen.LowerEquator(EquatorMaxHeight/100.0, EquatorHeightRoundness / 10.0, _cts.Token);
                     LoadPictures();
                 }
                 finally

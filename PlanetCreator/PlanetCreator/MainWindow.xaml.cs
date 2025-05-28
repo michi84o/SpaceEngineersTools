@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -47,10 +48,96 @@ namespace PlanetCreator
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             ViewModel.PropertyChanged += ViewModel_PropertyChanged;
+            CurvePreviewCanvas.Visibility = Visibility.Collapsed;
+            _previewOffTime = DateTime.UtcNow;
+            _timer.Elapsed += Timer_Elapsed;
+            _timer.AutoReset = true;
+            _timer.Enabled = true;
+        }
+
+        DateTime _previewOffTime;
+        private void Timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            if (CurvePreviewCanvas.Visibility != Visibility.Collapsed && DateTime.UtcNow > _previewOffTime)
+            {
+                Application.Current.Dispatcher.Invoke(() =>
+                {
+                    CurvePreviewCanvas.Visibility = Visibility.Collapsed;
+                });
+            }
+        }
+
+        System.Timers.Timer _timer = new(1000);
+
+        void ShowPreviewCanvas(List<Point> points, Brush? brush = null)
+        {
+            var b = brush ?? Brushes.Red;
+            var polyLine = new Polyline
+            {
+                Stroke = b,
+                StrokeThickness = 2,
+                Points = new(points)
+            };
+            if (brush == null)
+            {
+                CurvePreviewCanvas.Children.Clear();
+            }
+            CurvePreviewCanvas.Children.Add(polyLine);
+            CurvePreviewCanvas.Visibility = Visibility.Visible;
+            _previewOffTime = DateTime.UtcNow.AddSeconds(5);
         }
 
         private void ViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
+            // Curve Preview
+            if (e.PropertyName == nameof(ViewModel.FlattenLowsAmount) ||
+                e.PropertyName == nameof(ViewModel.FlattenPeaksAmount))
+            {
+                var gen = new PlanetGenerator();
+                List<Point> points = new();
+                for (double x=0;x<=1.0;x+=.01)
+                {
+                    points.Add(new Point(x*100, 100-gen.FlattenHistogramSingle(x, ViewModel.FlattenLowsAmount, ViewModel.FlattenPeaksAmount)*100));
+                }
+                ShowPreviewCanvas(points);
+            }
+            if (e.PropertyName == nameof(ViewModel.ExponentialFlattenStrength) ||
+                e.PropertyName == nameof(ViewModel.EquatorFlatWidth) ||
+                e.PropertyName == nameof(ViewModel.FlattenEquator))
+            {
+                var gen = new PlanetGenerator();
+                gen.TileWidth = ViewModel.TileWidth;
+                CurvePreviewCanvas.Children.Clear();
+                foreach (var ii in new List<(int,Brush)> { (ViewModel.TileWidth/2,Brushes.Red),(ViewModel.TileWidth/4, Brushes.Orange), (0,Brushes.Green)})
+                {
+                    List<Point> points = new();
+                    for (double x = 0; x <= 1.0; x += .01)
+                    {
+                        points.Add(new Point(x * 100, 100 - gen.ExponentialStretchSingle(
+                            x, ViewModel.ExponentialFlattenStrength,
+                            ViewModel.FlattenEquator ? ViewModel.EquatorFlatWidth : -1,
+                            false, ii.Item1) * 100));
+                    }
+                    ShowPreviewCanvas(points, ii.Item2);
+                    if (!ViewModel.FlattenEquator) break;
+                }
+            }
+            if (e.PropertyName == nameof(ViewModel.EquatorMaxHeight) ||
+                e.PropertyName == nameof(ViewModel.EquatorHeightRoundness))
+            {
+                var gen = new PlanetGenerator();
+                gen.TileWidth = ViewModel.TileWidth;
+                List<Point> points = new();
+                for (double x = 0; x <= ViewModel.TileWidth; x += ViewModel.TileWidth*0.01)
+                {
+                    points.Add(new Point(
+                        x * 100.0 / ViewModel.TileWidth,
+                        100 - gen.LowerEquatorSingle(1.0, ViewModel.EquatorMaxHeight/100.0, ViewModel.EquatorHeightRoundness/10.0, x) * 100));
+                }
+                CurvePreviewCanvas.Children.Clear();
+                ShowPreviewCanvas(points, Brushes.Yellow);
+            }
+
             if (e.PropertyName == nameof(ViewModel.PreviewMode) ||
                 e.PropertyName == nameof(ViewModel.LimitedPreview) ||
                 e.PropertyName == nameof(ViewModel.PreviewTile))

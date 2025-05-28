@@ -411,6 +411,63 @@ namespace PlanetCreator
             OnProgress(100);
         }
 
+        public double FlattenHistogramSingle(double val, int minStretch, int maxStretch)
+        {
+            // +-0.2 aligns the Sinus so that the gradient is 1 at value 0.5.
+            var valStretched = (1 - .2 * 2) * 0.5 * Math.Sin(Math.PI * (val - 0.5)) + 0.5;
+            // Apply the percentage
+            // 100% means that 0s are shifted tp 0.2 and 1s are lowered to .8.
+            // The value range will be sequeezed to 0.2 <-> 0.8
+            // Lower percentage shifts the values more towards their original.
+
+            // We have the original value "v".
+            // We have the stretched valie "s".
+            // We define a factor "f", so that our target value "t" equals:
+            // t = (v+s*f)/(1+f)
+            // If f==1 we get the average between original and stretched.
+            // f==1 would be percentage p=50%.
+            // Problem: Our intput is not "f" but the percentage "p".
+            // This required a complicated Excel spreadsheet with multiple segments:
+            // It looks like some exponential function at lower percentages but flattens out hard at higher percentages
+            Func<double, double> getFactor = (p) =>
+            {
+                if (p >= 50)
+                {
+                    return 5.38458104E-08 * p * p * p * p - 1.98322019E-05 * p * p * p + 2.87748371E-03 * p * p - 2.05511035E-01 * p + 6.22399659E+00;
+                }
+                else if (p >= 16.66667)
+                {
+                    return 4.40567976E-06 * p * p * p * p - 7.01736952E-04 * p * p * p + 4.31525352E-02 * p * p - 1.27854469E+00 * p + 1.72278030E+01;
+                }
+                else if (p >= 1)
+                {
+                    return 1.01896976E+02 * Math.Pow(p, -1.06095389E+00);
+                }
+                return 100;
+            };
+            if (val < .5)
+            {
+                if (minStretch == 100)
+                    val = valStretched;
+                else
+                {
+                    var factor = getFactor(minStretch);
+                    val = (val * factor + valStretched) / (1 + factor);
+                }
+            }
+            else
+            {
+                if (maxStretch == 100)
+                    val = valStretched;
+                else
+                {
+                    var factor = getFactor(maxStretch);
+                    val = (val * factor + valStretched) / (1 + factor);
+                }
+            }
+            return val;
+        }
+
         public void FlattenHistogram(int minStretch, int maxStretch, CancellationToken token)
         {
             // Strech using a SINUS curve.
@@ -435,60 +492,7 @@ namespace PlanetCreator
                         for (int y = cStart; y < cEnd; ++y)
                         {
                             if (token.IsCancellationRequested) return;
-                            var val = face.Value[x, y];
-                            // +-0.2 aligns the Sinus so that the gradient is 1 at value 0.5.
-                            var valStretched = (1 - .2 * 2) * 0.5 * Math.Sin(Math.PI * (val - 0.5)) + 0.5;
-                            // Apply the percentage
-                            // 100% means that 0s are shifted tp 0.2 and 1s are lowered to .8.
-                            // The value range will be sequeezed to 0.2 <-> 0.8
-                            // Lower percentage shifts the values more towards their original.
-
-                            // We have the original value "v".
-                            // We have the stretched valie "s".
-                            // We define a factor "f", so that our target value "t" equals:
-                            // t = (v+s*f)/(1+f)
-                            // If f==1 we get the average between original and stretched.
-                            // f==1 would be percentage p=50%.
-                            // Problem: Our intput is not "f" but the percentage "p".
-                            // This required a complicated Excel spreadsheet with multiple segments:
-                            // It looks like some exponential function at lower percentages but flattens out hard at higher percentages
-                            Func<double, double> getFactor = (p) =>
-                            {
-                                if (p >= 50)
-                                {
-                                    return 5.38458104E-08 * p * p * p * p - 1.98322019E-05 * p * p * p + 2.87748371E-03 * p * p - 2.05511035E-01 * p + 6.22399659E+00;
-                                }
-                                else if (p >= 16.66667)
-                                {
-                                    return 4.40567976E-06 * p * p * p * p - 7.01736952E-04 * p * p * p + 4.31525352E-02 * p * p - 1.27854469E+00 * p + 1.72278030E+01;
-                                }
-                                else if (p >= 1)
-                                {
-                                    return 1.01896976E+02 * Math.Pow(p, -1.06095389E+00);
-                                }
-                                return 100;
-                            };
-                            if (val < .5)
-                            {
-                                if (minStretch == 100)
-                                    val = valStretched;
-                                else
-                                {
-                                    var factor = getFactor(minStretch);
-                                    val = (val * factor + valStretched) / (1 + factor);
-                                }
-                            }
-                            else
-                            {
-                                if (maxStretch == 100)
-                                    val = valStretched;
-                                else
-                                {
-                                    var factor = getFactor(maxStretch);
-                                    val = (val * factor + valStretched) / (1 + factor);
-                                }
-                            }
-                            face.Value[x, y] = val;
+                            face.Value[x, y] = FlattenHistogramSingle(face.Value[x, y], minStretch, maxStretch);
                         }
                     });
                 });
@@ -519,6 +523,33 @@ namespace PlanetCreator
             SaveFaces(faces, token);
             OnProgress(100);
         }
+
+        public double ExponentialStretchSingle(double val, double stretchAmount, int equatorWidthPercentage, bool isNonEquatorTile, double y)
+        {
+            double stretch;
+            double equatorWidth = TileWidth * equatorWidthPercentage / 100d;
+            equatorWidth /= 2; // This is actually the sigma value of the Gauss curve. Must be half of the width.
+            if (equatorWidthPercentage > 1)
+            {
+                // Let's generate a Gauss curve that peaks at 2.5 around the equator
+                // and goes back to around 1.0 to allign with pole tiles.
+                double yd = y;
+                if (isNonEquatorTile)
+                {
+                    yd = 0; // Apply same value as on equator tile edges for seamless transition.
+                }
+                stretch = stretchAmount * Math.Exp(-0.5 * Math.Pow((yd - (TileWidth - 1) / 2) / equatorWidth, 2)) + 1;
+            }
+            else
+            {
+                // All that complicated stuff inside Math.Exp() above becomes 1 when we are at the equator
+                stretch = stretchAmount + 1;
+            }
+            val = Math.Pow(val, stretch);
+            if (val < 0) val = 0;
+            if (val > 1) val = 1;
+            return val;
+        }
         public void ExponentialStretch(double stretchAmount, int equatorWidthPercentage, CancellationToken token)
         {
             var faces = LoadHeightMaps(token);
@@ -534,29 +565,44 @@ namespace PlanetCreator
                         for (int y = 0; y < TileWidth; ++y)
                         {
                             var val = face.Value[x, y];
+                            face.Value[x, y] = ExponentialStretchSingle(val, stretchAmount, equatorWidthPercentage,
+                                face.Key == CubeMapFace.Up || face.Key == CubeMapFace.Down, y);
+                        }
+                    });
+                });
+            }
+            catch { return; }
+            OnProgress(90);
+            SaveFaces(faces, token);
+            OnProgress(100);
+        }
 
-                            double stretch;
-                            double equatorWidth = TileWidth * equatorWidthPercentage / 100d;
-                            if (equatorWidthPercentage > 1)
-                            {
-                                // Let's generate a Gauss curve that peaks at 2.5 around the equator
-                                // and goes back to around 1.0 to allign with pole tiles.
-                                double yd = y;
-                                if (face.Key == CubeMapFace.Up || face.Key == CubeMapFace.Down)
-                                {
-                                    yd = 0; // Apply same value as on equator tile edges for seamless transition.
-                                }
-                                stretch = stretchAmount * Math.Exp(-0.5 * Math.Pow((yd - (TileWidth - 1) / 2) / equatorWidth, 2)) + 1;
-                            }
-                            else
-                            {
-                                // All that complicated stuff inside Math.Exp() above becomes 1 when we are at the equator
-                                stretch = stretchAmount + 1;
-                            }
-                            val = Math.Pow(val, stretch);
-                            if (val < 0) val = 0;
-                            if (val > 1) val = 1;
-                            face.Value[x, y] = val;
+        public double LowerEquatorSingle(double val, double maxHeight, double roundness, double y)
+        {
+            var vv = Math.Abs(y - TileWidth / 2.0) / (TileWidth/2.0);
+            vv = Math.Pow(vv, roundness);
+            vv =  vv * (1-maxHeight) + maxHeight;
+            return vv * val;
+        }
+
+        public void LowerEquator(double maxHeight, double roundness, CancellationToken token)
+        {
+            var faces = LoadHeightMaps(token);
+            faces.Remove(CubeMapFace.Up);
+            faces.Remove(CubeMapFace.Down);
+            OnProgress(1);
+            try
+            {
+                Parallel.ForEach(faces, face =>
+                {
+                    if (token.IsCancellationRequested) return;
+                    Parallel.For(0, TileWidth, x =>
+                    {
+                        if (token.IsCancellationRequested) return;
+                        for (int y = 0; y < TileWidth; ++y)
+                        {
+                            var val = face.Value[x, y];
+                            face.Value[x, y] = LowerEquatorSingle(val, maxHeight, roundness, y);
                         }
                     });
                 });

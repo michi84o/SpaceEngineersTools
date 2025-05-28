@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PlanetCreator"
         mc:Ignorable="d"
-        Title="Planet Creator" Width="1080" MaxHeight="2160" >
+        Title="Planet Creator" Width="1080" MaxHeight="2160" Height="600" >
     <Window.DataContext>
         <local:MainWindowViewModel x:Name="ViewModel"/>
     </Window.DataContext>
@@ -64,270 +64,273 @@
                 <ColumnDefinition/>
             </Grid.ColumnDefinitions>
             <ScrollViewer Grid.Column="0">
-            <Grid
+                <Grid
                 IsEnabled="{Binding SessionLocked}">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                    <GroupBox
+                        <GroupBox
                         Grid.Row="0" Header="Backups" Margin="3">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <ListBox
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ListBox
                                 Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Margin="3" MinHeight="16" MaxHeight="96"
                                 ItemsSource="{Binding Backups}" SelectedItem="{Binding SelectedBackup}"/>
-                            <Button
+                                <Button
                                 Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Margin="3" Content="Load Backup"
                                 Command="{Binding LoadBackupCommand}"    />
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="New" VerticalAlignment="Center" Margin="3"/>
-                            <TextBox
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="New" VerticalAlignment="Center" Margin="3"/>
+                                <TextBox
                                 Grid.Row="2" Grid.Column="1" Margin="3" VerticalAlignment="Center"
                                 Text="{Binding NewBackupName, UpdateSourceTrigger=PropertyChanged}"/>
-                            <Button
+                                <Button
                                 Grid.Row="2" Grid.Column="2" Content="Save" VerticalAlignment="Center" MinWidth="50" Margin="3"
                                 Command="{Binding SaveBackupCommand}"/>
-                        </Grid>
-                    </GroupBox>
-                    <GroupBox Grid.Row="1" Header="Preview Mode" Margin="3">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Enable Preview Mode" Margin="3" VerticalAlignment="Center" />
-                            <CheckBox
+                            </Grid>
+                        </GroupBox>
+                        <GroupBox Grid.Row="1" Header="Preview Mode" Margin="3">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Enable Preview Mode" Margin="3" VerticalAlignment="Center" />
+                                <CheckBox
                                 Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" Margin="3"
                                 IsChecked="{Binding PreviewMode}"/>
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Limit Preview Area" Margin="3" VerticalAlignment="Center" />
-                            <CheckBox
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Limit Preview Area" Margin="3" VerticalAlignment="Center" />
+                                <CheckBox
                                 Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Margin="3"
                                 IsChecked="{Binding LimitedPreview}"/>
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Preview Tile" Margin="3" VerticalAlignment="Center" />
-                            <ComboBox
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Preview Tile" Margin="3" VerticalAlignment="Center" />
+                                <ComboBox
                                 Grid.Row="2" Grid.Column="1" Margin="3"
                                 ItemsSource="{Binding CubeMapFaces}"
                                 SelectedValue="{Binding PreviewTile}"/>
-                        </Grid>
-                    </GroupBox>
-                    <GroupBox Grid.Row="2" Header="Simplex Noise Generator" Margin="3">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock
+                            </Grid>
+                        </GroupBox>
+                        <GroupBox Grid.Row="2" Header="Simplex Noise Generator" Margin="3">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
                                 Grid.Row="0" Grid.Column="0" Margin="3"
                                 Text="Seed" />
-                            <TextBox
+                                <TextBox
                                 Grid.Row="0" Grid.Column="1" Margin="3"
                                 Text="{Binding Seed}" ToolTip="Changes the numbers of the random number generator"/>
-                            <TextBlock
+                                <TextBlock
                                 Grid.Row="1" Grid.Column="0" Margin="3"
                                 Text="Noise Scale" />
-                            <TextBox
+                                <TextBox
                                 Grid.Row="1" Grid.Column="1" Margin="3"
                                 Text="{Binding NoiseScale}" ToolTip="Defines the size of the cloud patterns"/>
-                            <TextBlock
+                                <TextBlock
                                 Grid.Row="2" Grid.Column="0" Margin="3"
                                 Text="Octaves" />
-                            <Grid Grid.Row="2" Grid.Column="1">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition Width="30"/>
-                                </Grid.ColumnDefinitions>
-                                <Slider Grid.Column="0" Margin="3" Minimum="1" Maximum="25" Value="{Binding Octaves}" TickFrequency="1" />
-                                <TextBlock Grid.Column="1" Margin="3" Text="{Binding Octaves}"/>
-                            </Grid>
-                            <Button
+                                <Grid Grid.Row="2" Grid.Column="1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition/>
+                                        <ColumnDefinition Width="30"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Slider Grid.Column="0" Margin="3" Minimum="1" Maximum="25" Value="{Binding Octaves}" TickFrequency="1" />
+                                    <TextBlock Grid.Column="1" Margin="3" Text="{Binding Octaves}"/>
+                                </Grid>
+                                <Button
                                 Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Margin="3" Content="Fill Map"
                                 Command="{Binding SimplexNoiseFillMapCommand}"/>
 
 
-                        </Grid>
-                    </GroupBox>
-                    <GroupBox Grid.Row="3" Header="Worley Noise Generator (Very Slow!)" Margin="3">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock
+                            </Grid>
+                        </GroupBox>
+                        <GroupBox Grid.Row="3" Header="Worley Noise Generator (Very Slow!)" Margin="3">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
                                 Grid.Row="0" Grid.Column="0" Margin="3"
                                 Text="Number of Cells" VerticalAlignment="Center"/>
-                            <Grid Grid.Row="0" Grid.Column="1">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition Width="30"/>
-                                </Grid.ColumnDefinitions>
-                                <Slider Grid.Column="0" Margin="3" Minimum="1" Maximum="75" Value="{Binding WorleyCells}" TickFrequency="1"
+                                <Grid Grid.Row="0" Grid.Column="1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition/>
+                                        <ColumnDefinition Width="30"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Slider Grid.Column="0" Margin="3" Minimum="1" Maximum="75" Value="{Binding WorleyCells}" TickFrequency="1"
                                         ToolTip="Defines Size of structures. Higher values make smaller structures but take more time."/>
-                                <TextBlock Grid.Column="1" Margin="3" Text="{Binding WorleyCells}"/>
-                            </Grid>
-                            <TextBlock
+                                    <TextBlock Grid.Column="1" Margin="3" Text="{Binding WorleyCells}"/>
+                                </Grid>
+                                <TextBlock
                                 Grid.Row="1" Grid.Column="0" Margin="3"
                                 Text="Invert Noise" VerticalAlignment="Center"/>
-                            <CheckBox
+                                <CheckBox
                                 Grid.Row="1" Grid.Column="1" Margin="3"
                                 IsChecked="{Binding InvertWorley}"/>
-                            <Button
+                                <Button
                                 Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Margin="3"
                                 Content="Fill Map" Command="{Binding WorleyNoiseFillMapCommand}"/>
-                            <TextBlock
+                                <TextBlock
                                 Grid.Row="5" Grid.Column="0" Margin="3"
                                 Text="Freckles per Tile"  />
-                            <Grid Grid.Row="5" Grid.Column="1">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition Width="30"/>
-                                </Grid.ColumnDefinitions>
-                                <Slider Grid.Column="0" Margin="3" Minimum="1" Maximum="20" Value="{Binding FrecklesPerTile}" TickFrequency="1"/>
-                                <TextBlock Grid.Column="1" Margin="3" Text="{Binding FrecklesPerTile}"/>
-                            </Grid>
-                            <TextBlock
+                                <Grid Grid.Row="5" Grid.Column="1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition/>
+                                        <ColumnDefinition Width="30"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Slider Grid.Column="0" Margin="3" Minimum="1" Maximum="20" Value="{Binding FrecklesPerTile}" TickFrequency="1"/>
+                                    <TextBlock Grid.Column="1" Margin="3" Text="{Binding FrecklesPerTile}"/>
+                                </Grid>
+                                <TextBlock
                                 Grid.Row="6" Grid.Column="0" Margin="3"
                                 Text="Freckle Segment Radius"  />
-                            <Grid Grid.Row="6" Grid.Column="1">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition Width="30"/>
-                                </Grid.ColumnDefinitions>
-                                <Slider Grid.Column="0" Margin="3" Minimum="10" Maximum="100" Value="{Binding FreckleRadius}" TickFrequency="10"/>
-                                <TextBlock Grid.Column="1" Margin="3" Text="{Binding FreckleRadius}"/>
-                            </Grid>
-                            <TextBlock
+                                <Grid Grid.Row="6" Grid.Column="1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition/>
+                                        <ColumnDefinition Width="30"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Slider Grid.Column="0" Margin="3" Minimum="10" Maximum="100" Value="{Binding FreckleRadius}" TickFrequency="10"/>
+                                    <TextBlock Grid.Column="1" Margin="3" Text="{Binding FreckleRadius}"/>
+                                </Grid>
+                                <TextBlock
                                 Grid.Row="7" Grid.Column="0" Margin="3"
                                 Text="Freckle Segment Count"  />
-                            <Grid Grid.Row="7" Grid.Column="1">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition Width="30"/>
-                                </Grid.ColumnDefinitions>
-                                <Slider Grid.Column="0" Margin="3" Minimum="1" Maximum="20" Value="{Binding FreckleSegments}" TickFrequency="1"/>
-                                <TextBlock Grid.Column="1" Margin="3" Text="{Binding FreckleSegments}"/>
-                            </Grid>
-                            <Grid
+                                <Grid Grid.Row="7" Grid.Column="1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition/>
+                                        <ColumnDefinition Width="30"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Slider Grid.Column="0" Margin="3" Minimum="1" Maximum="20" Value="{Binding FreckleSegments}" TickFrequency="1"/>
+                                    <TextBlock Grid.Column="1" Margin="3" Text="{Binding FreckleSegments}"/>
+                                </Grid>
+                                <Grid
                                 Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="2">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                <Button
+                                    <Button
                                     Margin="3"
                                     Content="Add Freckles" Command="{Binding WorleyAddFrecklesCommand}"/>
                                     <TextBox
                                         Grid.Column="1" Width="30" Margin="3"
                                         ToolTip="Seed for random number generator" Text="{Binding FreckleSeed}" />
                                 </Grid>
-                        </Grid>
-                    </GroupBox>
-                    <GroupBox Grid.Row="4" Header="Histogram Manipulation" Margin="3">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock
+                            </Grid>
+                        </GroupBox>
+                        <GroupBox Grid.Row="4" Header="Histogram Manipulation" Margin="3">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
                                  Grid.Row="0" Grid.Column="0" Margin="3" VerticalAlignment="Center"
                                  Text="Flatten Lows" />
-                            <Grid Grid.Row="0" Grid.Column="1">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition Width="40"/>
-                                </Grid.ColumnDefinitions>
-                                <Slider
+                                <Grid Grid.Row="0" Grid.Column="1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition/>
+                                        <ColumnDefinition Width="40"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Slider
                                     Grid.Column="0" Margin="3" Minimum="0" Maximum="100"
                                     Value="{Binding FlattenLowsAmount}" TickFrequency="5"/>
-                                <TextBlock
+                                    <TextBlock
                                     Grid.Column="1" Margin="3"
                                     Text="{Binding FlattenLowsAmount, StringFormat={}{0}%}"/>
-                            </Grid>
-                            <TextBlock
+                                </Grid>
+                                <TextBlock
                                  Grid.Row="1" Grid.Column="0" Margin="3" VerticalAlignment="Center"
                                  Text="Flatten Peaks" />
-                            <Grid Grid.Row="1" Grid.Column="1">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition Width="40"/>
-                                </Grid.ColumnDefinitions>
-                                <Slider
+                                <Grid Grid.Row="1" Grid.Column="1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition/>
+                                        <ColumnDefinition Width="40"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Slider
                                     Grid.Column="0" Margin="3" Minimum="0" Maximum="100"
                                     Value="{Binding FlattenPeaksAmount}"/>
-                                <TextBlock
+                                    <TextBlock
                                     Grid.Column="1" Margin="3"
                                     Text="{Binding FlattenPeaksAmount, StringFormat={}{0}%}"/>
-                            </Grid>
-                            <Button
+                                </Grid>
+                                <Button
                                   Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" Margin="3" Content="Flatten"
                                   Command="{Binding HistomgramFlattenCommand}">
-                                <Button.ToolTip>
-                                    <Viewbox Width="400">
-                                        <Grid>
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition/>
-                                            </Grid.RowDefinitions>
-                                            <TextBlock Grid.Row="0" Text="Apply s-curve on histogram" FontSize="32" />
-                                            <Image Grid.Row="1" Source="Resources/Flatten.png"/>
-                                        </Grid>
-                                    </Viewbox>
-                                </Button.ToolTip>
-                            </Button>
+                                    <Button.ToolTip>
+                                        <Viewbox Width="400">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition/>
+                                                </Grid.RowDefinitions>
+                                                <TextBlock Grid.Row="0" Text="Apply s-curve on histogram" FontSize="32" />
+                                                <Image Grid.Row="1" Source="Resources/Flatten.png"/>
+                                            </Grid>
+                                        </Viewbox>
+                                    </Button.ToolTip>
+                                </Button>
                                 <TextBlock
                                     Grid.Row="3" Grid.Column="0" Margin="3" VerticalAlignment="Center"
                                     Text="Exp. Factor"   />
@@ -343,7 +346,7 @@
                                 <TextBlock
                                   Grid.Row="4" Grid.Column="0" Margin="3" VerticalAlignment="Center"
                                   Text="Equator Width"   />
-                            <Grid Grid.Row="4" Grid.Column="1">
+                                <Grid Grid.Row="4" Grid.Column="1">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition/>
                                         <ColumnDefinition Width="30"/>
@@ -355,11 +358,11 @@
                                         IsEnabled="{Binding FlattenEquator}"/>
                                     <TextBlock Grid.Column="1" Margin="3" Text="{Binding EquatorFlatWidth, StringFormat={}{0}%}"/>
                                     <CheckBox Grid.Column="3" Margin="3" IsChecked="{Binding FlattenEquator}" ToolTip="Apply exponential flatten only to area around Equator"/>
-                            </Grid>
-                            <Button
+                                </Grid>
+                                <Button
                                 Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2" Margin="3" Content="Flatten Exponential"
                                 Command="{Binding EquatorFlattenCommand}">
-                                <Button.ToolTip>
+                                    <Button.ToolTip>
                                         <Viewbox Width="400">
                                             <Grid>
                                                 <Grid.RowDefinitions>
@@ -371,55 +374,85 @@
                                             </Grid>
                                         </Viewbox>
                                     </Button.ToolTip>
-                            </Button>
-                            <TextBlock
+                                </Button>
+                                <TextBlock
                                 Grid.Row="6" Grid.Column="0" Margin="3" VerticalAlignment="Center"
                                 Text="Stretch Min" ToolTip="Defines the size of the flattened area around the equator"  />
-                            <Grid Grid.Row="6" Grid.Column="1">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition Width="30"/>
-                                </Grid.ColumnDefinitions>
-                                <Slider
+                                <Grid Grid.Row="6" Grid.Column="1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition/>
+                                        <ColumnDefinition Width="30"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Slider
                                     Grid.Column="0" Margin="3" Minimum="0" Maximum=".9" TickFrequency="0.1" SmallChange="0.1"
                                     Value="{Binding StretchHistogramMin}" IsSnapToTickEnabled="True"   />
                                     <TextBlock Grid.Column="1" Margin="3" Text="{Binding StretchHistogramMin, StringFormat=N1}"/>
-                            </Grid>
-                            <TextBlock
+                                </Grid>
+                                <TextBlock
                                   Grid.Row="7" Grid.Column="0" Margin="3" VerticalAlignment="Center"
                                   Text="Stretch Max" ToolTip="Defines the size of the flattened area around the equator"  />
-                            <Grid Grid.Row="7" Grid.Column="1">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition Width="30"/>
-                                </Grid.ColumnDefinitions>
-                                <Slider
+                                <Grid Grid.Row="7" Grid.Column="1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition/>
+                                        <ColumnDefinition Width="30"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Slider
                                     Grid.Column="0" Margin="3" Minimum="0.1" Maximum="1" TickFrequency="0.1" SmallChange="0.1"
                                     Value="{Binding StretchHistogramMax}" IsSnapToTickEnabled="True" />
                                     <TextBlock Grid.Column="1" Margin="3" Text="{Binding StretchHistogramMax, StringFormat=N1}"/>
-                            </Grid>
-                            <Button
+                                </Grid>
+                                <Button
                                   Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="2" Margin="3" Content="Stretch Histogram"
                                   ToolTip="Stretch histogram so all values are between Min and Max"
                                   Command="{Binding HistomgramStretchCommand}"/>
                                 <Button
                                   Grid.Row="9" Grid.Column="0" Grid.ColumnSpan="2" Margin="3" Content="Invert"
                                   Command="{Binding InvertCommand}"/>
+
+                                <TextBlock
+                                    Grid.Row="10" Grid.Column="0" Margin="3" VerticalAlignment="Center"
+                                    Text="Max Eq. height" ToolTip="Max height at equator"  />
+                                <Grid Grid.Row="10" Grid.Column="1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition/>
+                                        <ColumnDefinition Width="35"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Slider
+                                        Grid.Column="0" Margin="3" Minimum="10" Maximum="100" TickFrequency="10" SmallChange="10"
+                                        Value="{Binding EquatorMaxHeight}" IsSnapToTickEnabled="True" />
+                                    <TextBlock Grid.Column="1" Margin="3" Text="{Binding EquatorMaxHeight, StringFormat={}{0}%}"/>
+                                </Grid>
+                                <TextBlock
+                                    Grid.Row="11" Grid.Column="0" Margin="3" VerticalAlignment="Center"
+                                    Text="Eq. Roundness" ToolTip="Max height at equator"  />
+                                <Grid Grid.Row="11" Grid.Column="1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition/>
+                                        <ColumnDefinition Width="35"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Slider
+                                    Grid.Column="0" Margin="3" Minimum="10" Maximum="60" TickFrequency="1" SmallChange="1"
+                                    Value="{Binding EquatorHeightRoundness}" IsSnapToTickEnabled="True" />
+                                    <TextBlock Grid.Column="1" Margin="3" Text="{Binding EquatorHeightRoundness}"/>
+                                </Grid>
+                                <Button
+                                    Grid.Row="12" Grid.Column="0" Grid.ColumnSpan="2" Margin="3" Content="Lower Equator"
+                                    Command="{Binding EquatorLowerCommand}"/>
                             </Grid>
-                    </GroupBox>
-                    <GroupBox
+                        </GroupBox>
+                        <GroupBox
                         Grid.Row="5" Header="Sediment Layers" Margin="3">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition/>
-                            </Grid.ColumnDefinitions>
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
                                 <TextBlock
                                     Grid.Row="0" Grid.Column="0" Margin="3"
                                     Text="Total Sed. Plates" VerticalAlignment="Center" />
@@ -445,29 +478,29 @@
                                     Content="Create Sediment Layers"
                                     Command="{Binding GenerateSedimentLayersCommand}"/>
                             </Grid>
-                    </GroupBox>
-                    <GroupBox Grid.Row="6" Header="Hydraulic Erosion" Margin="3">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
+                        </GroupBox>
+                        <GroupBox Grid.Row="6" Header="Hydraulic Erosion" Margin="3">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition/>
-                            </Grid.ColumnDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
                                 <TextBlock
                                     Grid.Row="0" Grid.Column="0" Margin="3"
                                     Text="Iterations" />
@@ -547,56 +580,56 @@
                                     Content="Erode"
                                     Command="{Binding ErodeHydraulicCommand}"/>
                             </Grid>
-                    </GroupBox>
-                    <GroupBox
+                        </GroupBox>
+                        <GroupBox
                         Grid.Row="7" Header="Lakes">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
                                 Grid.Row="0" Grid.Column="0" Margin="3"
                                 Text="Lakes per Tile" />
-                            <TextBox
+                                <TextBox
                                 Grid.Row="0" Grid.Column="1" Margin="3"
                                 Text="{Binding LakesPerTile, UpdateSourceTrigger=PropertyChanged}"/>
-                            <TextBlock
+                                <TextBlock
                                 Grid.Row="1" Grid.Column="0" Margin="3"
                                 Text="Lake Area Multi." />
-                            <TextBox
+                                <TextBox
                                 Grid.Row="1" Grid.Column="1" Margin="3"
                                 Text="{Binding LakeAreaMultiplier}" ToolTip="Average lake size is 3000. Multiply area with this factor."/>
-                            <TextBlock
+                                <TextBlock
                                 Grid.Row="2" Grid.Column="0" Margin="3"
                                 Text="Mat. Source"   />
-                            <TextBox
+                                <TextBox
                                 Grid.Row="2" Grid.Column="1" Margin="3"
                                 Text="{Binding MaterialSource}" />
-                            <TextBlock
+                                <TextBlock
                                 Grid.Row="3" Grid.Column="0" Margin="3"
                                 Text="Stamp Depth"  />
-                            <TextBox
+                                <TextBox
                                 Grid.Row="3" Grid.Column="1" Margin="3"
                                 Text="{Binding LakeStampDepth}" ToolTip="Height units to lower the lake height. Makes lake edges more distinct." />
-                            <TextBlock
+                                <TextBlock
                                 Grid.Row="4" Grid.Column="0" Margin="3"
                                 Text="Mat. Map Value"  />
-                            <TextBox
+                                <TextBox
                                 Grid.Row="4" Grid.Column="1" Margin="3"
                                 Text="{Binding LakeMatMapValue}" ToolTip="Red channel value in material map (1-255), default 82." />
-                             <TextBlock
+                                <TextBlock
                                 Grid.Row="5" Grid.Column="0" Margin="3" VerticalAlignment="Center"
                                 Text="Mode"  />
                                 <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
@@ -612,10 +645,10 @@
                                     Content="Add Lake by Right Click"
                                     Command="{Binding AddLakeByClickCommand}"/>
                             </Grid>
-                    </GroupBox>
-                </Grid>
+                        </GroupBox>
+                    </Grid>
 
-            </Grid>
+                </Grid>
             </ScrollViewer>
             <Grid
                 Grid.Column="0" Visibility="{Binding IsBusy, Converter={StaticResource BoolVis}}">
@@ -688,7 +721,17 @@
                 Background="White">
                 <CheckBox Content="Show Overlays" Margin="1" IsChecked="{Binding ShowOverlays}" />
             </Border>
-
+            <Border
+                Grid.Column="1"
+                BorderThickness="1"
+                BorderBrush="Black"
+                VerticalAlignment="Top" HorizontalAlignment="Left">
+                <Canvas
+                    Width="100" Height="100"
+                    x:Name="CurvePreviewCanvas"
+                    Background="LightGray">
+                </Canvas>
+            </Border>
         </Grid>
     </Grid>
 
