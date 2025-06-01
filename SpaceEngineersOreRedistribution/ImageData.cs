@@ -31,6 +31,7 @@ namespace SpaceEngineersOreRedistribution
         public byte[,] H { get; private set; }
         public byte[,] HGrad { get; private set; }
 
+        public List<(int, int, byte)> OrePixels { get; } = new();
 
         public static ImageData Create(string directory, CubeMapFace face, int tileWidth, CancellationToken token)
         {
@@ -91,7 +92,10 @@ namespace SpaceEngineersOreRedistribution
                             retval.G[x, y] = pixVal.G;
                             retval.R[x, y] = pixVal.R;
                             retval.B[x, y] = pixVal.B;
-
+                            if (pixVal.B != 255) // If not empty pixel
+                            {
+                                retval.OrePixels.Add((x, y, pixVal.B)); // Store ore pixel with value
+                            }
                         }
                     }
                 });
@@ -178,7 +182,7 @@ namespace SpaceEngineersOreRedistribution
             R = B = G = H = HGrad = null;
         }
 
-        public BitmapImage CreateBitmapImage(bool heightMap, bool ore, bool complexMaterials, int? selectedComplexMaterial, List<OreMapping> oreMappings, bool biomes, int? selectedBiome)
+        public BitmapImage CreateBitmapImage(bool heightMap, bool complexMaterials, int? selectedComplexMaterial, bool biomes, int? selectedBiome)
         {
             using MemoryStream memory = new MemoryStream();
             var image = new Image<Rgb24>(TileWidth, TileWidth);
@@ -222,29 +226,6 @@ namespace SpaceEngineersOreRedistribution
                             r = (byte)newRed; g = 0; b = 0;
                         }
                     }
-                    // Ore
-                    if (ore && B[x,y] != 255)
-                    {
-                        if (oreMappings == null)
-                        {
-                            g = 255; r = 0; b = 0;
-                        }
-                        else
-                        {
-                            var mapping = oreMappings.FirstOrDefault(o => o.Value == B[x,y]);
-                            if (mapping != null)
-                            {
-                                r = mapping.MapRgbValue.R;
-                                g = mapping.MapRgbValue.G;
-                                b = mapping.MapRgbValue.B;
-                            }
-                            else
-                            {
-                                r = 0; g = 0; b = 64;
-                            }
-                        }
-                    }
-
                     image[x, y] = new Rgb24(r,g,b); // TODO: Use Span<Rgb24> for performance
                 }
             });

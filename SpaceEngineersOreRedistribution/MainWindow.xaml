@@ -95,6 +95,7 @@
                 <RowDefinition/>
                 <RowDefinition/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <GroupBox
                 Grid.Row="0" Grid.RowSpan="2"
@@ -138,9 +139,42 @@
                     </Grid>
                 </Grid>
             </GroupBox>
-
+            <Grid
+                Grid.Row="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock
+                    Grid.Row="0" Text="Ore detector range: (S=50, L=150)" Margin="3"
+                    Grid.Column="0" Grid.ColumnSpan="3"/>
+                <CheckBox
+                    Grid.Row="1" ToolTip="Enable" Margin="3"
+                    VerticalAlignment="Center"
+                    IsChecked="{Binding UseOreDetectorRange}"/>
+                <Slider
+                    Grid.Row="1" Grid.Column="1" Margin="3"
+                    Orientation="Horizontal"
+                    IsEnabled="{Binding UseOreDetectorRange}"
+                    Value="{Binding OreDetectorRange}"
+                    Minimum="10"
+                    Maximum="500"
+                    TickFrequency="10"
+                    SmallChange="10" LargeChange="50"
+                    IsSnapToTickEnabled="True"
+                    />
+                <TextBlock
+                    Grid.Row="1" Grid.Column="2" Margin="3"
+                    VerticalAlignment="Center" Text="{Binding OreDetectorRange}" Width="30"
+                    HorizontalAlignment="Center" TextAlignment="Center"/>
+            </Grid>
             <GroupBox
-                Grid.Row="2" Header="Selected Environment Item" Margin="3">
+                Grid.Row="3" Header="Selected Environment Item" Margin="3">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition/>
@@ -222,7 +256,7 @@
                 </Canvas>
             </Border>
         </GroupBox>
-        <Grid
+        <!--<Grid
             Grid.Row="0" Grid.Column="0" Background="#FFFFFF" Opacity=".5"
             Grid.RowSpan="5" Grid.ColumnSpan="3" Visibility="{Binding ProgressBarVisibility}">
         </Grid>
@@ -232,7 +266,7 @@
             <ProgressBar
                 VerticalAlignment="Center" HorizontalAlignment="Center"
                 Width="200" Height="30" IsIndeterminate="True" Visibility="{Binding ProgressBarVisibility}"/>
-        </Grid>
+        </Grid>-->
     </Grid>
 </Window>
 

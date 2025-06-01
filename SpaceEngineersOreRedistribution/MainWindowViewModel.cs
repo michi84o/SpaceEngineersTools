@@ -6,6 +6,7 @@ using SpaceEngineersToolsShared;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Data;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.Drawing.Imaging;
@@ -19,6 +20,7 @@ using System.Threading.Tasks;
 using System.Transactions;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Xml.Linq;
 
@@ -249,6 +251,7 @@ namespace SpaceEngineersOreRedistribution
                             if (token.IsCancellationRequested) return;
                             _updatingImages = false;
                             UpdateImages();
+                            UpdateOverlays(true);
                         });
                     }
                     finally
@@ -291,7 +294,7 @@ namespace SpaceEngineersOreRedistribution
                 if (value == null || SelectedPlanetDefinition == null)
                 {
                     if (ShowOreLocations && !_updatingImages)
-                        UpdateImages();
+                        UpdateOverlays(false);
                     return;
                 }
 
@@ -315,7 +318,28 @@ namespace SpaceEngineersOreRedistribution
                     OreMappings.Add(mapping);
                 }
                 if (ShowOreLocations && !_updatingImages)
-                    UpdateImages();
+                    UpdateOverlays(false);
+            }
+        }
+
+        int _oreDetectorRange = 150;
+        public int OreDetectorRange
+        {
+            get => _oreDetectorRange;
+            set
+            {
+                if (SetProp(ref _oreDetectorRange, value))
+                    UpdateOverlays(false);
+            }
+        }
+        bool _useOreDetectorRange = true;
+        public bool UseOreDetectorRange
+        {
+            get => _useOreDetectorRange;
+            set
+            {
+                if (SetProp(ref _useOreDetectorRange, value))
+                    UpdateOverlays(false);
             }
         }
 
@@ -373,7 +397,7 @@ namespace SpaceEngineersOreRedistribution
             {
                 if (!SetProp(ref _showOreLocations, value)) return;
                 if (!_updatingImages)
-                    UpdateImages();
+                    UpdateOverlays(true);
             }
         }
 
@@ -667,6 +691,101 @@ namespace SpaceEngineersOreRedistribution
             _images.Clear();
         }
 
+        void UpdateOverlays(bool clear)
+        {
+            if (clear || TileBackOverlay == null)
+            {
+                TileBackOverlay = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
+                TileDownOverlay = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
+                TileFrontOverlay = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
+                TileLeftOverlay = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
+                TileRightOverlay = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
+                TileUpOverlay = new WriteableBitmap(TileWidth, TileWidth, 96, 96, PixelFormats.Bgra32, null);
+            }
+            if (!ShowOreLocations || SelectedPlanetDefinition == null)
+            {
+                return;
+            }
+            var keys = _images.Keys;
+            List<OreMapping> oreMappings = null;
+            if (SelectedOreType != null && OreMappings != null && OreMappings.Count > 0)
+            {
+                oreMappings = OreMappings.ToList();
+            }
+            foreach (var key in keys)
+            {
+                if (!_images.TryGetValue(key, out var value)) continue;
+                if (value == null) continue;
+                WriteableBitmap bitmap = null;
+                switch (key)
+                {
+                    case CubeMapFace.Back: bitmap = TileBackOverlay; break;
+                    case CubeMapFace.Down: bitmap = TileDownOverlay; break;
+                    case CubeMapFace.Front: bitmap = TileFrontOverlay; break;
+                    case CubeMapFace.Left: bitmap = TileLeftOverlay; break;
+                    case CubeMapFace.Right: bitmap = TileRightOverlay; break;
+                    case CubeMapFace.Up: bitmap = TileUpOverlay; break;
+                }
+                try
+                {
+                    bitmap.Lock();
+                    unsafe
+                    {
+                        foreach (var tuple in value.OrePixels)
+                        {
+                            byte r = 0;
+                            byte g = 255;
+                            byte b = 0;
+                            byte a = 255;
+                            int x = tuple.Item1;
+                            int y = tuple.Item2;
+
+                            if (UseOreDetectorRange)
+                            {
+                                var mapping = SelectedPlanetDefinition.OreMappings.FirstOrDefault(x => x.Value == tuple.Item3);
+                                if (mapping != null)
+                                {
+                                    if (mapping.Start > OreDetectorRange)
+                                        a = 32;
+                                }
+                            }
+
+                            IntPtr pBackBuffer = bitmap.BackBuffer;
+                            pBackBuffer += y * bitmap.BackBufferStride;
+                            pBackBuffer += x * 4;
+
+                            if (oreMappings != null)
+                            {
+                                var mapping = oreMappings.FirstOrDefault(x => x.Value == tuple.Item3);
+                                if (mapping != null)
+                                {
+                                    r = mapping.MapRgbValue.R;
+                                    g = mapping.MapRgbValue.G;
+                                    b = mapping.MapRgbValue.B;
+                                }
+                                else
+                                {
+                                    g = 0;
+                                    b = 64;
+                                }
+                            }
+                            int color_data = b;    // B
+                            color_data |= g << 8;  // G
+                            color_data |= r << 16; // R
+                            color_data |= a << 24; // A
+                            *((int*)pBackBuffer) = color_data;
+                            bitmap.AddDirtyRect(new Int32Rect(x, y, 1, 1));
+                        }
+                    }
+                }
+                catch { continue; }
+                finally
+                {
+                    bitmap.Unlock();
+                }
+            }
+        }
+
         void UpdateImages()
         {
             TileUp = null;
@@ -683,16 +802,11 @@ namespace SpaceEngineersOreRedistribution
                 if (!_images.TryGetValue(key, out var value)) return;
                 if (value == null) return;
 
-                List<OreMapping> oreMappings = null;
-                if (SelectedOreType != null && OreMappings != null && OreMappings.Count > 0)
-                {
-                    oreMappings = OreMappings.ToList();
-                }
                 int? biome = null;
                 if (SelectedEnvironmentItem != null) biome = SelectedEnvironmentItem.Biome;
                 int? complexMaterial = null;
                 if (SelectedComplexMaterial != null) complexMaterial = SelectedComplexMaterial.Value;
-                var image = value.CreateBitmapImage(!ShowGradients, ShowOreLocations, ShowLakes, complexMaterial, oreMappings, ShowBiomes, biome);
+                var image = value.CreateBitmapImage(!ShowGradients, ShowLakes, complexMaterial, ShowBiomes, biome);
 
                 switch (key)
                 {
