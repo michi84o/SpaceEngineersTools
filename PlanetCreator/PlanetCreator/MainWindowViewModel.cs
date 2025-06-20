@@ -715,7 +715,7 @@ namespace PlanetCreator
             get => _noiseScale;
             set => SetProp(ref _noiseScale, value);
         }
-        int _octaves = 8;
+        int _octaves = 6;
         public int Octaves
         {
             get => _octaves;
@@ -723,12 +723,19 @@ namespace PlanetCreator
             {
                 if (SetProp(ref _octaves, value))
                 {
-                    if (value > 25) Octaves = 25;
+                    if (value > 10) Octaves = 10;
                 }
             }
         }
 
-        bool _ridgedNoise = false;
+        string _ridgedOctaves = "2";
+        public string RidgedOctaves
+        {
+            get => _ridgedOctaves;
+            set => SetProp(ref _ridgedOctaves, value);
+        }
+
+        bool _ridgedNoise = true;
         public bool RidgedNoise
         {
             get => _ridgedNoise;
@@ -1102,7 +1109,7 @@ namespace PlanetCreator
                 try
                 {
                     var gen = GetGenerator();
-                    gen.GenerateSimplexHeightMaps(Seed, Octaves, NoiseScale, Persistence, Lacunarity, RidgedNoise, _cts.Token);
+                    gen.GenerateSimplexHeightMaps(Seed, Octaves, NoiseScale, Persistence, Lacunarity, RidgedNoise, RidgedOctaves, _cts.Token);
                     LoadPictures();
                 }
                 finally { IsBusy = false; }
@@ -1192,6 +1199,23 @@ namespace PlanetCreator
                 {
                     var gen = GetGenerator();
                     gen.LowerEquator(EquatorMaxHeight/100.0, EquatorHeightRoundness / 10.0, _cts.Token);
+                    LoadPictures();
+                }
+                finally
+                { IsBusy = false; }
+            });
+        });
+
+        public ICommand FlattenPolesCommand => new RelayCommand(o =>
+        {
+            SaveBackup(AutoBackupName);
+            IsBusy = true;
+            Task.Run(() =>
+            {
+                try
+                {
+                    var gen = GetGenerator();
+                    gen.FlattenPoles(_cts.Token);
                     LoadPictures();
                 }
                 finally

@@ -141,7 +141,7 @@ namespace PlanetCreator
             return faces;
         }
 
-        public void GenerateSimplexHeightMaps(int seed, int octaves, int noiseScale, double persistence, double lacunarity, bool ridgedNoise, CancellationToken token)
+        public void GenerateSimplexHeightMaps(int seed, int octaves, int noiseScale, double persistence, double lacunarity, bool ridgedNoise, string ridgedOctaves, CancellationToken token)
         {
             var faces = GetFaces();
             GetPixelRange(out var cStart, out var cEnd);
@@ -175,7 +175,7 @@ namespace PlanetCreator
 
                 // Create a NoiseMaker for this octave
                 // The seed should vary per octave to avoid repetitions
-                list.Add(new NoiseMaker(seed + i, currentFrequency, currentAmplitude) { RidgedNoise = ridgedNoise });
+                list.Add(new NoiseMaker(seed + i, currentFrequency, currentAmplitude));
 
                 // Scale amplitude and frequency for the next octave
                 currentAmplitude *= persistence;
@@ -191,15 +191,36 @@ namespace PlanetCreator
                 if (token.IsCancellationRequested) return;
                 var face = kv.Key;
                 var tile = kv.Value;
+
+                HashSet<int> ridgedOctaveList = new();
+                if (ridgedNoise && !string.IsNullOrEmpty(ridgedOctaves))
+                {
+                    var parts = ridgedOctaves.Split(',');
+                    foreach (var part in parts)
+                    {
+                        if (int.TryParse(part.Trim(), out int octaveIndex) && octaveIndex > 0 && octaveIndex <= octaves)
+                        {
+                            ridgedOctaveList.Add(octaveIndex-1);
+                        }
+                    }
+                }
+
                 Parallel.For(cStart, cEnd, POptions(token), x =>
                 {
                     for (int y = cStart; y < cEnd; ++y)
                     {
                         var point = GetNormalizedSphereCoordinates(face, x, y);
                         double value = 0;
-                        foreach (var nm in list)
+                        for (int i=0;i<list.Count;++i)
                         {
-                            value += nm.GetValue3D(point.X * sphereRadius, point.Y * sphereRadius, point.Z * sphereRadius);
+                            var nm = list[i];
+                            bool ridged = ridgedNoise;
+                            if (ridgedNoise)
+                            {
+                                if (ridgedOctaveList.Count > 0 && !ridgedOctaveList.Contains(i))
+                                    ridged = false;
+                            }
+                            value += nm.GetValue3D(point.X * sphereRadius, point.Y * sphereRadius, point.Z * sphereRadius, ridged);
                         }
                         tile[x, y] = value;
                     }
@@ -628,6 +649,60 @@ namespace PlanetCreator
                         {
                             var val = face.Value[x, y];
                             face.Value[x, y] = LowerEquatorSingle(val, maxHeight, roundness, y);
+                        }
+                    });
+                });
+            }
+            catch { return; }
+            OnProgress(90);
+            SaveFaces(faces, token);
+            OnProgress(100);
+        }
+
+        public void FlattenPoles(CancellationToken token)
+        {
+            var faces = LoadHeightMaps(token);
+            faces.Remove(CubeMapFace.Front);
+            faces.Remove(CubeMapFace.Left);
+            faces.Remove(CubeMapFace.Back);
+            faces.Remove(CubeMapFace.Right);
+            OnProgress(1);
+            try
+            {
+                double middle = (TileWidth-1) / 2;
+                Parallel.ForEach(faces, face =>
+                {
+                    double avg = 0;
+                    long cnt = 0;
+                    // Sample surface to get average height
+                    for (int x = 0; x < TileWidth; x+=10)
+                    {
+                        for (int y = 0; y < TileWidth; y+=10)
+                        {
+                            avg += face.Value[x, y];
+                            ++cnt;
+                        }
+                    }
+                    var avgHeight = avg / cnt;
+
+                    if (token.IsCancellationRequested) return;
+                    Parallel.For(0, TileWidth, x =>
+                    {
+                        if (token.IsCancellationRequested) return;
+                        for (int y = 0; y < TileWidth; ++y)
+                        {
+                            double deltaX = x - middle;
+                            double deltaY = y - middle;
+                            var distanceNormalized = Math.Sqrt(deltaX * deltaX + deltaY * deltaY) / middle;
+                            var distanceInverted = 1 - distanceNormalized;
+                            if (distanceInverted < 0) distanceInverted = 0;
+
+                            var val = face.Value[x, y];
+                            var multiplier1 = distanceInverted * 100;
+                            var multiplier2 = 100 - distanceInverted;
+                            val = (val * multiplier2 + avgHeight * multiplier1) / (multiplier1 + multiplier2);
+
+                            face.Value[x, y] = val;
                         }
                     });
                 });
@@ -1828,17 +1903,21 @@ namespace PlanetCreator
 
     class NoiseMaker
     {
-        public bool RidgedNoise;
         OpenSimplexNoise _noise;
         public double ResolutionScale;
         public double Weight;
-        public double GetValue2D(double x, double y)
+        public double GetValue2D(double x, double y, bool ridged)
         {
+            if (ridged)
+            {
+                // Create ridged noise, which is useful for mountains and ridges
+                return (1 - Math.Abs(_noise.Evaluate(x * ResolutionScale, y * ResolutionScale))) * Weight;
+            }
             return _noise.Evaluate(x * ResolutionScale, y * ResolutionScale) * Weight;
         }
-        public double GetValue3D(double x, double y, double z)
+        public double GetValue3D(double x, double y, double z, bool ridged)
         {
-            if (RidgedNoise)
+            if (ridged)
             {
                 // Create ridged noise, which is useful for mountains and ridges
                 return (1-Math.Abs(_noise.Evaluate(x * ResolutionScale, y * ResolutionScale, z * ResolutionScale))) * Weight;
