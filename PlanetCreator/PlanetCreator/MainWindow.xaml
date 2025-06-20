@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PlanetCreator"
         mc:Ignorable="d"
-        Title="Planet Creator 1.9.3" Width="1080" MaxHeight="2160" >
+        Title="Planet Creator 1.9.4" Width="1080" MaxHeight="2160" >
     <Window.DataContext>
         <local:MainWindowViewModel x:Name="ViewModel"/>
     </Window.DataContext>
@@ -138,6 +138,9 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -166,8 +169,38 @@
                                     <Slider Grid.Column="0" Margin="3" Minimum="1" Maximum="25" Value="{Binding Octaves}" TickFrequency="1" />
                                     <TextBlock Grid.Column="1" Margin="3" Text="{Binding Octaves}"/>
                                 </Grid>
+                                <TextBlock
+                                Grid.Row="3" Grid.Column="0" Margin="3"
+                                Text="Persistence" />
+                                <Grid Grid.Row="3" Grid.Column="1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition/>
+                                        <ColumnDefinition Width="30"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Slider
+                                        Grid.Column="0" Margin="3" Minimum="0.3" Maximum=".8" Value="{Binding Persistence}" TickFrequency="0.1" IsSnapToTickEnabled="True"
+                                        ToolTip="How quickly the amplitude decreases.&#x0d;&#x0a;Higher values = more detail in high frequencies, 'roughe' terrain.&#x0d;&#x0a;Lower values = smoother terrain."/>
+                                    <TextBlock Grid.Column="1" Margin="3" Text="{Binding Persistence, StringFormat=F1}"/>
+                                </Grid>
+                                <TextBlock
+                                    Grid.Row="4" Grid.Column="0" Margin="3"
+                                    Text="Lacunarity" />
+                                <Grid Grid.Row="4" Grid.Column="1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition/>
+                                        <ColumnDefinition Width="30"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Slider
+                                        Grid.Column="0" Margin="3" Minimum="1.5" Maximum="2.5" Value="{Binding Lacunarity}" TickFrequency="0.1" IsSnapToTickEnabled="True"
+                                        ToolTip="How quickly the frequency increases.&#x0d;&#x0a;Higher values = more 'distortion' and detail increase per octave." />
+                                    <TextBlock Grid.Column="1" Margin="3" Text="{Binding Lacunarity, StringFormat=F1}" />
+                                </Grid>
+                                <TextBlock
+                                 Grid.Row="5" Grid.Column="0" Margin="3"
+                                 Text="Ridged" />
+                                <CheckBox Grid.Row="5" Grid.Column="1" Margin="3" IsChecked="{Binding RidgedNoise}"/>
                                 <Button
-                                Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Margin="3" Content="Fill Map"
+                                Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" Margin="3" Content="Fill Map"
                                 Command="{Binding SimplexNoiseFillMapCommand}"/>
 
 

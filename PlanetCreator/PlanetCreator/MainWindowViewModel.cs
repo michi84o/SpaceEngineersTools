@@ -728,6 +728,27 @@ namespace PlanetCreator
             }
         }
 
+        bool _ridgedNoise = false;
+        public bool RidgedNoise
+        {
+            get => _ridgedNoise;
+            set => SetProp(ref _ridgedNoise, value);
+        }
+
+        double _lacunarity = 2.0;
+        public double Lacunarity
+        {
+            get => _lacunarity;
+            set => SetProp(ref _lacunarity, value);
+        }
+
+        double _persistence = 0.5;
+        public double Persistence
+        {
+            get => _persistence;
+            set => SetProp(ref _persistence, value);
+        }
+
         bool _applySCurve;
         public bool ApplySCurve
         {
@@ -1081,7 +1102,7 @@ namespace PlanetCreator
                 try
                 {
                     var gen = GetGenerator();
-                    gen.GenerateSimplexHeightMaps(Seed, Octaves, NoiseScale, _cts.Token);
+                    gen.GenerateSimplexHeightMaps(Seed, Octaves, NoiseScale, Persistence, Lacunarity, RidgedNoise, _cts.Token);
                     LoadPictures();
                 }
                 finally { IsBusy = false; }

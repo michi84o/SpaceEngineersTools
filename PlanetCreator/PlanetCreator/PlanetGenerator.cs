@@ -141,7 +141,7 @@ namespace PlanetCreator
             return faces;
         }
 
-        public void GenerateSimplexHeightMaps(int seed, int octaves, int noiseScale, CancellationToken token)
+        public void GenerateSimplexHeightMaps(int seed, int octaves, int noiseScale, double persistence, double lacunarity, bool ridgedNoise, CancellationToken token)
         {
             var faces = GetFaces();
             GetPixelRange(out var cStart, out var cEnd);
@@ -150,11 +150,36 @@ namespace PlanetCreator
 
             // Layers of diferent noise frequencies
             List<NoiseMaker> list = new();
+
+            // Parameters for fractal noise
+            double baseFrequency = 1.0 / noiseScale; // Your base frequency (influences the "size" of the terrain features)
+            double baseAmplitude = 1.0;              // Starting amplitude for the first octave
+
+            // These values are crucial for shaping the terrain:
+            //double persistence = 0.5;                // Typical: 0.3 to 0.8. How quickly the amplitude decreases.
+                                                     // Higher values = more detail in high frequencies, "rougher" terrain.
+                                                     // Lower values = smoother terrain.
+            //double lacunarity = 2.0;                 // Typical: 1.8 to 2.2. How quickly the frequency increases.
+                                                     // Higher values = more "distortion" and detail increase per octave.
+
+            // Current amplitude and frequency for the iteration
+            double currentAmplitude = baseAmplitude;
+            double currentFrequency = baseFrequency;
+
+
             var octave = 1;
             for (int i = 0; i < octaves; ++i)
             {
-                list.Add(new(seed + 0, 1.0 * octave / noiseScale, 1.0 / (octave)));
-                octave *= 2;
+                //list.Add(new(seed + 0, 1.0 * octave / noiseScale, 1.0 / (octave)) { RidgedNoise = ridgedNoise });
+                //octave *= 2;
+
+                // Create a NoiseMaker for this octave
+                // The seed should vary per octave to avoid repetitions
+                list.Add(new NoiseMaker(seed + i, currentFrequency, currentAmplitude) { RidgedNoise = ridgedNoise });
+
+                // Scale amplitude and frequency for the next octave
+                currentAmplitude *= persistence;
+                currentFrequency *= lacunarity;
             }
             double sphereRadius = 1000;
 
@@ -1803,6 +1828,7 @@ namespace PlanetCreator
 
     class NoiseMaker
     {
+        public bool RidgedNoise;
         OpenSimplexNoise _noise;
         public double ResolutionScale;
         public double Weight;
@@ -1812,6 +1838,11 @@ namespace PlanetCreator
         }
         public double GetValue3D(double x, double y, double z)
         {
+            if (RidgedNoise)
+            {
+                // Create ridged noise, which is useful for mountains and ridges
+                return (1-Math.Abs(_noise.Evaluate(x * ResolutionScale, y * ResolutionScale, z * ResolutionScale))) * Weight;
+            }
             return _noise.Evaluate(x * ResolutionScale, y * ResolutionScale, z * ResolutionScale) * Weight;
         }
         public NoiseMaker(int seed, double resolutionScale, double weight)
