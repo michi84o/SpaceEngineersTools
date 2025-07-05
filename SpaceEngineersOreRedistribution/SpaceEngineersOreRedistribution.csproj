@@ -18,4 +18,10 @@
     <ProjectReference Include="..\SpaceEngineersToolsShared\SpaceEngineersToolsShared.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="ingotmap.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

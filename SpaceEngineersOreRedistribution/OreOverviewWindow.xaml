@@ -1,0 +1,69 @@
+﻿<Window x:Class="SpaceEngineersOreRedistribution.OreOverviewWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:SpaceEngineersOreRedistribution"
+        mc:Ignorable="d"
+        Title="Ore Overview" Height="450" Width="800">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <TextBlock
+            Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"
+            Text="Raw Ore" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center" Margin="5"/>
+        <local:PieChart
+            Grid.Column="0" Grid.Row="1"
+            Height="{Binding ActualWidth, RelativeSource={RelativeSource Self}}"
+            Margin="5"
+            ItemsSource="{Binding ItemsRaw}"/>
+        <ListView
+            Grid.Row="1" Grid.Column="1" MinWidth="100" VerticalAlignment="Stretch" Margin="5"
+            ItemsSource="{Binding ItemsRaw}">
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal">
+                        <Border Width="10" Height="10" Margin="5" Background="{Binding FillBrush}"/>
+                        <TextBlock Text="{Binding Name}" Margin="5"/>
+                        <TextBlock Text="{Binding Percentage}" Margin="0,5,5,5"/>
+                    </StackPanel>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+        <Border
+            Grid.Row="1" Grid.Column="2" Margin="5" Width="2" Background="Black"/>
+        <TextBlock
+            Grid.Row="0" Grid.Column="2" Text="Base Ore" FontSize="24" FontWeight="Bold" Grid.ColumnSpan="2"
+            HorizontalAlignment="Center" Margin="5"/>
+        <local:PieChart
+            Grid.Column="3" Grid.Row="1" Margin="5"
+            Height="{Binding ActualWidth, RelativeSource={RelativeSource Self}}"
+             ItemsSource="{Binding ItemsBase}"/>
+        <ListView
+             Grid.Row="1" Grid.Column="4" MinWidth="100" VerticalAlignment="Stretch" Margin="5"
+             ItemsSource="{Binding ItemsBase}">
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal">
+                        <Border Width="10" Height="10" Margin="5" Background="{Binding FillBrush}"/>
+                        <TextBlock Text="{Binding Name}" Margin="5"/>
+                        <TextBlock Text="{Binding Percentage}" Margin="0,5,5,5"/>
+                    </StackPanel>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+        <Button
+            Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="5"
+            Margin="5" Content="Refresh" Command="{Binding RefreshCommand}"/>
+    </Grid>
+</Window>

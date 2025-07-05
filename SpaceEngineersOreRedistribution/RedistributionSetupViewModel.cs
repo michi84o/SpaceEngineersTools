@@ -36,6 +36,14 @@ namespace SpaceEngineersOreRedistribution
             OnPropertyChanged(nameof(ValuesCount));
         });
 
+        public ICommand ShowOverviewCommand => new RelayCommand(o =>
+        {
+            var overview = new OreOverviewWindow();
+            //overview.Owner = Parent;
+            overview.DataContext = new OreOverviewViewModel(this);
+            overview.Show();
+        });
+
         public ICommand RemoveOreCommand => new RelayCommand(o =>
         {
             OreInfos.Remove(SelectedInfo);
@@ -342,7 +350,10 @@ namespace SpaceEngineersOreRedistribution
             {
                 item.ExpectedRatio = (item.TypicalSize * item.SpawnWeight) / sum;
             }
+            RatiosCalculated?.Invoke(this, EventArgs.Empty);
         }
+
+        public event EventHandler RatiosCalculated;
 
         public class OreInfo : PropChangeNotifier
         {
