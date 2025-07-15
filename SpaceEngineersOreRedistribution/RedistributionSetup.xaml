@@ -6,11 +6,11 @@
         xmlns:local="clr-namespace:SpaceEngineersOreRedistribution"
         mc:Ignorable="d"
         Title="Redistribution Setup"
-        MaxHeight="960" Height="800" SizeToContent="WidthAndHeight" MaxWidth="765" >
+        MaxHeight="870" Height="800" SizeToContent="WidthAndHeight" MaxWidth="810" >
     <Window.DataContext>
         <local:RedistributionSetupViewModel x:Name="ViewModel"/>
     </Window.DataContext>
-    <Grid Width="760">
+    <Grid Width="800">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
@@ -106,6 +106,7 @@
                     <Button Content="Export" Margin="3" Width="100" Command="{Binding ExportCommand}"/>
                     <Button Content="Update Ore Mapping Diagram" Margin="3" Click="UpdateDiagramClick"/>
                     <Button Content="Ore Overview" Margin="3" Width="100" Command="{Binding ShowOverviewCommand}"/>
+                    <Button Content="Sort" Margin="3" Width="80" Command="{Binding SortCommand}"/>
                 </StackPanel>
                 <TextBlock Grid.Row="4" Text="Multiple definition of same ore allowed. Vanilla ore detectors have a maximum range of 150m.&#x0d;&#x0a;First start value of tier 3 (depth 6) should be within range. If ore spawns deeper it will dive from there to target depth. &#x0d;&#x0a;Weight: Spawn probability relative to other ore. Weights will be summed up to use relative %.&#x0d;&#x0a;Size: 1-500 ore patches per vein, 0 for random (5-30), default: 15&#x0d;&#x0a;Depth: 0-9 (9 only if deep ore enabled!), -1 for random (0-9), default: -1, set preferred depth to Gauss distribute around that value (std dev 4).&#x0d;&#x0a;Size will still be randomized using a Gauss distribution."/>
                 <StackPanel Orientation="Horizontal" Grid.Row="5" >
@@ -194,6 +195,7 @@
                         <TextBlock Text="Presets:" Margin="3" VerticalAlignment="Center"/>
                         <ComboBox Width="200" Margin="3" ItemsSource="{Binding OreMappingPresets}" DisplayMemberPath="Name" SelectedItem="{Binding SelectedOreMappingPreset}"/>
                         <Button Content="Use selected Preset" Margin="3"  Command="{Binding LoadPresetCommand}"/>
+                        <Button Content="Use for All" Margin="3"  Command="{Binding LoadPresetAllCommand}"/>
                         <Button Content="Save current values as Preset" Margin="3"  Command="{Binding SavePresetCommand}" />
                     </StackPanel>
                 </Grid>

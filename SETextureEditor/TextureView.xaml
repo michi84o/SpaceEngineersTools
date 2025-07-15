@@ -1,0 +1,16 @@
+﻿<UserControl x:Class="SETextureEditor.TextureView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:SETextureEditor"
+             mc:Ignorable="d"
+             d:DesignHeight="256" d:DesignWidth="256">
+    <Border
+        x:Name="MyBorder"  ClipToBounds="True" Background="Gray">
+        <Canvas x:Name="MyCanvas" Width="{Binding Width}" Height="{Binding Height}">
+            <Image Width="{Binding Width}" Height="{Binding Height}" Source="{Binding Texture}"/>
+        </Canvas>
+
+    </Border>
+</UserControl>

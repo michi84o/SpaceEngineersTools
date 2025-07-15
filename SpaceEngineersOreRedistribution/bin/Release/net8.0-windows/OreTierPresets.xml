@@ -36,4 +36,16 @@
     <OreTierItem Start="270" Depth="102" />
     <OreTierItem Start="370" Depth="80" />
   </OreTierPreset>
+  <OreTierPreset Name="Flat Ore">
+    <OreTierItem Start="3" Depth="3" />
+    <OreTierItem Start="5" Depth="5" />
+    <OreTierItem Start="8" Depth="7" />
+    <OreTierItem Start="30" Depth="12" />
+    <OreTierItem Start="40" Depth="16" />
+    <OreTierItem Start="50" Depth="20" />
+    <OreTierItem Start="90" Depth="28" />
+    <OreTierItem Start="115" Depth="36" />
+    <OreTierItem Start="145" Depth="42" />
+    <OreTierItem Start="180" Depth="50" />
+  </OreTierPreset>
 </OreTierPresets>

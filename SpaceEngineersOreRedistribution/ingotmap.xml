@@ -47,6 +47,10 @@
  <ingot name="Uranium" amount="0.01" />
 </ore>
 
+<ore name="Ice">
+ <ingot name="Ice" amount="1" />
+</ore>
+
 <ore name="Ice_01">
  <ingot name="Ice" amount="1" />
 </ore>

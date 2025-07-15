@@ -39,9 +39,26 @@ namespace SpaceEngineersOreRedistribution
         public ICommand ShowOverviewCommand => new RelayCommand(o =>
         {
             var overview = new OreOverviewWindow();
-            //overview.Owner = Parent;
+            overview.Owner = Parent;
+            //overview.Owner = Application.Current.MainWindow; // would minimize setup window
             overview.DataContext = new OreOverviewViewModel(this);
             overview.Show();
+        });
+
+        public ICommand SortCommand => new RelayCommand(o =>
+        {
+            var list = OreInfos.ToList();
+            list.Sort((a, b) =>
+            {
+                if (a.ExpectedRatio == b.ExpectedRatio) return 0;
+                return a.ExpectedRatio < b.ExpectedRatio ? 1 : -1;
+            });
+            OreInfos.Clear();
+            foreach (var item in list)
+            {
+                OreInfos.Add(item);
+            }
+            OnPropertyChanged(nameof(OreInfos));
         });
 
         public ICommand RemoveOreCommand => new RelayCommand(o =>
@@ -265,6 +282,25 @@ namespace SpaceEngineersOreRedistribution
             var info = SelectedInfo;
             SelectedInfo = null;
             SelectedInfo = info;
+
+        }, o => SelectedOreMappingPreset != null && SelectedInfo != null);
+
+        public ICommand LoadPresetAllCommand => new RelayCommand(o =>
+        {
+            foreach (var info in OreInfos)
+            {
+                var items = SelectedOreMappingPreset.Items;
+                for (int i = 0; i < items.Count && i < info.OreMappings.Count; ++i)
+                {
+                    info.OreMappings[i].Start = items[i].Start;
+                    info.OreMappings[i].Depth = items[i].Depth;
+                }
+            }
+
+            // Causes redraw of diagram
+            var infoX = SelectedInfo;
+            SelectedInfo = null;
+            SelectedInfo = infoX;
 
         }, o => SelectedOreMappingPreset != null && SelectedInfo != null);
 

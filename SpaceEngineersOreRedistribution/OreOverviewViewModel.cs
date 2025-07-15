@@ -14,6 +14,22 @@ namespace SpaceEngineersOreRedistribution
 {
     class OreOverviewViewModel : PropChangeNotifier
     {
+        public List<string> CalculationBases { get; } = new List<string>
+        {
+            "Spawn Weight",
+            "Expected Ratio"
+        };
+        string _selectedCalculationBase = "Spawn Weight";
+        public string SelectedCalculationBase
+        {
+            get => _selectedCalculationBase;
+            set
+            {
+               if (SetProp(ref _selectedCalculationBase, value))
+                   Refresh();
+            }
+        }
+
         public RedistributionSetupViewModel SetupVm { get; }
 
         public BindingList<PieChartDataItem> ItemsRaw { get; } = new BindingList<PieChartDataItem>();
@@ -76,10 +92,14 @@ namespace SpaceEngineersOreRedistribution
             int j = 0;
             foreach (var ore in SetupVm.OreInfos)
             {
+                if (string.IsNullOrEmpty(ore.Name)) continue;
+
+                float value = (float)(SelectedCalculationBase == "Spawn Weight" ? ore.SpawnWeight : ore.ExpectedRatio);
+
                 var item = new OreOverviewItem
                 {
                     Name = ore.Name,
-                    Value = (float)ore.ExpectedRatio,
+                    Value = value,
                     FillBrush = DiagramColors.GetBrush(i++)
                 };
                 ItemsRaw.Add(item);
@@ -95,14 +115,14 @@ namespace SpaceEngineersOreRedistribution
                             baseItem = new OreOverviewItem
                             {
                                 Name = ingot.Name,
-                                Value = (float)ore.ExpectedRatio,
+                                Value = value,
                                 FillBrush = DiagramColors.GetBrush(j++)
                             };
                             ItemsBase.Add(baseItem);
                         }
                         else
                         {
-                            baseItem.Value += (float)ore.ExpectedRatio;
+                            baseItem.Value += value;
                         }
                     }
                 }
@@ -119,6 +139,13 @@ namespace SpaceEngineersOreRedistribution
             {
                 var ore = (OreOverviewItem)item;
                 ore.Percentage = sum > 0 ? $"{(ore.Value / sum * 100):F2}%" : "0%";
+            }
+            var copy = list.ToList();
+            copy.Sort((x, y) => ((OreOverviewItem)y).Value.CompareTo(((OreOverviewItem)x).Value));
+            list.Clear();
+            foreach (var item in copy)
+            {
+                list.Add(item);
             }
         }
     }

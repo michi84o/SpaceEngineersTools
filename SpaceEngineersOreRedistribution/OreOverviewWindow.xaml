@@ -62,8 +62,23 @@
                 </DataTemplate>
             </ListView.ItemTemplate>
         </ListView>
-        <Button
-            Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="5"
-            Margin="5" Content="Refresh" Command="{Binding RefreshCommand}"/>
+        <Grid
+            Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock
+                Grid.Column="0" Text="Calculation based on:" Margin="5"
+                VerticalAlignment="Center"/>
+            <ComboBox
+                Grid.Column="1" Margin="5" Width="120" ItemsSource="{Binding CalculationBases}" SelectedValue="{Binding SelectedCalculationBase}"
+                VerticalAlignment="Center"/>
+            <Button
+                Grid.Column="2" Grid.ColumnSpan="5"
+                Margin="5" Content="Refresh" Command="{Binding RefreshCommand}"/>
+        </Grid>
+
     </Grid>
 </Window>
