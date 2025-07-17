@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36221.1 d17.14
+VisualStudioVersion = 17.14.36221.1
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SETextureEditor", "SETextureEditor.csproj", "{5150D582-3392-4C26-9BF6-730147D9A0A2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SETextureLoader", "SETextureLoader.csproj", "{5150D582-3392-4C26-9BF6-730147D9A0A2}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SpaceEngineersToolsShared", "..\SpaceEngineersToolsShared\SpaceEngineersToolsShared.csproj", "{26471104-E40C-2908-A4CF-1F960BB3194C}"
 EndProject

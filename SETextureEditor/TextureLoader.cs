@@ -15,6 +15,10 @@ namespace SETextureEditor
     {
         Image<Rgba32> _image;
         public WriteableBitmap Texture;
+        public WriteableBitmap TextureR;
+        public WriteableBitmap TextureG;
+        public WriteableBitmap TextureB;
+        public WriteableBitmap TextureA;
 
         public bool LoadTexture(string filePath, string tempDir)
         {
@@ -62,7 +66,7 @@ namespace SETextureEditor
                             {
                                 var backBufferPos = backBuffer + (y * _image.Width + x) * 4;
                                 var val = pixelRow[x];
-                                var color = val.A << 24 | val.R << 16 | val.G << 8 | val.B;
+                                var color = /*val.A << 24 |*/ val.R << 16 | val.G << 8 | val.B;
                                 System.Runtime.InteropServices.Marshal.WriteInt32(backBufferPos, color);
                             }
                         }
@@ -74,6 +78,7 @@ namespace SETextureEditor
                     bmp.Unlock();
                 }
                 Texture = bmp;
+                //Clipboard.SetImage(bmp);
                 return true;
             }
             catch (Exception ex)

@@ -5,13 +5,12 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SETextureEditor"
         mc:Ignorable="d"
-        Title="MainWindow" Height="600" Width="800">
+        Title="SE Texture Loader" Width="1600" Height="640">
     <Window.DataContext>
-        <local:MainViewModel/>
+        <local:MainViewModel x:Name="ViewModel"/>
     </Window.DataContext>
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
@@ -24,10 +23,61 @@
                 <MenuItem Header="_Exit" />
             </MenuItem>
         </Menu>
-        <local:TextureView
-            Grid.Row="1" Width="512" Height="512"
-            DataContext="{Binding Path=TextureVm}"/>
-
+        <ScrollViewer
+            Grid.Row="1"
+            VerticalScrollBarVisibility="Auto"
+            HorizontalScrollBarVisibility="Auto">
+            <Grid
+                Grid.Row="1" Width="1560" Height="524">
+                <Grid.RowDefinitions>
+                    <RowDefinition/>
+                    <RowDefinition/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*"/>
+                    <ColumnDefinition Width="1*"/>
+                    <ColumnDefinition Width="1*"/>
+                    <ColumnDefinition Width="2*"/>
+                </Grid.ColumnDefinitions>
+                <Border
+                    x:Name="MyBorderRgb"  ClipToBounds="True" Background="Gray" Grid.RowSpan="2"
+                    Width="512" Height="512" Margin="3,6,3,6" >
+                    <Canvas x:Name="MyCanvasRgb" Width="{Binding Width}" Height="{Binding Height}">
+                        <Image Width="{Binding TextureWidth}" Height="{Binding TextureHeight}" Source="{Binding Texture}"/>
+                    </Canvas>
+                </Border>
+                <Border
+                    Grid.Row="0" Grid.Column="1" Width="256" Height="256"
+                    ClipToBounds="True" Background="Gray" Margin="3">
+                </Border>
+                <Border
+                    Grid.Row="0" Grid.Column="2" Width="256" Height="256"
+                    ClipToBounds="True" Background="Gray" Margin="3">
+                </Border>
+                <Border
+                    Grid.Row="1" Grid.Column="1" Width="256" Height="256"
+                    ClipToBounds="True" Background="Gray" Margin="3">
+                </Border>
+                <Border
+                    Grid.Row="1" Grid.Column="2" Width="256" Height="256"
+                    ClipToBounds="True" Background="Gray" Margin="3">
+                </Border>
+                <Border
+                    Grid.Row="0" Grid.Column="3"
+                    ClipToBounds="True" Background="Gray" Grid.RowSpan="2"
+                    Width="512" Height="512" Margin="3,6,3,6" >
+                    <Canvas Width="{Binding Width}" Height="{Binding Height}">
+                        <Image Width="{Binding Width}" Height="{Binding Height}"/>
+                    </Canvas>
+                </Border>
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="RGB" VerticalAlignment="Top" HorizontalAlignment="Right" Foreground="White" Margin="0,4,6,0"/>
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="Metalness" VerticalAlignment="Top" HorizontalAlignment="Right" Foreground="White" Margin="0,3,4,0"/>
+                <TextBlock Grid.Row="0" Grid.Column="2" Text="Gloss" VerticalAlignment="Top" HorizontalAlignment="Right" Foreground="White" Margin="0,3,4,0"/>
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="Emissiveness" VerticalAlignment="Top" HorizontalAlignment="Right" Foreground="White" Margin="0,3,4,0"/>
+                <TextBlock Grid.Row="1" Grid.Column="2" Text="Paintability" VerticalAlignment="Top" HorizontalAlignment="Right" Foreground="White" Margin="0,3,4,0"/>
+                <TextBlock Grid.Row="0" Grid.Column="3" Text="Bumpmap" VerticalAlignment="Top" HorizontalAlignment="Right" Foreground="White" Margin="0,4,6,0"/>
+            </Grid>
+        </ScrollViewer>
 
     </Grid>
 </Window>

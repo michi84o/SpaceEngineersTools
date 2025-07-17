@@ -8,12 +8,15 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media.Imaging;
 using System.Xml.Linq;
 
 namespace SETextureEditor
 {
     public class MainViewModel : PropChangeNotifier
     {
+        string _lastFileName;
+
         string _tempDir;
         readonly string[] _fileNamePatterns = new string[]
         {
@@ -32,6 +35,45 @@ namespace SETextureEditor
             "_ForAxisY_distance_ng.dds",
             "_ForAxisY_ng.dds"
         };
+
+        int _textureWidth = 2048;
+        public int TextureWidth
+        {
+            get => _textureWidth;
+            set => SetProp(ref _textureWidth, value);
+        }
+        int _textureHeight = 2048;
+        public int TextureHeight
+        {
+            get => _textureHeight;
+            set => SetProp(ref _textureHeight, value);
+        }
+
+        BitmapSource _textureRgb;
+        public BitmapSource TextureRgb
+        {
+            get => _textureRgb;
+            set
+            {
+                if (SetProp(ref _textureRgb, value))
+                {
+                    if (value != null)
+                    {
+                        TextureWidth = value.PixelWidth;
+                        TextureHeight = value.PixelHeight;
+                    }
+                    else
+                    {
+                        TextureWidth = 2048;
+                        TextureHeight = 2048;
+                    }
+                    AutoscaleAction?.Invoke();
+                }
+            }
+        }
+
+        public Action AutoscaleAction { get; set; }
+
 
         public MainViewModel()
         {
@@ -70,13 +112,6 @@ namespace SETextureEditor
             #endregion
         }
 
-        TextureViewModel _textureVm;
-        public TextureViewModel TextureVm
-        {
-            get => _textureVm;
-            set => SetProp(ref _textureVm, value);
-        }
-
         public ICommand OpenFileCommand => new RelayCommand(o =>
         {
             OpenFileDialog openFileDialog = new OpenFileDialog
@@ -106,10 +141,11 @@ namespace SETextureEditor
                 return;
             }
 
-            TextureVm = new TextureViewModel
-            {
-                Texture = loader.Texture,
-            };
+            //TextureVm = new TextureViewModel
+            //{
+            //    Texture = loader.Texture,
+            //};
+            _lastFileName = openFileDialog.FileName;
 
         });
     }
