@@ -18,64 +18,137 @@
             Grid.Row="0">
             <MenuItem Header="_File">
                 <MenuItem Header="_Open" Command="{Binding OpenFileCommand}" />
-                <MenuItem Header="_Save" />
-                <Separator/>
-                <MenuItem Header="_Exit" />
+                <MenuItem Header="_Save" Command="{Binding SaveCommand}" />
+                <!--<Separator/>
+                <MenuItem Header="_Exit" />-->
             </MenuItem>
         </Menu>
         <ScrollViewer
             Grid.Row="1"
             VerticalScrollBarVisibility="Auto"
             HorizontalScrollBarVisibility="Auto">
-            <Grid
-                Grid.Row="1" Width="1560" Height="524">
+            <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition/>
-                    <RowDefinition/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="2*"/>
-                    <ColumnDefinition Width="1*"/>
-                    <ColumnDefinition Width="1*"/>
-                    <ColumnDefinition Width="2*"/>
-                </Grid.ColumnDefinitions>
-                <Border
-                    x:Name="MyBorderRgb"  ClipToBounds="True" Background="Gray" Grid.RowSpan="2"
-                    Width="512" Height="512" Margin="3,6,3,6" >
-                    <Canvas x:Name="MyCanvasRgb" Width="{Binding Width}" Height="{Binding Height}">
-                        <Image Width="{Binding TextureWidth}" Height="{Binding TextureHeight}" Source="{Binding Texture}"/>
-                    </Canvas>
-                </Border>
-                <Border
-                    Grid.Row="0" Grid.Column="1" Width="256" Height="256"
-                    ClipToBounds="True" Background="Gray" Margin="3">
-                </Border>
-                <Border
-                    Grid.Row="0" Grid.Column="2" Width="256" Height="256"
-                    ClipToBounds="True" Background="Gray" Margin="3">
-                </Border>
-                <Border
-                    Grid.Row="1" Grid.Column="1" Width="256" Height="256"
-                    ClipToBounds="True" Background="Gray" Margin="3">
-                </Border>
-                <Border
-                    Grid.Row="1" Grid.Column="2" Width="256" Height="256"
-                    ClipToBounds="True" Background="Gray" Margin="3">
-                </Border>
-                <Border
-                    Grid.Row="0" Grid.Column="3"
-                    ClipToBounds="True" Background="Gray" Grid.RowSpan="2"
-                    Width="512" Height="512" Margin="3,6,3,6" >
-                    <Canvas Width="{Binding Width}" Height="{Binding Height}">
-                        <Image Width="{Binding Width}" Height="{Binding Height}"/>
-                    </Canvas>
-                </Border>
-                <TextBlock Grid.Row="0" Grid.Column="0" Text="RGB" VerticalAlignment="Top" HorizontalAlignment="Right" Foreground="White" Margin="0,4,6,0"/>
-                <TextBlock Grid.Row="0" Grid.Column="1" Text="Metalness" VerticalAlignment="Top" HorizontalAlignment="Right" Foreground="White" Margin="0,3,4,0"/>
-                <TextBlock Grid.Row="0" Grid.Column="2" Text="Gloss" VerticalAlignment="Top" HorizontalAlignment="Right" Foreground="White" Margin="0,3,4,0"/>
-                <TextBlock Grid.Row="1" Grid.Column="1" Text="Emissiveness" VerticalAlignment="Top" HorizontalAlignment="Right" Foreground="White" Margin="0,3,4,0"/>
-                <TextBlock Grid.Row="1" Grid.Column="2" Text="Paintability" VerticalAlignment="Top" HorizontalAlignment="Right" Foreground="White" Margin="0,3,4,0"/>
-                <TextBlock Grid.Row="0" Grid.Column="3" Text="Bumpmap" VerticalAlignment="Top" HorizontalAlignment="Right" Foreground="White" Margin="0,4,6,0"/>
+                <Grid
+                    Grid.Row="0"  Width="1560">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="2*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="Copy" Width="50" Margin="0,0,3,0" Command="{Binding CopyRgbXZCommand}" />
+                        <Button Content="Paste" Width="50" Margin="3,0,0,0" Command="{Binding PasteRgbXZCommand}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="Copy" Width="50" Margin="0,0,3,0" Command="{Binding CopyMetalnessXZCommand}" />
+                        <Button Content="Paste" Width="50" Margin="3,0,0,0" Command="{Binding PasteMetalnessXZCommand}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="Copy" Width="50" Margin="0,0,3,0" Command="{Binding CopyGlossXZCommand}" />
+                        <Button Content="Paste" Width="50" Margin="3,0,0,0" Command="{Binding PasteGlossXZCommand}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="Copy" Width="50" Margin="0,0,3,0" Command="{Binding CopyNormalXZCommand}" />
+                        <Button Content="Paste" Width="50" Margin="3,0,0,0" Command="{Binding PasteNormalXZCommand}" />
+                    </StackPanel>
+                </Grid>
+                <Grid
+                    Grid.Row="1" Width="1560" Height="524">
+                    <Grid.RowDefinitions>
+                        <RowDefinition/>
+                        <RowDefinition/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*"/>
+                        <ColumnDefinition Width="1*"/>
+                        <ColumnDefinition Width="1*"/>
+                        <ColumnDefinition Width="2*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border
+                        x:Name="MyBorderRgbXZ"  ClipToBounds="True" Background="Gray" Grid.RowSpan="2"
+                        Width="512" Height="512" Margin="3,6,3,6" >
+                        <Canvas x:Name="MyCanvasRgbXZ" Width="{Binding TextureWidth}" Height="{Binding TextureHeight}">
+                            <Image Width="{Binding TextureWidth}" Height="{Binding TextureHeight}" Source="{Binding TextureRgbXZ}"/>
+                        </Canvas>
+                    </Border>
+                    <Border
+                        Grid.Row="0" Grid.Column="1" Width="256" Height="256"
+                        ClipToBounds="True" Background="Gray" Margin="3">
+                        <Canvas x:Name="MyCanvasMetalnessXZ" Width="{Binding TextureWidth}" Height="{Binding TextureHeight}">
+                            <Image Width="{Binding TextureWidth}" Height="{Binding TextureHeight}" Source="{Binding TextureMetalnessXZ}"/>
+                        </Canvas>
+                    </Border>
+                    <Border
+                        Grid.Row="0" Grid.Column="2" Width="256" Height="256"
+                        ClipToBounds="True" Background="Gray" Margin="3">
+                        <Canvas x:Name="MyCanvasGlossXZ" Width="{Binding TextureWidth}" Height="{Binding TextureHeight}">
+                            <Image Width="{Binding TextureWidth}" Height="{Binding TextureHeight}" Source="{Binding TextureGlossXZ}"/>
+                        </Canvas>
+                    </Border>
+                    <Border
+                        Grid.Row="1" Grid.Column="1" Width="256" Height="256"
+                        ClipToBounds="True" Background="Gray" Margin="3">
+                        <Canvas x:Name="MyCanvasEmissivenessXZ" Width="{Binding TextureWidth}" Height="{Binding TextureHeight}">
+                            <Image Width="{Binding TextureWidth}" Height="{Binding TextureHeight}" Source="{Binding TextureEmissivenessXZ}"/>
+                        </Canvas>
+                    </Border>
+                    <Border
+                        Grid.Row="1" Grid.Column="2" Width="256" Height="256"
+                        ClipToBounds="True" Background="Gray" Margin="3">
+                        <Canvas x:Name="MyCanvasPainabilityXZ" Width="{Binding TextureWidth}" Height="{Binding TextureHeight}">
+                            <Image Width="{Binding TextureWidth}" Height="{Binding TextureHeight}" Source="{Binding TexturePaintabilityXZ}"/>
+                        </Canvas>
+                    </Border>
+                    <Border
+                        Grid.Row="0" Grid.Column="3"
+                        ClipToBounds="True" Background="Gray" Grid.RowSpan="2"
+                        Width="512" Height="512" Margin="3,6,3,6" >
+                        <Canvas x:Name="MyCanvasNormalXZ" Width="{Binding TextureWidth}" Height="{Binding TextureHeight}">
+                            <Image Width="{Binding TextureWidth}" Height="{Binding TextureHeight}" Source="{Binding TextureNormalXZ}"/>
+                        </Canvas>
+                    </Border>
+                    <Border Grid.Row="0" Grid.Column="0"  VerticalAlignment="Top" HorizontalAlignment="Right"  Margin="0,6,4,0" Background="#44000000">
+                        <TextBlock Text="RGB" Foreground="White"/>
+                    </Border>
+                    <Border  Grid.Row="0" Grid.Column="1"  VerticalAlignment="Top" HorizontalAlignment="Right"  Margin="0,3,3,0" Background="#44000000">
+                        <TextBlock Text="Metalness" Foreground="White"/>
+                    </Border>
+                    <Border  Grid.Row="0" Grid.Column="2"  VerticalAlignment="Top" HorizontalAlignment="Right"  Margin="0,3,3,0" Background="#44000000">
+                        <TextBlock Text="Gloss" Foreground="White"/>
+                    </Border>
+                    <Border  Grid.Row="1" Grid.Column="1"  VerticalAlignment="Top" HorizontalAlignment="Right"  Margin="0,3,3,0" Background="#44000000">
+                        <TextBlock Text="Emissiveness" Foreground="White"/>
+                    </Border>
+                    <Border  Grid.Row="1" Grid.Column="2"  VerticalAlignment="Top" HorizontalAlignment="Right"  Margin="0,3,3,0" Background="#44000000">
+                        <TextBlock Text="Paintability" Foreground="White"/>
+                    </Border>
+                    <Border  Grid.Row="0" Grid.Column="3"  VerticalAlignment="Top" HorizontalAlignment="Right"  Margin="0,6,4,0" Background="#44000000">
+                        <TextBlock Text="Bumpmap" Foreground="White"/>
+                    </Border>
+                </Grid>
+                <Grid
+                    Grid.Row="2"  Width="1560">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="2*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="Copy" Width="50" Margin="0,0,3,0" Command="{Binding CopyEmissivenessXZCommand}" />
+                        <Button Content="Paste" Width="50" Margin="3,0,0,0" Command="{Binding PasteEmissivenessXZCommand}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Content="Copy" Width="50" Margin="0,0,3,0" Command="{Binding CopyPaintabilityXZCommand}" />
+                        <Button Content="Paste" Width="50" Margin="3,0,0,0" Command="{Binding PastePaintabilityXZCommand}" />
+                    </StackPanel>
+                </Grid>
             </Grid>
         </ScrollViewer>
 

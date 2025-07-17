@@ -25,11 +25,11 @@ namespace SETextureEditor
         {
             InitializeComponent();
 
-            MyBorderRgb.MouseWheel += MyBorderRgb_MouseWheel;
-            MyBorderRgb.MouseLeftButtonDown += MyBorderRgb_MouseLeftButtonDown;
-            MyBorderRgb.MouseLeftButtonUp += MyBorderRgb_MouseLeftButtonUp;
-            MyBorderRgb.MouseMove += MyBorderRgb_MouseMove;
-            MyBorderRgb.MouseRightButtonUp += MyBorderRgb_MouseRightButtonUp;
+            //MyBorderRgbXZ.MouseWheel += MyBorderRgb_MouseWheel;
+            //MyBorderRgbXZ.MouseLeftButtonDown += MyBorderRgb_MouseLeftButtonDown;
+            //MyBorderRgbXZ.MouseLeftButtonUp += MyBorderRgb_MouseLeftButtonUp;
+            //MyBorderRgbXZ.MouseMove += MyBorderRgb_MouseMove;
+            //MyBorderRgbXZ.MouseRightButtonUp += MyBorderRgb_MouseRightButtonUp;
 
             ViewModel.AutoscaleAction = AutoScale;
         }
@@ -43,16 +43,27 @@ namespace SETextureEditor
         void AutoScale()
         {
             var scale = Math.Min(
-                    512 / MyCanvasRgb.Width,
-                    512 / MyCanvasRgb.Height);
+                    512 / MyCanvasRgbXZ.Width,
+                    512 / MyCanvasRgbXZ.Height);
             var mat = new Matrix();
             mat.ScaleAtPrepend(scale, scale, 0, 0);
-            MyCanvasRgb.RenderTransform = new MatrixTransform(mat);
+            MyCanvasRgbXZ.RenderTransform = new MatrixTransform(mat);
+            MyCanvasNormalXZ.RenderTransform = new MatrixTransform(mat);
+
+            scale = Math.Min(
+                    256 / MyCanvasRgbXZ.Width,
+                    256 / MyCanvasRgbXZ.Height);
+            mat = new Matrix();
+            mat.ScaleAtPrepend(scale, scale, 0, 0);
+            MyCanvasEmissivenessXZ.RenderTransform = new MatrixTransform(mat);
+            MyCanvasMetalnessXZ.RenderTransform = new MatrixTransform(mat);
+            MyCanvasGlossXZ.RenderTransform = new MatrixTransform(mat);
+            MyCanvasPainabilityXZ.RenderTransform = new MatrixTransform(mat);
         }
 
         private void MyBorderRgb_MouseMove(object sender, MouseEventArgs e)
         {
-            if (!MyBorderRgb.IsMouseCaptured)
+            if (!MyBorderRgbXZ.IsMouseCaptured)
             {
                 return;
             }
@@ -63,42 +74,42 @@ namespace SETextureEditor
                 _moved = true;
                 return;
             }
-            Point p = e.MouseDevice.GetPosition(MyBorderRgb);
+            Point p = e.MouseDevice.GetPosition(MyBorderRgbXZ);
             var dx = (p.X - _start.X);
             var dy = (p.Y - _start.Y);
 
-            Matrix m = MyCanvasRgb.RenderTransform.Value;
+            Matrix m = MyCanvasRgbXZ.RenderTransform.Value;
             m.OffsetX = _origin.X + (p.X - _start.X);
             m.OffsetY = _origin.Y + (p.Y - _start.Y);
-            MyCanvasRgb.RenderTransform = new MatrixTransform(m);
+            MyCanvasRgbXZ.RenderTransform = new MatrixTransform(m);
         }
 
         private void MyBorderRgb_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            MyBorderRgb.ReleaseMouseCapture();
+            MyBorderRgbXZ.ReleaseMouseCapture();
             _moved = false;
         }
 
         private void MyBorderRgb_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (MyBorderRgb.IsMouseCaptured) return;
-            MyBorderRgb.CaptureMouse();
+            if (MyBorderRgbXZ.IsMouseCaptured) return;
+            MyBorderRgbXZ.CaptureMouse();
             _moved = false;
             //Debug.WriteLine("Down, Mouse captured");
-            _start = e.GetPosition(MyBorderRgb);
-            _origin.X = MyCanvasRgb.RenderTransform.Value.OffsetX;
-            _origin.Y = MyCanvasRgb.RenderTransform.Value.OffsetY;
+            _start = e.GetPosition(MyBorderRgbXZ);
+            _origin.X = MyCanvasRgbXZ.RenderTransform.Value.OffsetX;
+            _origin.Y = MyCanvasRgbXZ.RenderTransform.Value.OffsetY;
         }
 
         private void MyBorderRgb_MouseWheel(object sender, MouseWheelEventArgs e)
         {
-            Point p = e.MouseDevice.GetPosition(MyCanvasRgb);
-            Matrix m = MyCanvasRgb.RenderTransform.Value;
+            Point p = e.MouseDevice.GetPosition(MyCanvasRgbXZ);
+            Matrix m = MyCanvasRgbXZ.RenderTransform.Value;
             if (e.Delta > 0)
                 m.ScaleAtPrepend(1.1, 1.1, p.X, p.Y);
             else
                 m.ScaleAtPrepend(1 / 1.1, 1 / 1.1, p.X, p.Y);
-            MyCanvasRgb.RenderTransform = new MatrixTransform(m);
+            MyCanvasRgbXZ.RenderTransform = new MatrixTransform(m);
         }
     }
 }
