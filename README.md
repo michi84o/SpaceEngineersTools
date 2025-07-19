@@ -76,3 +76,7 @@ Tutorial:
 https://youtu.be/nS_ERI_GFhw
 
 ![Screenshot of Complex Material Viewer](Screenshots/CpmplexMatView.png)
+
+## SETextureEditor
+
+Helper for editing DDS texture files (WIP).
