@@ -7,6 +7,7 @@ using SixLabors.ImageSharp.PixelFormats;
 using SpaceEngineersToolsShared;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.Contracts;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -38,6 +39,7 @@ namespace SETextureEditor
             set => SetProp(ref _textureHeight, value);
         }
 
+        #region XZ
         WriteableBitmap _textureRgbXZ;
         public WriteableBitmap TextureRgbXZ
         {
@@ -101,6 +103,87 @@ namespace SETextureEditor
             get => _textureGlossXZ;
             set => SetProp(ref _textureGlossXZ, value);
         }
+        #endregion
+
+        #region Y
+        WriteableBitmap _textureRgbY;
+        public WriteableBitmap TextureRgbY
+        {
+            get => _textureRgbY;
+            set
+            {
+                if (SetProp(ref _textureRgbY, value))
+                {
+                    if (value != null)
+                    {
+                        TextureWidth = value.PixelWidth;
+                        TextureHeight = value.PixelHeight;
+                    }
+                    else
+                    {
+                        TextureWidth = 2048;
+                        TextureHeight = 2048;
+                    }
+                }
+            }
+        }
+
+        WriteableBitmap _textureMetalnessY;
+        public WriteableBitmap TextureMetalnessY
+        {
+            get => _textureMetalnessY;
+            set => SetProp(ref _textureMetalnessY, value);
+        }
+
+        WriteableBitmap _textureAmbientOcclusionY;
+        public WriteableBitmap TextureAmbientOcclusionY
+        {
+            get => _textureAmbientOcclusionY;
+            set => SetProp(ref _textureAmbientOcclusionY, value);
+        }
+
+        WriteableBitmap _textureEmissivenessY;
+        public WriteableBitmap TextureEmissivenessY
+        {
+            get => _textureEmissivenessY;
+            set => SetProp(ref _textureEmissivenessY, value);
+        }
+
+        WriteableBitmap _texturePaintabilityY;
+        public WriteableBitmap TexturePaintabilityY
+        {
+            get => _texturePaintabilityY;
+            set => SetProp(ref _texturePaintabilityY, value);
+        }
+
+        WriteableBitmap _textureNormalY;
+        public WriteableBitmap TextureNormalY
+        {
+            get => _textureNormalY;
+            set => SetProp(ref _textureNormalY, value);
+        }
+
+        WriteableBitmap _textureGlossY;
+        public WriteableBitmap TextureGlossY
+        {
+            get => _textureGlossY;
+            set => SetProp(ref _textureGlossY, value);
+        }
+        #endregion
+
+        bool _skipYAxis = false;
+        public bool SkipYAxis
+        {
+            get => _skipYAxis;
+            set => SetProp(ref _skipYAxis, value);
+        }
+
+        bool _loadDistanceTextures = false;
+        public bool LoadDistanceTextures
+        {
+            get => _loadDistanceTextures;
+            set => SetProp(ref _loadDistanceTextures, value);
+        }
 
         public Action AutoscaleAction { get; set; }
 
@@ -143,6 +226,24 @@ namespace SETextureEditor
 
         public ICommand OpenFileCommand => new RelayCommand(o =>
         {
+            _fileNamePatterns = new string[]
+            {
+                // XZ axis
+                "_ForAxisXZ_add.dds",
+                "_ForAxisXZ_cm.dds",
+                "_ForAxisXZ_distance_add.dds",
+                "_ForAxisXZ_distance_cm.dds",
+                "_ForAxisXZ_distance_ng.dds",
+                "_ForAxisXZ_ng.dds",
+                // Y axis
+                "_ForAxisY_add.dds",
+                "_ForAxisY_cm.dds",
+                "_ForAxisY_distance_add.dds",
+                "_ForAxisY_distance_cm.dds",
+                "_ForAxisY_distance_ng.dds",
+                "_ForAxisY_ng.dds"
+            };
+
             var localDir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
             var texconvPath = System.IO.Path.Combine(localDir, "texconv.exe");
             if (!System.IO.File.Exists(texconvPath))
@@ -163,6 +264,17 @@ namespace SETextureEditor
             TexturePaintabilityXZ = null;
             TextureAmbientOcclusionXZ = null;
             TextureEmissivenessXZ = null;
+            TextureMetalnessXZ = null;
+            TextureGlossXZ = null;
+            TextureNormalXZ = null;
+
+            TextureRgbY = null;
+            TexturePaintabilityY = null;
+            TextureAmbientOcclusionY = null;
+            TextureEmissivenessY = null;
+            TextureMetalnessY = null;
+            TextureGlossY = null;
+            TextureNormalY = null;
 
             var fullFileName = openFileDialog.FileName;
             var fileName = System.IO.Path.GetFileName(fullFileName);
@@ -180,6 +292,37 @@ namespace SETextureEditor
                 }
             }
 
+            bool fallback = false;
+            if (groupName == null)
+            {
+                // Fallback. Here are some example file names:
+                // AlienGreenGrass_cm.dds --> CM file
+                // EarthIce_Far1_cm.dds --> distance file
+
+                if (fileName.EndsWith("_cm.dds", StringComparison.OrdinalIgnoreCase) ||
+                    fileName.EndsWith("_ng.dds", StringComparison.OrdinalIgnoreCase))
+                {
+                    groupName = fileName.Substring(0, fileName.Length - "_cm.dds".Length);
+                    SkipYAxis = true;
+                }
+                else if (fileName.EndsWith("_add.dds", StringComparison.OrdinalIgnoreCase))
+                {
+                    groupName = fileName.Substring(0, fileName.Length - "_add.dds".Length);
+                    SkipYAxis = true;
+                }
+                if (groupName != null)
+                {
+                    var list = _fileNamePatterns.ToList();
+                    list.RemoveAll(p => p.Contains("ForAxisY"));
+                    for (int i = 0; i < list.Count; ++i)
+                    {
+                        list[i] = list[i].Replace("_ForAxisXZ", "");
+                    }
+                    _fileNamePatterns = list.ToArray();
+                    fallback = true;
+                }
+            }
+
             if (groupName == null)
             {
                 MessageBox.Show("Selected file does not match any known texture group patterns.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -192,6 +335,9 @@ namespace SETextureEditor
                 var fileToLoad = System.IO.Path.Combine(folder, groupName + pattern);
                 if (File.Exists(fileToLoad))
                 {
+                    if (LoadDistanceTextures != pattern.Contains("distance")) continue;
+                    if (SkipYAxis && !pattern.Contains("XZ") && !fallback) continue;
+
                     if (pattern.Contains("add")) // ADDITIVE
                     {
                         // R: Ambient Occlusion
@@ -201,7 +347,7 @@ namespace SETextureEditor
                         var textures = LoadDDS(fileToLoad, new TextureLoadMode[] { TextureLoadMode.R, TextureLoadMode.G, TextureLoadMode.A });
                         if (textures != null)
                         {
-                            if (pattern.Contains("XZ"))
+                            if (pattern.Contains("XZ") || fallback)
                             {
                                 TextureAmbientOcclusionXZ = textures[0];
                                 TextureEmissivenessXZ = textures[1];
@@ -209,6 +355,9 @@ namespace SETextureEditor
                             }
                             else if (pattern.Contains("Y"))
                             {
+                                TextureAmbientOcclusionY = textures[0];
+                                TextureEmissivenessY = textures[1];
+                                TexturePaintabilityY = textures[2];
                             }
                         }
                     }
@@ -219,13 +368,15 @@ namespace SETextureEditor
                         var textures = LoadDDS(fileToLoad, new TextureLoadMode[] { TextureLoadMode.RGB, TextureLoadMode.A });
                         if (textures != null)
                         {
-                            if (pattern.Contains("XZ"))
+                            if (pattern.Contains("XZ") || fallback)
                             {
                                 TextureRgbXZ = textures[0];
                                 TextureMetalnessXZ = textures[1];
                             }
                             else if (pattern.Contains("Y"))
                             {
+                                TextureRgbY = textures[0];
+                                TextureMetalnessY = textures[1];
                             }
                         }
                     }
@@ -236,13 +387,15 @@ namespace SETextureEditor
                         var textures = LoadDDS(fileToLoad, new TextureLoadMode[] { TextureLoadMode.RGB, TextureLoadMode.A });
                         if (textures != null)
                         {
-                            if (pattern.Contains("XZ"))
+                            if (pattern.Contains("XZ") || fallback)
                             {
                                 TextureNormalXZ = textures[0];
                                 TextureGlossXZ = textures[1];
                             }
                             else if (pattern.Contains("Y"))
                             {
+                                TextureNormalY = textures[0];
+                                TextureGlossY = textures[1];
                             }
                         }
                     }
@@ -252,22 +405,22 @@ namespace SETextureEditor
 
         });
 
-        readonly string[] _fileNamePatterns = new string[]
+        string[] _fileNamePatterns = new string[]
         {
             // XZ axis
             "_ForAxisXZ_add.dds",
             "_ForAxisXZ_cm.dds",
-            //"_ForAxisXZ_distance_add.dds",
-            //"_ForAxisXZ_distance_cm.dds",
-            //"_ForAxisXZ_distance_ng.dds",
+            "_ForAxisXZ_distance_add.dds",
+            "_ForAxisXZ_distance_cm.dds",
+            "_ForAxisXZ_distance_ng.dds",
             "_ForAxisXZ_ng.dds",
             // Y axis
-            //"_ForAxisY_add.dds",
-            //"_ForAxisY_cm.dds",
-            //"_ForAxisY_distance_add.dds",
-            //"_ForAxisY_distance_cm.dds",
-            //"_ForAxisY_distance_ng.dds",
-            //"_ForAxisY_ng.dds"
+            "_ForAxisY_add.dds",
+            "_ForAxisY_cm.dds",
+            "_ForAxisY_distance_add.dds",
+            "_ForAxisY_distance_cm.dds",
+            "_ForAxisY_distance_ng.dds",
+            "_ForAxisY_ng.dds"
         };
 
         enum TextureLoadMode
@@ -376,6 +529,8 @@ namespace SETextureEditor
             }
         }
 
+
+        #region XZ Commands
         public ICommand CopyRgbXZCommand => new RelayCommand(o =>
         {
             Clipboard.SetImage(TextureRgbXZ);
@@ -410,6 +565,44 @@ namespace SETextureEditor
         {
             Clipboard.SetImage(TextureGlossXZ);
         }, o => TextureGlossXZ != null);
+        #endregion
+
+        #region Y Commands
+        public ICommand CopyRgbYCommand => new RelayCommand(o =>
+        {
+            Clipboard.SetImage(TextureRgbY);
+        }, o => TextureRgbY != null);
+
+        public ICommand CopyMetalnessYCommand => new RelayCommand(o =>
+        {
+            Clipboard.SetImage(TextureMetalnessY);
+        }, o => TextureMetalnessY != null);
+
+        public ICommand CopyAmbientOcclusionYCommand => new RelayCommand(o =>
+        {
+            Clipboard.SetImage(TextureAmbientOcclusionY);
+        }, o => TextureAmbientOcclusionY != null);
+
+        public ICommand CopyEmissivenessYCommand => new RelayCommand(o =>
+        {
+            Clipboard.SetImage(TextureEmissivenessY);
+        }, o => TextureEmissivenessY != null);
+
+        public ICommand CopyPaintabilityYCommand => new RelayCommand(o =>
+        {
+            Clipboard.SetImage(TexturePaintabilityY);
+        }, o => TexturePaintabilityY != null);
+
+        public ICommand CopyNormalYCommand => new RelayCommand(o =>
+        {
+            Clipboard.SetImage(TextureNormalY);
+        }, o => TextureNormalY != null);
+
+        public ICommand CopyGlossYCommand => new RelayCommand(o =>
+        {
+            Clipboard.SetImage(TextureGlossY);
+        }, o => TextureGlossY != null);
+        #endregion
 
         DateTime _lastChecked = DateTime.Now;
         bool _lastCheck = false;
@@ -490,6 +683,7 @@ namespace SETextureEditor
 
         }
 
+        #region XZ Commands Paste
         public ICommand PasteRgbXZCommand => new RelayCommand(o =>
         {
             var img = GetFromClipBoard(TextureLoadMode.RGB);
@@ -552,6 +746,72 @@ namespace SETextureEditor
                 TextureGlossXZ = img;
             }
         }, o => ContainsImage());
+        #endregion
+
+        #region Y Commands Paste
+        public ICommand PasteRgbYCommand => new RelayCommand(o =>
+        {
+            var img = GetFromClipBoard(TextureLoadMode.RGB);
+            if (img != null)
+            {
+                TextureRgbY = img;
+            }
+        }, o => ContainsImage());
+
+        public ICommand PasteMetalnessYCommand => new RelayCommand(o =>
+        {
+            var img = GetFromClipBoard(TextureLoadMode.A);
+            if (img != null)
+            {
+                TextureMetalnessY = img;
+            }
+        }, o => ContainsImage());
+
+        public ICommand PasteAmbientOcclusionYCommand => new RelayCommand(o =>
+        {
+            var img = GetFromClipBoard(TextureLoadMode.R);
+            if (img != null)
+            {
+                TextureAmbientOcclusionY = img;
+            }
+        }, o => ContainsImage());
+
+        public ICommand PasteEmissivenessYCommand => new RelayCommand(o =>
+        {
+            var img = GetFromClipBoard(TextureLoadMode.G);
+            if (img != null)
+            {
+                TextureEmissivenessY = img;
+            }
+        }, o => ContainsImage());
+
+        public ICommand PastePaintabilityYCommand => new RelayCommand(o =>
+        {
+            var img = GetFromClipBoard(TextureLoadMode.A);
+            if (img != null)
+            {
+                TexturePaintabilityY = img;
+            }
+        }, o => ContainsImage());
+
+        public ICommand PasteNormalYCommand => new RelayCommand(o =>
+        {
+            var img = GetFromClipBoard(TextureLoadMode.RGB);
+            if (img != null)
+            {
+                TextureNormalY = img;
+            }
+        }, o => ContainsImage());
+
+        public ICommand PasteGlossYCommand => new RelayCommand(o =>
+        {
+            var img = GetFromClipBoard(TextureLoadMode.A);
+            if (img != null)
+            {
+                TextureGlossY = img;
+            }
+        }, o => ContainsImage());
+        #endregion
 
         public ICommand SaveCommand => new RelayCommand(o =>
         {
@@ -586,6 +846,7 @@ namespace SETextureEditor
 
             var dir = Path.GetDirectoryName(fullFileName);
 
+            #region XZ
             // _ForAxisXZ_add.dds
             // Additive
             if (TextureAmbientOcclusionXZ != null &&
@@ -619,6 +880,43 @@ namespace SETextureEditor
                     PngToDDS(pngFileName, ddsFileName);
                 }
             }
+            #endregion
+
+            #region Y
+            // _ForAxisY_add.dds
+            // Additive
+            if (TextureAmbientOcclusionY != null &&
+                TextureEmissivenessY != null &&
+                TexturePaintabilityY != null)
+            {
+                var pngFileName = System.IO.Path.Combine(_tempDir, groupName + "_ForAxisY_add.png");
+                var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisY_add.dds");
+                if (SaveAddTexture(pngFileName, TextureAmbientOcclusionY, TextureEmissivenessY, TexturePaintabilityY))
+                {
+                    PngToDDS(pngFileName, ddsFileName);
+                }
+            }
+            // _ForAxisY_cm.dds
+            if (TextureRgbY != null && TextureMetalnessY != null)
+            {
+                var pngFileName = System.IO.Path.Combine(_tempDir, groupName + "_ForAxisY_cm.png");
+                var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisY_cm.dds");
+                if (SaveCmTexture(pngFileName, TextureRgbY, TextureMetalnessY))
+                {
+                    PngToDDS(pngFileName, ddsFileName);
+                }
+            }
+            // _ForAxisY_ng.dds
+            if (TextureNormalY != null && TextureGlossY != null)
+            {
+                var pngFileName = System.IO.Path.Combine(_tempDir, groupName + "_ForAxisY_ng.png");
+                var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisY_ng.dds");
+                if (SaveNgTexture(pngFileName, TextureNormalY, TextureGlossY))
+                {
+                    PngToDDS(pngFileName, ddsFileName);
+                }
+            }
+            #endregion
 
         });
 

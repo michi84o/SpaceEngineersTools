@@ -50,15 +50,27 @@ namespace SETextureEditor
             MyCanvasRgbXZ.RenderTransform = new MatrixTransform(mat);
             MyCanvasNormalXZ.RenderTransform = new MatrixTransform(mat);
 
+            MyCanvasRgbY.RenderTransform = new MatrixTransform(mat);
+            MyCanvasNormalY.RenderTransform = new MatrixTransform(mat);
+
             scale = Math.Min(
                     256 / MyCanvasRgbXZ.Width,
                     256 / MyCanvasRgbXZ.Height);
             mat = new Matrix();
             mat.ScaleAtPrepend(scale, scale, 0, 0);
+
+
             MyCanvasEmissivenessXZ.RenderTransform = new MatrixTransform(mat);
             MyCanvasMetalnessXZ.RenderTransform = new MatrixTransform(mat);
             MyCanvasGlossXZ.RenderTransform = new MatrixTransform(mat);
             MyCanvasPainabilityXZ.RenderTransform = new MatrixTransform(mat);
+            MyCanvasOcclusionXZ.RenderTransform = new MatrixTransform(mat);
+
+            MyCanvasEmissivenessY.RenderTransform = new MatrixTransform(mat);
+            MyCanvasMetalnessY.RenderTransform = new MatrixTransform(mat);
+            MyCanvasGlossY.RenderTransform = new MatrixTransform(mat);
+            MyCanvasPainabilityY.RenderTransform = new MatrixTransform(mat);
+            MyCanvasOcclusionY.RenderTransform = new MatrixTransform(mat);
         }
 
         private void MyBorderRgb_MouseMove(object sender, MouseEventArgs e)
