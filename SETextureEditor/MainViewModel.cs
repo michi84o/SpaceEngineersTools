@@ -840,8 +840,9 @@ namespace SETextureEditor
 
             if (groupName == null)
             {
-                MessageBox.Show("Selected file does not match any known texture group patterns.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
+                MessageBox.Show(
+                    "Selected file does not match any known texture group patterns. Using fallback filename.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                groupName = "fallback_99";
             }
 
             var dir = Path.GetDirectoryName(fullFileName);
@@ -933,7 +934,7 @@ namespace SETextureEditor
                 }
                 using var process = new System.Diagnostics.Process();
                 process.StartInfo.FileName = texconvPath;
-                process.StartInfo.Arguments = $"\"{pngFileName}\" -y -ft dds BC7_UNORM_SRGB -o \"{System.IO.Path.GetDirectoryName(ddsFileName)}\"";
+                process.StartInfo.Arguments = $"\"{pngFileName}\" -y -ft dds -f BC7_UNORM_SRGB -o \"{System.IO.Path.GetDirectoryName(ddsFileName)}\"";
                 process.StartInfo.UseShellExecute = false;
                 process.StartInfo.RedirectStandardOutput = true;
                 process.StartInfo.RedirectStandardError = true;
