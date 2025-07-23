@@ -2,11 +2,14 @@
 using MathNet.Numerics.Providers.LinearAlgebra;
 using Microsoft.Win32;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.ColorSpaces;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 using SpaceEngineersToolsShared;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.IO;
 using System.Linq;
@@ -340,6 +343,7 @@ namespace SETextureEditor
 
                     if (pattern.Contains("add")) // ADDITIVE
                     {
+                        // ! SRGB
                         // R: Ambient Occlusion
                         // G: Emmissiveness
                         // B: unused
@@ -363,6 +367,7 @@ namespace SETextureEditor
                     }
                     else if (pattern.Contains("cm")) // COLOR METALNESS
                     {
+                        // ! SRGB
                         // RGB: Material Color
                         // A: Metalness
                         var textures = LoadDDS(fileToLoad, new TextureLoadMode[] { TextureLoadMode.RGB, TextureLoadMode.A });
@@ -382,6 +387,7 @@ namespace SETextureEditor
                     }
                     else if (pattern.Contains("ng")) // NORMAL GLOSS
                     {
+                        // ! Linear RGB
                         // RGB: Normal Map
                         // A: Gloss
                         var textures = LoadDDS(fileToLoad, new TextureLoadMode[] { TextureLoadMode.RGB, TextureLoadMode.A });
@@ -433,7 +439,7 @@ namespace SETextureEditor
             A
         }
 
-        WriteableBitmap[] LoadDDS(string filePath, TextureLoadMode[] loadModes)
+        WriteableBitmap[] LoadDDS(string filePath, TextureLoadMode[] loadModes, bool fromSrgb = false)
         {
             try
             {
@@ -442,11 +448,12 @@ namespace SETextureEditor
                 // Step 1 convert using texconv
                 using var process = new System.Diagnostics.Process();
                 process.StartInfo.FileName = texconvPath;
-                process.StartInfo.Arguments = $"\"{filePath}\" -y -ft png -o \"{_tempDir}\"";
+                process.StartInfo.Arguments = $"\"{filePath}\" -y -ft png { (fromSrgb?"":"-srgb") } -o \"{_tempDir}\"";
                 process.StartInfo.UseShellExecute = false;
                 process.StartInfo.RedirectStandardOutput = true;
                 process.StartInfo.RedirectStandardError = true;
                 process.StartInfo.CreateNoWindow = true;
+                Debug.WriteLine("texconv.exe " + process.StartInfo.Arguments);
                 process.Start();
                 process.WaitForExit();
 
@@ -845,6 +852,14 @@ namespace SETextureEditor
                 groupName = "fallback_99";
             }
 
+            /* Requirements for textures:
+                Exactly 2048x2048 resolution, no more, no less!
+                All mipmaps
+                ColorMetal textures (_cm) need to be in the following format: BC7_UNORM_SRGB
+                NormalGloss textures (_ng) need to be in the following format: BC7_UNORM
+                Extension textures (_add) need to be in the following format: BC7_UNORM_SRGB
+            */
+
             var dir = Path.GetDirectoryName(fullFileName);
 
             #region XZ
@@ -858,7 +873,7 @@ namespace SETextureEditor
                 var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisXZ_add.dds");
                 if (SaveAddTexture(pngFileName, TextureAmbientOcclusionXZ, TextureEmissivenessXZ, TexturePaintabilityXZ))
                 {
-                    PngToDDS(pngFileName, ddsFileName);
+                    PngToDDS(pngFileName, ddsFileName, TextureType.Additive);
                 }
             }
             // _ForAxisXZ_cm.dds
@@ -868,7 +883,7 @@ namespace SETextureEditor
                 var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisXZ_cm.dds");
                 if (SaveCmTexture(pngFileName, TextureRgbXZ, TextureMetalnessXZ))
                 {
-                    PngToDDS(pngFileName, ddsFileName);
+                    PngToDDS(pngFileName, ddsFileName, TextureType.ColorMetalness);
                 }
             }
             // _ForAxisXZ_ng.dds
@@ -878,7 +893,7 @@ namespace SETextureEditor
                 var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisXZ_ng.dds");
                 if (SaveNgTexture(pngFileName, TextureNormalXZ, TextureGlossXZ))
                 {
-                    PngToDDS(pngFileName, ddsFileName);
+                    PngToDDS(pngFileName, ddsFileName, TextureType.NormalGloss);
                 }
             }
             #endregion
@@ -894,7 +909,7 @@ namespace SETextureEditor
                 var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisY_add.dds");
                 if (SaveAddTexture(pngFileName, TextureAmbientOcclusionY, TextureEmissivenessY, TexturePaintabilityY))
                 {
-                    PngToDDS(pngFileName, ddsFileName);
+                    PngToDDS(pngFileName, ddsFileName, TextureType.Additive);
                 }
             }
             // _ForAxisY_cm.dds
@@ -904,7 +919,7 @@ namespace SETextureEditor
                 var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisY_cm.dds");
                 if (SaveCmTexture(pngFileName, TextureRgbY, TextureMetalnessY))
                 {
-                    PngToDDS(pngFileName, ddsFileName);
+                    PngToDDS(pngFileName, ddsFileName, TextureType.ColorMetalness);
                 }
             }
             // _ForAxisY_ng.dds
@@ -914,15 +929,23 @@ namespace SETextureEditor
                 var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisY_ng.dds");
                 if (SaveNgTexture(pngFileName, TextureNormalY, TextureGlossY))
                 {
-                    PngToDDS(pngFileName, ddsFileName);
+                    PngToDDS(pngFileName, ddsFileName, TextureType.NormalGloss);
                 }
             }
             #endregion
 
         });
 
-        bool PngToDDS(string pngFileName, string ddsFileName)
+        enum TextureType
         {
+            Additive,
+            ColorMetalness,
+            NormalGloss
+        }
+
+        bool PngToDDS(string pngFileName, string ddsFileName, TextureType type)
+        {
+            //format = "BC7_UNORM_SRGB";
             try
             {
                 var localDir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
@@ -932,13 +955,34 @@ namespace SETextureEditor
                     MessageBox.Show("texconv.exe not found in the application directory.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     return false;
                 }
+
+                string format = type switch
+                {
+                    TextureType.Additive => "BC7_UNORM_SRGB",
+                    TextureType.ColorMetalness => "BC7_UNORM_SRGB",
+                    TextureType.NormalGloss => "BC7_UNORM",
+                    _ => throw new ArgumentOutOfRangeException(nameof(type), type, null)
+                };
+
+                if (type == TextureType.Additive)
+                {
+                    format += " -if POINT_DITHER_DIFFUSION";
+                }
+
+                var srgb = "-srgb";
+                if (type == TextureType.NormalGloss)
+                {
+                    srgb = ""; // Normal Gloss textures are not SRGB
+                }
+
                 using var process = new System.Diagnostics.Process();
                 process.StartInfo.FileName = texconvPath;
-                process.StartInfo.Arguments = $"\"{pngFileName}\" -y -ft dds -f BC7_UNORM_SRGB -o \"{System.IO.Path.GetDirectoryName(ddsFileName)}\"";
+                process.StartInfo.Arguments = "\"" + pngFileName + "\" -y "+srgb+" -ft dds -f " + format + " -sepalpha -m 0 -o \"" + System.IO.Path.GetDirectoryName(ddsFileName) + "\"";
                 process.StartInfo.UseShellExecute = false;
                 process.StartInfo.RedirectStandardOutput = true;
                 process.StartInfo.RedirectStandardError = true;
                 process.StartInfo.CreateNoWindow = true;
+                Debug.WriteLine("texconv.exe " + process.StartInfo.Arguments);
                 process.Start();
                 process.WaitForExit();
                 return File.Exists(ddsFileName);
