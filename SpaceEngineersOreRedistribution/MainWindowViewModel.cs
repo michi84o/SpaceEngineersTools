@@ -1141,10 +1141,9 @@ namespace SpaceEngineersOreRedistribution
                                 if (lastDepthIndex >= defaultDepthIndex)
                                     dive = false;
                             }
-                            // Give a 75% chance of staying at the same height if height is starting height
                             else if (lastDepthIndex == defaultDepthIndex)
                             {
-                                if (depthMod >= 0.75)
+                                if (depthMod >= 0.70) // Give a 70% chance of staying at the same height if height is starting height
                                 {
                                     // Flip to neighbor index
                                     if (lastDepthIndex <= 0) lastDepthIndex++;
@@ -1152,17 +1151,22 @@ namespace SpaceEngineersOreRedistribution
                                     else
                                     {
                                         // both directions possible
-                                        if (rnd.NextDouble() > 0.7 || ignoreTiers)
+                                        if (rnd.NextDouble() > 0.6 || ignoreTiers)
                                         {
-                                            // 30% chance of going up or down
+                                            // 40% chance of going up or down
                                             if (rnd.Next(2) == 0) lastDepthIndex--; else lastDepthIndex++;
                                         }
-                                        else // 70% chance of staying in the same tier
+                                        else // 60% chance of staying in the same tier
                                         {
                                             var oldTier = GetTier(lastDepthIndex);
                                             var tierDown = GetTier(lastDepthIndex + 1);
                                             var tierUp = GetTier(lastDepthIndex - 1);
-                                            if (tierDown != oldTier && tierUp == oldTier)
+                                            if (tierUp == oldTier && tierDown == oldTier)
+                                            {
+                                                // We are in the middle of a tier. Randomly go up or down
+                                                if (rnd.Next(2) == 0) lastDepthIndex--; else lastDepthIndex++;
+                                            }
+                                            else if (tierDown != oldTier && tierUp == oldTier)
                                                 lastDepthIndex--;
                                             else if (tierDown == oldTier && tierUp != oldTier)
                                                 lastDepthIndex++;

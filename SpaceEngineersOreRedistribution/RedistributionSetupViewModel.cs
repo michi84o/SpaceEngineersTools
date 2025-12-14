@@ -160,7 +160,7 @@ namespace SpaceEngineersOreRedistribution
         // Lets randomize this a bit:
         // Square of 2*28 pixels width and length with 1 ore means:
         // 1 ore in 3136 pixels
-        int _oreSpawnRate = 2000;
+        int _oreSpawnRate = 1000; // Updated to 1000 because it seems to be closer to original
         public int OreSpawnRate
         {
             get => _oreSpawnRate;

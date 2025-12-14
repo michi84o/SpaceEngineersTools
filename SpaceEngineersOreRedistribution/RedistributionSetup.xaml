@@ -118,7 +118,7 @@
                 <StackPanel Orientation="Horizontal" Grid.Row="6" >
                     <TextBlock Text="Randomly spawn ore every "/>
                     <TextBox Width="40" Text="{Binding OreSpawnRate, UpdateSourceTrigger=PropertyChanged}" HorizontalContentAlignment="Center" Margin="3,0,3,0"/>
-                    <TextBlock Text="pixels on average. (Default: 2000) "/>
+                    <TextBlock Text="pixels on average. (Default: 1000) "/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Grid.Row="7" >
                     <TextBlock Text="Seed" VerticalAlignment="Center"/>
