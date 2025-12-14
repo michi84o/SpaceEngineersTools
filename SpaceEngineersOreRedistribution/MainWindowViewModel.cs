@@ -10,6 +10,7 @@ using System.Data;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.Drawing.Imaging;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -593,9 +594,9 @@ namespace SpaceEngineersOreRedistribution
             max = 0;
             if (element == null) return;
             var eMin = element.Attribute("Min");
-            if (eMin != null) double.TryParse(eMin.Value, out min);
+            if (eMin != null) double.TryParse(eMin.Value, CultureInfo.InvariantCulture, out min);
             var eMax = element.Attribute("Max");
-            if (eMax != null) double.TryParse(eMax.Value, out max);
+            if (eMax != null) double.TryParse(eMax.Value, CultureInfo.InvariantCulture, out max);
         }
 
         BitmapImage _tileUp;
@@ -841,6 +842,9 @@ namespace SpaceEngineersOreRedistribution
 
         public ICommand RedistributeOreCommand => new RelayCommand(o =>
         {
+            // Command line arg -ignoretiers to not reduce tier jumps
+            bool ignoreTiers = Environment.GetCommandLineArgs().Any(x => x.Equals("-ignoretiers", StringComparison.InvariantCultureIgnoreCase));
+
             var sfd = new SaveFileDialog();
             sfd.Filter = "PNG Files|*.png";
             sfd.FileName = "specifyFolder.png";
@@ -946,6 +950,7 @@ namespace SpaceEngineersOreRedistribution
                 });
 
                 int spawnRate = setup.ViewModel.OreSpawnRate; // Default 3000
+                if (setup.ViewModel.SmallPlanetMode) spawnRate *= 2;
                 if (spawnRate < 100) spawnRate = 100;
                 else if (spawnRate > 2000000) spawnRate = 2000000;
 
@@ -963,6 +968,7 @@ namespace SpaceEngineersOreRedistribution
                         // Decide which ore is spawned
                         var info = setup.ViewModel.PickRandomOreWeighted(rnd);
                         var spawnSize = info.TypicalSize;
+                        if (setup.ViewModel.SmallPlanetMode) spawnSize *= 2;
                         var depthMin = info.TypicalDepthMin;
                         var depthMax = info.TypicalDepthMax;
 
@@ -1146,12 +1152,12 @@ namespace SpaceEngineersOreRedistribution
                                     else
                                     {
                                         // both directions possible
-                                        // 70% chance of staying in the same tier
-                                        if (rnd.NextDouble() > 0.7)
+                                        if (rnd.NextDouble() > 0.7 || ignoreTiers)
                                         {
+                                            // 30% chance of going up or down
                                             if (rnd.Next(2) == 0) lastDepthIndex--; else lastDepthIndex++;
                                         }
-                                        else
+                                        else // 70% chance of staying in the same tier
                                         {
                                             var oldTier = GetTier(lastDepthIndex);
                                             var tierDown = GetTier(lastDepthIndex + 1);

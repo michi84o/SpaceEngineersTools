@@ -82,6 +82,7 @@ namespace SpaceEngineersOreRedistribution
                 root.Add(new XAttribute("StdDevDepth", StdDevDepth));
                 root.Add(new XAttribute("OreSpawnRate", OreSpawnRate));
                 root.Add(new XAttribute("Seed", Seed));
+                root.Add(new XAttribute("SmallPlanet", SmallPlanetMode));
                 foreach (var oreInfo in OreInfos)
                 {
                     root.Add(oreInfo.ToXElement());
@@ -113,6 +114,7 @@ namespace SpaceEngineersOreRedistribution
                 if (int.TryParse(root.Attribute("StdDevDepth")?.Value, out var stdDevDepth)) StdDevDepth = stdDevDepth;
                 if (int.TryParse(root.Attribute("OreSpawnRate")?.Value, out var oresp)) OreSpawnRate = oresp;
                 if (int.TryParse(root.Attribute("Seed")?.Value, out var seed)) Seed= seed;
+                if (bool.TryParse(root.Attribute("SmallPlanet")?.Value, out var spm)) SmallPlanetMode = spm;
                 OreInfos.Clear();
                 foreach (var node in root.Elements("OreInfo"))
                 {
@@ -170,6 +172,13 @@ namespace SpaceEngineersOreRedistribution
         {
             get => _seed;
             set => SetProp(ref _seed, value);
+        }
+
+        bool _smallPlanetMode;
+        public bool SmallPlanetMode
+        {
+            get => _smallPlanetMode;
+            set => SetProp(ref _smallPlanetMode, value);
         }
 
         public Action ConfirmAction;

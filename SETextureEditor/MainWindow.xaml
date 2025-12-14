@@ -309,6 +309,12 @@
                 </Grid>
             </Grid>
         </ScrollViewer>
-
+        <Grid
+            Grid.Row="0" Grid.RowSpan="2" Background="White" Opacity=".5"
+            Visibility="{Binding Saving}">
+        </Grid>
+        <ProgressBar
+            Grid.Row="0" Grid.RowSpan="2" Visibility="{Binding Saving}"
+            Width="200" Height="25" IsIndeterminate="True" />
     </Grid>
 </Window>

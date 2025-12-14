@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Drawing;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -14,6 +15,16 @@ namespace SpaceEngineersOreRedistribution
 {
     class OreOverviewViewModel : PropChangeNotifier
     {
+        bool _useAmounts = false;
+        public bool UseAmounts
+        {
+            get => _useAmounts;
+            set
+            {
+                if (SetProp(ref _useAmounts, value))
+                    Refresh();
+            }
+        }
         public List<string> CalculationBases { get; } = new List<string>
         {
             "Spawn Weight",
@@ -63,13 +74,23 @@ namespace SpaceEngineersOreRedistribution
                             var ingotName = ingotNode.Attribute("name")?.Value;
                             if (string.IsNullOrEmpty(ingotName))
                                 continue;
-                            if (!double.TryParse(ingotNode.Attribute("amount")?.Value, out double amount))
+                            if (!double.TryParse(ingotNode.Attribute("amount")?.Value, CultureInfo.InvariantCulture, out double amount))
                                 amount = 0;
                             var ingotItem = new IngotItem { Name = ingotName, Amount = amount };
                             oreItem.Ingots.Add(ingotItem);
                         }
                         // Duplicates will be overwritten
                         _oreItems[oreName] = oreItem;
+                        // Normalize amounts
+                        var totalAmount = oreItem.Ingots.Sum(x => x.Amount);
+                        // Normalize amounts
+                        if (totalAmount > 0)
+                        {
+                            foreach (var ingot in oreItem.Ingots)
+                            {
+                                ingot.Amount /= totalAmount;
+                            }
+                        }
                     }
                     Refresh();
                 }
@@ -115,7 +136,7 @@ namespace SpaceEngineersOreRedistribution
                             baseItem = new OreOverviewItem
                             {
                                 Name = ingot.Name,
-                                Value = value,
+                                Value = value * (UseAmounts ? (float)ingot.Amount : 1f),
                                 FillBrush = DiagramColors.GetBrush(j++)
                             };
                             ItemsBase.Add(baseItem);

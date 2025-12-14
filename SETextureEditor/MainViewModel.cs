@@ -820,6 +820,12 @@ namespace SETextureEditor
         }, o => ContainsImage());
         #endregion
 
+        Visibility _saving = Visibility.Collapsed;
+        public Visibility Saving
+        {
+            get => _saving;
+            set => SetProp(ref _saving, value);
+        }
         public ICommand SaveCommand => new RelayCommand(o =>
         {
             SaveFileDialog saveFileDialog = new SaveFileDialog
@@ -831,110 +837,131 @@ namespace SETextureEditor
             if (saveFileDialog.ShowDialog() != true)
                 return;
 
-            var fullFileName = saveFileDialog.FileName;
-            var fileName = System.IO.Path.GetFileName(fullFileName);
-
-            string groupName = null;
-            foreach (var pattern in _fileNamePatterns)
+            Task.Run(() =>
             {
-                if (fileName.EndsWith(pattern, StringComparison.OrdinalIgnoreCase))
+                Saving = Visibility.Visible;
+                try
                 {
-                    // Found a matching file
-                    groupName = fileName.Substring(0, fileName.Length - pattern.Length);
-                    break;
-                }
-            }
+                    var fullFileName = saveFileDialog.FileName;
+                    var fileName = System.IO.Path.GetFileName(fullFileName);
 
-            if (groupName == null)
-            {
-                MessageBox.Show(
-                    "Selected file does not match any known texture group patterns. Using fallback filename.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                groupName = "fallback_99";
-            }
+                    string groupName = null;
+                    foreach (var pattern in _fileNamePatterns)
+                    {
+                        if (fileName.EndsWith(pattern, StringComparison.OrdinalIgnoreCase))
+                        {
+                            // Found a matching file
+                            groupName = fileName.Substring(0, fileName.Length - pattern.Length);
+                            break;
+                        }
+                    }
 
-            /* Requirements for textures:
-                Exactly 2048x2048 resolution, no more, no less!
-                All mipmaps
-                ColorMetal textures (_cm) need to be in the following format: BC7_UNORM_SRGB
-                NormalGloss textures (_ng) need to be in the following format: BC7_UNORM
-                Extension textures (_add) need to be in the following format: BC7_UNORM_SRGB
-            */
+                    if (groupName == null)
+                    {
+                        MessageBox.Show(
+                            "Selected file does not match any known texture group patterns. Using fallback filename.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        groupName = "fallback_99";
+                    }
 
-            var dir = Path.GetDirectoryName(fullFileName);
+                    /* Requirements for textures:
+                        Exactly 2048x2048 resolution, no more, no less!
+                        All mipmaps
+                        ColorMetal textures (_cm) need to be in the following format: BC7_UNORM_SRGB
+                        NormalGloss textures (_ng) need to be in the following format: BC7_UNORM
+                        Extension textures (_add) need to be in the following format: BC7_UNORM_SRGB
+                    */
 
-            #region XZ
-            // _ForAxisXZ_add.dds
-            // Additive
-            if (TextureAmbientOcclusionXZ != null &&
-                TextureEmissivenessXZ != null &&
-                TexturePaintabilityXZ != null)
-            {
-                var pngFileName = System.IO.Path.Combine(_tempDir, groupName + "_ForAxisXZ_add.png");
-                var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisXZ_add.dds");
-                if (SaveAddTexture(pngFileName, TextureAmbientOcclusionXZ, TextureEmissivenessXZ, TexturePaintabilityXZ))
-                {
-                    PngToDDS(pngFileName, ddsFileName, TextureType.Additive);
-                }
-            }
-            // _ForAxisXZ_cm.dds
-            if (TextureRgbXZ != null && TextureMetalnessXZ != null)
-            {
-                var pngFileName = System.IO.Path.Combine(_tempDir, groupName + "_ForAxisXZ_cm.png");
-                var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisXZ_cm.dds");
-                if (SaveCmTexture(pngFileName, TextureRgbXZ, TextureMetalnessXZ))
-                {
-                    PngToDDS(pngFileName, ddsFileName, TextureType.ColorMetalness);
-                }
-            }
-            // _ForAxisXZ_ng.dds
-            if (TextureNormalXZ != null && TextureGlossXZ != null)
-            {
-                var pngFileName = System.IO.Path.Combine(_tempDir, groupName + "_ForAxisXZ_ng.png");
-                var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisXZ_ng.dds");
-                if (SaveNgTexture(pngFileName, TextureNormalXZ, TextureGlossXZ))
-                {
-                    PngToDDS(pngFileName, ddsFileName, TextureType.NormalGloss);
-                }
-            }
-            #endregion
+                    var dir = Path.GetDirectoryName(fullFileName);
 
-            #region Y
-            // _ForAxisY_add.dds
-            // Additive
-            if (TextureAmbientOcclusionY != null &&
-                TextureEmissivenessY != null &&
-                TexturePaintabilityY != null)
-            {
-                var pngFileName = System.IO.Path.Combine(_tempDir, groupName + "_ForAxisY_add.png");
-                var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisY_add.dds");
-                if (SaveAddTexture(pngFileName, TextureAmbientOcclusionY, TextureEmissivenessY, TexturePaintabilityY))
-                {
-                    PngToDDS(pngFileName, ddsFileName, TextureType.Additive);
-                }
-            }
-            // _ForAxisY_cm.dds
-            if (TextureRgbY != null && TextureMetalnessY != null)
-            {
-                var pngFileName = System.IO.Path.Combine(_tempDir, groupName + "_ForAxisY_cm.png");
-                var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisY_cm.dds");
-                if (SaveCmTexture(pngFileName, TextureRgbY, TextureMetalnessY))
-                {
-                    PngToDDS(pngFileName, ddsFileName, TextureType.ColorMetalness);
-                }
-            }
-            // _ForAxisY_ng.dds
-            if (TextureNormalY != null && TextureGlossY != null)
-            {
-                var pngFileName = System.IO.Path.Combine(_tempDir, groupName + "_ForAxisY_ng.png");
-                var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisY_ng.dds");
-                if (SaveNgTexture(pngFileName, TextureNormalY, TextureGlossY))
-                {
-                    PngToDDS(pngFileName, ddsFileName, TextureType.NormalGloss);
-                }
-            }
-            #endregion
+                    bool saveOk = false;
 
-        });
+                    #region XZ
+                    // _ForAxisXZ_add.dds
+                    // Additive
+                    if (TextureAmbientOcclusionXZ != null &&
+                        TextureEmissivenessXZ != null &&
+                        TexturePaintabilityXZ != null)
+                    {
+                        var pngFileName = System.IO.Path.Combine(_tempDir, groupName + "_ForAxisXZ_add.png");
+                        var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisXZ_add.dds");
+                        RunOnUi(() => saveOk = SaveAddTexture(pngFileName, TextureAmbientOcclusionXZ, TextureEmissivenessXZ, TexturePaintabilityXZ));
+                        if (saveOk)
+                        {
+                            PngToDDS(pngFileName, ddsFileName, TextureType.Additive);
+                        }
+                    }
+                    // _ForAxisXZ_cm.dds
+                    if (TextureRgbXZ != null && TextureMetalnessXZ != null)
+                    {
+                        var pngFileName = System.IO.Path.Combine(_tempDir, groupName + "_ForAxisXZ_cm.png");
+                        var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisXZ_cm.dds");
+                        RunOnUi(() => saveOk = SaveCmTexture(pngFileName, TextureRgbXZ, TextureMetalnessXZ));
+                        if (saveOk)
+                        {
+                            PngToDDS(pngFileName, ddsFileName, TextureType.ColorMetalness);
+                        }
+                    }
+                    // _ForAxisXZ_ng.dds
+                    if (TextureNormalXZ != null && TextureGlossXZ != null)
+                    {
+                        var pngFileName = System.IO.Path.Combine(_tempDir, groupName + "_ForAxisXZ_ng.png");
+                        var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisXZ_ng.dds");
+                        RunOnUi(() => saveOk = SaveNgTexture(pngFileName, TextureNormalXZ, TextureGlossXZ));
+                        if (saveOk)
+                        {
+                            PngToDDS(pngFileName, ddsFileName, TextureType.NormalGloss);
+                        }
+                    }
+                    #endregion
+
+                    #region Y
+                    // _ForAxisY_add.dds
+                    // Additive
+                    if (TextureAmbientOcclusionY != null &&
+                        TextureEmissivenessY != null &&
+                        TexturePaintabilityY != null)
+                    {
+                        var pngFileName = System.IO.Path.Combine(_tempDir, groupName + "_ForAxisY_add.png");
+                        var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisY_add.dds");
+                        RunOnUi(() => saveOk = SaveAddTexture(pngFileName, TextureAmbientOcclusionY, TextureEmissivenessY, TexturePaintabilityY));
+                        if (saveOk)
+                        {
+                            PngToDDS(pngFileName, ddsFileName, TextureType.Additive);
+                        }
+                    }
+                    // _ForAxisY_cm.dds
+                    if (TextureRgbY != null && TextureMetalnessY != null)
+                    {
+                        var pngFileName = System.IO.Path.Combine(_tempDir, groupName + "_ForAxisY_cm.png");
+                        var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisY_cm.dds");
+                        RunOnUi(() => saveOk = SaveCmTexture(pngFileName, TextureRgbY, TextureMetalnessY));
+                        if (saveOk)
+                        {
+                            PngToDDS(pngFileName, ddsFileName, TextureType.ColorMetalness);
+                        }
+                    }
+                    // _ForAxisY_ng.dds
+                    if (TextureNormalY != null && TextureGlossY != null)
+                    {
+                        var pngFileName = System.IO.Path.Combine(_tempDir, groupName + "_ForAxisY_ng.png");
+                        var ddsFileName = System.IO.Path.Combine(dir, groupName + "_ForAxisY_ng.dds");
+                        RunOnUi(() => saveOk = SaveNgTexture(pngFileName, TextureNormalY, TextureGlossY));
+                        if (saveOk)
+                        {
+                            PngToDDS(pngFileName, ddsFileName, TextureType.NormalGloss);
+                        }
+                    }
+                    #endregion
+                }
+                finally { Saving = Visibility.Collapsed; }
+            });
+
+        }, o => Saving == Visibility.Collapsed);
+
+        void RunOnUi(Action action)
+        {
+            Application.Current.Dispatcher.Invoke(action);
+        }
 
         enum TextureType
         {

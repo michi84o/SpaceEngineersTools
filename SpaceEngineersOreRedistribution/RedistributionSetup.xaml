@@ -121,8 +121,9 @@
                     <TextBlock Text="pixels on average. (Default: 2000) "/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Grid.Row="7" >
-                    <TextBlock Text="Seed"/>
+                    <TextBlock Text="Seed" VerticalAlignment="Center"/>
                     <TextBox Width="40" Text="{Binding Seed, UpdateSourceTrigger=PropertyChanged}" HorizontalContentAlignment="Center" Margin="3,0,3,0"/>
+                    <CheckBox Content="Small Planet Mode (scale patches by 2x and reduce spawn rate by 50%)" VerticalAlignment="Center" Margin="3"/>
                 </StackPanel>
                 <TextBlock Grid.Row="2" Text="Ore Mapping for selected Ore: Depths 0-9 refer to these 10 mappings. Left gray bar in diagram is spawn probability." />
                 <Grid

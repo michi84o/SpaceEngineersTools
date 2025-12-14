@@ -1,173 +1,300 @@
 <?xml version="1.0"?>
 <oremap>
 
-<ore name="Stone">
- <ingot name="Iron"    amount="0.030" />
- <ingot name="Nickel"  amount="0.0024" />
- <ingot name="Silicon" amount="0.004" />
-</ore>
+	<ore name="Stone">
+		<ingot name="Iron"    amount="0.030" />
+		<ingot name="Nickel"  amount="0.0024" />
+		<ingot name="Silicon" amount="0.004" />
+	</ore>
 
-<ore name="Iron_01">
- <ingot name="Iron" amount="0.7" />
-</ore>
+	<ore name="Iron_01">
+		<ingot name="Iron" amount="0.7" />
+	</ore>
 
-<ore name="Iron_02">
- <ingot name="Iron" amount="0.7" />
-</ore>
+	<ore name="Iron_02">
+		<ingot name="Iron" amount="0.7" />
+	</ore>
 
-<ore name="Nickel_01">
- <ingot name="Nickel" amount="0.4" />
-</ore>
+	<ore name="Nickel_01">
+		<ingot name="Nickel" amount="0.4" />
+	</ore>
 
-<ore name="Cobalt_01">
- <ingot name="Cobalt" amount="0.3" />
-</ore>
+	<ore name="Cobalt_01">
+		<ingot name="Cobalt" amount="0.3" />
+	</ore>
 
-<ore name="Magnesium_01">
- <ingot name="Magnesium" amount="0.007" />
-</ore>
+	<ore name="Magnesium_01">
+		<ingot name="Magnesium" amount="0.007" />
+	</ore>
 
-<ore name="Silicon_01">
- <ingot name="Silicon" amount="0.7" />
-</ore>
+	<ore name="Silicon_01">
+		<ingot name="Silicon" amount="0.7" />
+	</ore>
 
-<ore name="Silver_01">
- <ingot name="Silver" amount="0.1" />
-</ore>
+	<ore name="Silver_01">
+		<ingot name="Silver" amount="0.1" />
+	</ore>
 
-<ore name="Gold_01">
- <ingot name="Gold" amount="0.01" />
-</ore>
+	<ore name="Gold_01">
+		<ingot name="Gold" amount="0.01" />
+	</ore>
 
-<ore name="Platinum_01">
- <ingot name="Platinum" amount="0.005" />
-</ore>
+	<ore name="Platinum_01">
+		<ingot name="Platinum" amount="0.005" />
+	</ore>
 
-<ore name="Uraninite_01">
- <ingot name="Uranium" amount="0.01" />
-</ore>
+	<ore name="Uraninite_01">
+		<ingot name="Uranium" amount="0.01" />
+	</ore>
 
-<ore name="Ice">
- <ingot name="Ice" amount="1" />
-</ore>
+	<ore name="Ice">
+		<ingot name="Ice" amount="1" />
+	</ore>
 
-<ore name="Ice_01">
- <ingot name="Ice" amount="1" />
-</ore>
+	<ore name="Ice_01">
+		<ingot name="Ice" amount="1" />
+	</ore>
 
-<ore name="Ice_02">
-	<ingot name="Ice" amount="1" />
-</ore>
+	<ore name="Ice_02">
+		<ingot name="Ice" amount="1" />
+	</ore>
 
-<ore name="Ice_03">
-	<ingot name="Ice" amount="1" />
-</ore>
+	<ore name="Ice_03">
+		<ingot name="Ice" amount="1" />
+	</ore>
 
-<!-- Better Stone -->
+	<!-- Another Stone Mod -->
 
-<ore name="Iron_01">
- <ingot name="Iron" amount="0.4" />
- <ingot name="Ice" amount="0.5" />
-</ore>
+	<ore name="Quartz_01">
+		<ingot name="Silicon" amount="0.4442" />
+		<ingot name="Iron" amount="0.035" />
+	</ore>
 
-<ore name="Iron_02">
- <ingot name="Iron" amount="0.9" />
-</ore>
+	<ore name="Dolomite_01">
+		<ingot name="Magnesium" amount="0.1318" />
+	</ore>
 
-  <ore name="Hapkeite_01">
-    <ingot name="Iron" amount="0.350" />
-    <ingot name="Silicon" amount="0.450" />
-  </ore>
-  <ore name="Heazlewoodite_01">
-    <ingot name="Nickel" amount="0.400" />
-    <ingot name="Ice" amount="0.150" />
-  </ore>
-  <ore name="Porphyry_01">
-    <ingot name="Gold" amount="0.006" />
-  </ore>
-  <ore name="Dolomite_01">
-    <ingot name="Magnesium" amount="0.007" />
-  </ore>
-  <ore name="Cattierite_01">
-    <ingot name="Cobalt" amount="0.270" />
-  </ore>
-  <ore name="Niggliite_01">
-    <ingot name="Platinum" amount="0.003" />
-  </ore>
-  <ore name="Carnotite_01">
-    <ingot name="Uranium" amount="0.001" />
-    <ingot name="Ice" amount="0.572" />
-  </ore>
-  <ore name="Glaucodot_01">
-    <ingot name="Iron" amount="0.234" />
-    <ingot name="Cobalt" amount="0.400" />
-  </ore>
-  <ore name="Sinoite_01">
-    <ingot name="Silicon" amount="0.620" />
-    <ingot name="Ice" amount="0.440" />
-  </ore>
-  <ore name="Pyrite_01">
-    <ingot name="Iron" amount="0.550" />
-    <ingot name="Gold" amount="0.001" />
-  </ore>
-  <ore name="Olivine_01">
-    <ingot name="Silicon" amount="0.180" />
-    <ingot name="Magnesium" amount="0.008" />
-    <ingot name="Ice" amount="0.350" />
-  </ore>
-  <ore name="Cooperite_01">
-    <ingot name="Nickel" amount="0.360" />
-    <ingot name="Platinum" amount="0.002" />
-  </ore>
-  <ore name="Quartz_01">
-    <ingot name="Silicon" amount="0.490" />
-    <ingot name="Ice" amount="1.120" />
-  </ore>
-  <ore name="Galena_01">
-    <ingot name="Silver" amount="0.035" />
-  </ore>
-  <ore name="Chlorargyrite_01">
-    <ingot name="Silver" amount="0.064" />
-    <ingot name="Ice" amount="0.002" />
-  </ore>
-  <ore name="Electrum_01">
-    <ingot name="Silver" amount="0.045" />
-    <ingot name="Gold" amount="0.004" />
-  </ore>
-  <ore name="Sperrylite_01">
-    <ingot name="Platinum" amount="0.003" />
-  </ore>
-  <ore name="Autunite_01">
-    <ingot name="Uranium" amount="0.004" />
-  </ore>
-  <ore name="Akimotoite_01">
-    <ingot name="Silicon" amount="0.220" />
-    <ingot name="Magnesium" amount="0.005" />
-  </ore>
-  <ore name="Wadsleyite_01">
-    <ingot name="Silicon" amount="0.300" />
-    <ingot name="Magnesium" amount="0.003" />
-  </ore>
-  <ore name="Taenite_01">
-    <ingot name="Iron" amount="0.350" />
-    <ingot name="Nickel" amount="0.200" />
-  </ore>
-  <ore name="Cohenite_01">
-    <ingot name="Nickel" amount="0.210" />
-    <ingot name="Cobalt" amount="0.180" />
-  </ore>
-  <ore name="Kamacite_01">
-    <ingot name="Iron" amount="0.284" />
-    <ingot name="Nickel" amount="0.174" />
-    <ingot name="Cobalt" amount="0.100" />
-  </ore>
-  <ore name="Uraniaurite_01">
-    <ingot name="Gold" amount="0.003" />
-    <ingot name="Uranium" amount="0.003" />
-  </ore>
-  <ore name="Petzite_01">
-    <ingot name="Silver" amount="0.045" />
-    <ingot name="Gold" amount="0.004" />
-  </ore>
+	<ore name="Serpentinite_01">
+		<ingot name="Silicon" amount="0.2028" />
+		<ingot name="Magnesium" amount="0.2631" />
+		<ingot name="Ice" amount="0.1299" />
+	</ore>
+
+	<ore name="Acanthite_01">
+		<ingot name="Silver" amount="0.1742" />
+	</ore>
+
+	<ore name="Coffinite_01">
+		<ingot name="Silicon" amount="0.0089" />
+		<ingot name="Uranium" amount="0.1506" />
+		<ingot name="Ice" amount="0.0057" />
+	</ore>
+
+	<ore name="Limonite_01">
+		<ingot name="Ice" amount="0.6159" />
+		<ingot name="Iron" amount="0.0199" />
+	</ore>
+
+	<ore name="Glaucodot_01">
+		<ingot name="Iron" amount="0.0823" />
+		<ingot name="Nickel" amount="0.0142" />
+		<ingot name="Cobalt" amount="0.2558" />
+	</ore>
+
+	<ore name="Skutterudite_01">
+		<ingot name="Iron" amount="0.0298" />
+		<ingot name="Nickel" amount="0.1036" />
+		<ingot name="Cobalt" amount="0.0727" />
+	</ore>
+
+	<ore name="Garnierite_01">
+		<ingot name="Silicon" amount="0.0841" />
+		<ingot name="Nickel" amount="0.3473" />
+		<ingot name="Magnesium" amount="0.0658" />
+		<ingot name="Ice" amount="0.1299" />
+	</ore>
+
+	<ore name="Cattierite_01">
+		<ingot name="Cobalt" amount="0.3834" />
+	</ore>
+
+	<ore name="Troilite_01">
+		<ingot name="Iron" amount="0.6355" />
+	</ore>
+
+	<ore name="Kamacite_01">
+		<ingot name="Iron" amount="0.72" />
+		<ingot name="Nickel" amount="0.08" />
+	</ore>
+
+	<ore name="Taenite_01">
+		<ingot name="Iron" amount="0.6" />
+		<ingot name="Nickel" amount="0.2" />
+	</ore>
+
+	<ore name="Hematite_01">
+		<ingot name="Iron" amount="0.6992" />
+	</ore>
+
+	<ore name="Magnetite_01">
+		<ingot name="Iron" amount="0.6355" />
+	</ore>
+
+	<ore name="Pentlandite_01">
+		<ingot name="Iron" amount="0.3256" />
+		<ingot name="Nickel" amount="0.3425" />
+	</ore>
+
+	<ore name="Cobaltite_01">
+		<ingot name="Iron" amount="0.0269" />
+		<ingot name="Cobalt" amount="0.2558" />
+	</ore>
+
+	<ore name="Sperrylite_01">
+		<ingot name="Platinum" amount="0.0057" />
+	</ore>
+
+	<ore name="Electrum_01">
+		<ingot name="Silver" amount="0.08" />
+		<ingot name="Gold" amount="0.12" />
+	</ore>
+
+	<ore name="Brannerite_01">
+		<ingot name="Iron" amount="0.002" />
+		<ingot name="Uranium" amount="0.1107" />
+	</ore>
+
+	<ore name="Petzite_01">
+		<ingot name="Silver" amount="0.0834" />
+		<ingot name="Gold" amount="0.0508" />
+	</ore>
+
+	<ore name="Galena_01">
+		<ingot name="Iron" amount="0.005" />
+		<ingot name="Silver" amount="0.01" />
+	</ore>
+
+	<ore name="Carnotite_01">
+		<ingot name="Uranium" amount="0.1055" />
+		<ingot name="Ice" amount="0.0120" />
+	</ore>
+
+	<ore name="Fayalite_01">
+		<ingot name="Iron" amount="0.5479" />
+		<ingot name="Silicon" amount="0.1379" />
+	</ore>
+
+	<ore name="Forsterite_01">
+		<ingot name="Silicon" amount="0.0999" />
+		<ingot name="Magnesium" amount="0.1727" />
+	</ore>
+
+
+	<!-- Better Stone -->
+
+	<!-- <ore name="Iron_01"> -->
+	<!-- <ingot name="Iron" amount="0.4" /> -->
+	<!-- <ingot name="Ice" amount="0.5" /> -->
+	<!-- </ore> -->
+
+	<!-- <ore name="Iron_02"> -->
+	<!-- <ingot name="Iron" amount="0.9" /> -->
+	<!-- </ore> -->
+
+	<!-- <ore name="Hapkeite_01"> -->
+	<!-- <ingot name="Iron" amount="0.350" /> -->
+	<!-- <ingot name="Silicon" amount="0.450" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Heazlewoodite_01"> -->
+	<!-- <ingot name="Nickel" amount="0.400" /> -->
+	<!-- <ingot name="Ice" amount="0.150" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Porphyry_01"> -->
+	<!-- <ingot name="Gold" amount="0.006" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Dolomite_01"> -->
+	<!-- <ingot name="Magnesium" amount="0.007" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Cattierite_01"> -->
+	<!-- <ingot name="Cobalt" amount="0.270" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Niggliite_01"> -->
+	<!-- <ingot name="Platinum" amount="0.003" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Carnotite_01"> -->
+	<!-- <ingot name="Uranium" amount="0.001" /> -->
+	<!-- <ingot name="Ice" amount="0.572" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Glaucodot_01"> -->
+	<!-- <ingot name="Iron" amount="0.234" /> -->
+	<!-- <ingot name="Cobalt" amount="0.400" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Sinoite_01"> -->
+	<!-- <ingot name="Silicon" amount="0.620" /> -->
+	<!-- <ingot name="Ice" amount="0.440" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Pyrite_01"> -->
+	<!-- <ingot name="Iron" amount="0.550" /> -->
+	<!-- <ingot name="Gold" amount="0.001" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Olivine_01"> -->
+	<!-- <ingot name="Silicon" amount="0.180" /> -->
+	<!-- <ingot name="Magnesium" amount="0.008" /> -->
+	<!-- <ingot name="Ice" amount="0.350" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Cooperite_01"> -->
+	<!-- <ingot name="Nickel" amount="0.360" /> -->
+	<!-- <ingot name="Platinum" amount="0.002" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Quartz_01"> -->
+	<!-- <ingot name="Silicon" amount="0.490" /> -->
+	<!-- <ingot name="Ice" amount="1.120" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Galena_01"> -->
+	<!-- <ingot name="Silver" amount="0.035" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Chlorargyrite_01"> -->
+	<!-- <ingot name="Silver" amount="0.064" /> -->
+	<!-- <ingot name="Ice" amount="0.002" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Electrum_01"> -->
+	<!-- <ingot name="Silver" amount="0.045" /> -->
+	<!-- <ingot name="Gold" amount="0.004" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Sperrylite_01"> -->
+	<!-- <ingot name="Platinum" amount="0.003" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Autunite_01"> -->
+	<!-- <ingot name="Uranium" amount="0.004" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Akimotoite_01"> -->
+	<!-- <ingot name="Silicon" amount="0.220" /> -->
+	<!-- <ingot name="Magnesium" amount="0.005" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Wadsleyite_01"> -->
+	<!-- <ingot name="Silicon" amount="0.300" /> -->
+	<!-- <ingot name="Magnesium" amount="0.003" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Taenite_01"> -->
+	<!-- <ingot name="Iron" amount="0.350" /> -->
+	<!-- <ingot name="Nickel" amount="0.200" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Cohenite_01"> -->
+	<!-- <ingot name="Nickel" amount="0.210" /> -->
+	<!-- <ingot name="Cobalt" amount="0.180" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Kamacite_01"> -->
+	<!-- <ingot name="Iron" amount="0.284" /> -->
+	<!-- <ingot name="Nickel" amount="0.174" /> -->
+	<!-- <ingot name="Cobalt" amount="0.100" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Uraniaurite_01"> -->
+	<!-- <ingot name="Gold" amount="0.003" /> -->
+	<!-- <ingot name="Uranium" amount="0.003" /> -->
+	<!-- </ore> -->
+	<!-- <ore name="Petzite_01"> -->
+	<!-- <ingot name="Silver" amount="0.045" /> -->
+	<!-- <ingot name="Gold" amount="0.004" /> -->
+	<!-- </ore> -->
 
 </oremap>
